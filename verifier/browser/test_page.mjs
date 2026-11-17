@@ -1,12 +1,13 @@
 // Headless test of amep-verify.html: runs the page's own inline script in a VM with WebCrypto (Node >= 22)
 // and a minimal DOM stub, clicks "Run all vectors" and "Verify packet", and checks the results.
-// Run from the repo root: node verifier/browser/test_page.mjs
+// Run from the repo root: node verifier/browser/test_page.mjs [page.html]  (default: amep-verify.html)
 import { readFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 
-const html = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "amep-verify.html"), "utf8");
+const page = process.argv[2] ? resolve(process.argv[2]) : join(dirname(fileURLToPath(import.meta.url)), "amep-verify.html");
+const html = readFileSync(page, "utf8");
 const data = html.match(/<script id="amep-data" type="application\/json">([\s\S]*?)<\/script>/)[1];
 const script = html.match(/<script>\n([\s\S]*?)<\/script>/)[1];
 

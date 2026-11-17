@@ -45,6 +45,8 @@ The evidence format is AMEP (Agentic Mandate Evidence Protocol), an open specifi
 npx --package @stafordtituss/amep@0.2.0-alpha.5 amep-protocol check-suite .
 ```
 
+Or, with no install and no network, open [`verify.html`](verify.html) in a current browser and click "Run all vectors". It embeds the 20 vectors and the JavaScript verifier, and checks signatures with the browser's WebCrypto.
+
 Both verifiers agree with the expected outcome on all 20 vectors. `generate.py` regenerates them from a checkout of https://github.com/stafordtituss/amep.
 
 The keys are deterministic **test** keys derived from public labels. They protect nothing and must not be reused. The folder contains no personal data: every identifier is fictitious.

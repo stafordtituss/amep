@@ -1,17 +1,24 @@
 // Builds verifier/browser/amep-verify.html: a single offline page that runs the shared evaluation core
 // (packages/js/src/core.mjs) with WebCrypto Ed25519, embeds the conformance suite, and lets anyone
 // paste a packet. Run from the repo root: node verifier/browser/build.mjs
+// Optional arguments build the same page over another vector set (a folder with keys.json, positive/, must-reject/):
+//   node verifier/browser/build.mjs <vectors dir> <output .html> "<page title>"
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const [argDir, argOut, argTitle] = process.argv.slice(2);
+const vecDir = argDir ? resolve(argDir) : join(root, "vectors");
+const outFile = argOut ? resolve(argOut) : join(root, "verifier/browser/amep-verify.html");
+const title = argTitle || "AMEP Verifier";
 const core = readFileSync(join(root, "packages/js/src/core.mjs"), "utf8").replace(/^export /gm, "");
-const keys = JSON.parse(readFileSync(join(root, "vectors/keys.json"), "utf8"));
+const keys = JSON.parse(readFileSync(join(vecDir, "keys.json"), "utf8"));
 const suite = [];
 for (const sub of ["positive", "must-reject"])
-  for (const f of readdirSync(join(root, "vectors", sub)).filter(f => f.endsWith(".json")).sort())
-    suite.push({ file: `${sub}/${f}`, ...JSON.parse(readFileSync(join(root, "vectors", sub, f), "utf8")) });
+  for (const f of readdirSync(join(vecDir, sub)).filter(f => f.endsWith(".json")).sort())
+    suite.push({ file: `${sub}/${f}`, ...JSON.parse(readFileSync(join(vecDir, sub, f), "utf8")) });
+const htmlEsc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const embed = JSON.stringify({ keys, suite }).replace(/</g, "\\u003c");
 
 const html = `<!doctype html>
@@ -19,7 +26,7 @@ const html = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AMEP Verifier</title>
+<title>${htmlEsc(title)}</title>
 <style>
 :root { --bg:#f7f8fa; --panel:#ffffff; --text:#1b1f24; --muted:#5b6470; --line:#dde1e6; --accent:#2457c5;
   --ok:#1a7f45; --ok-bg:#e6f4ec; --bad:#b42318; --bad-bg:#fdecea; --warn:#9a6700; --warn-bg:#fff4d6; }
@@ -53,7 +60,7 @@ code { font:12.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
 </head>
 <body>
 <main>
-<h1>AMEP Verifier</h1>
+<h1>${htmlEsc(title)}</h1>
 <p class="lead">Checks AMEP v0.2 evidence packets entirely in this page. Nothing is uploaded. Signatures are verified with your browser's WebCrypto Ed25519.</p>
 <p id="unsupported">This browser does not support Ed25519 in WebCrypto, so signatures cannot be checked here. Use a current Chrome, Edge, Safari or Firefox, or the command-line verifiers.</p>
 
@@ -119,7 +126,7 @@ document.getElementById("run-suite").onclick = async () => {
 };
 
 document.getElementById("load-example").onclick = () => {
-  const v = DATA.suite.find(v => v.file.includes("revoked-root-with-live-child")) || DATA.suite[0];
+  const v = DATA.suite.find(v => v.file.includes("revoked-root-with-live-child") || v.file.includes("root-revoked-before-action")) || DATA.suite[0];
   document.getElementById("packet").value = JSON.stringify(v.packet, null, 2);
   document.getElementById("keys").value = JSON.stringify(DATA.keys, null, 2);
 };
@@ -140,5 +147,5 @@ ed25519Supported().then(ok => { if (!ok) document.getElementById("unsupported").
 </body>
 </html>
 `;
-writeFileSync(join(root, "verifier/browser/amep-verify.html"), html);
-console.log(`wrote verifier/browser/amep-verify.html (${suite.length} vectors, ${Math.round(html.length / 1024)} KB)`);
+writeFileSync(outFile, html);
+console.log(`wrote ${outFile} (${suite.length} vectors, ${Math.round(html.length / 1024)} KB)`);
