@@ -9,7 +9,7 @@ Expires: 21 May 2027
 
 
            Continuity Evaluation of Agent Delegation Records
-             draft-selvaraj-audit-continuity-evaluation-00
+            draft-stafordtituss-agentic-mandate-evidence-00
 
 Abstract
 

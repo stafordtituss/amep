@@ -1146,7 +1146,7 @@ Suite: 95 vectors (25 positive, 70 must-reject).
 |---|---|
 | OAuth Token Exchange, Transaction Tokens, Cross App Access / ID-JAG | Sources of mandates and delegation. AMEP verifies that effects stayed within them. |
 | OpenID AuthZEN (+ Approval, Obligations) | Decision transport. A ContinuityDecision is an AuthZEN decision plus evidence. |
-| IETF AUDIT | Record layer. AMEP is the continuity-evaluation profile over AUDIT records (see `draft-…-audit-continuity-evaluation`). |
+| IETF AUDIT | Record layer. AMEP is the continuity-evaluation profile over AUDIT records (see `draft-stafordtituss-agentic-mandate-evidence`). |
 | IETF SCITT | Transparency for AMEP objects and checkpoints. |
 | draft-sharif-agent-audit-trail | Logging format that can supply Invocation and Effect evidence. |
 | Agent Receipts (W3C VC) | One possible encoding of ExecutedEffectReceipt. |

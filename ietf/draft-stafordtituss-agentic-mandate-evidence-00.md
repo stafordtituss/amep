@@ -2,7 +2,7 @@
 title: "Continuity Evaluation of Agent Delegation Records"
 abbrev: "Agent Continuity Evaluation"
 category: info
-docname: draft-selvaraj-audit-continuity-evaluation-00
+docname: draft-stafordtituss-agentic-mandate-evidence-00
 submissiontype: IETF
 number:
 date:
