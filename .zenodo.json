@@ -1,0 +1,33 @@
+{
+  "title": "AMEP: Agentic Mandate Evidence Protocol",
+  "upload_type": "software",
+  "description": "<p>AMEP is an open protocol for proving that actions taken by AI agents stayed within the authority a person delegated. It defines signed evidence objects for each link from a person's mandate to an independently observed effect, a deterministic three-valued evaluation (preserved, violated, unresolved) that names the invariant that broke, and a conformance suite of 95 vectors with two independent reference verifiers (Python and JavaScript).</p><p>This archive contains the specification (v0.2.0-draft.4), its bindings and profiles, JSON Schemas and CDDL, the conformance vectors, and the reference packages.</p>",
+  "creators": [
+    {
+      "name": "Selvaraj, Staford Titus",
+      "affiliation": "Independent"
+    }
+  ],
+  "license": "Apache-2.0",
+  "keywords": [
+    "AI agents",
+    "delegation",
+    "authorization",
+    "audit evidence",
+    "open standard",
+    "AMEP"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://datatracker.ietf.org/doc/draft-stafordtituss-agentic-mandate-evidence/",
+      "relation": "isDocumentedBy",
+      "resource_type": "publication-other"
+    },
+    {
+      "identifier": "https://github.com/stafordtituss/amep",
+      "relation": "isSupplementTo",
+      "resource_type": "software"
+    }
+  ],
+  "version": "0.2.0-draft.4"
+}
