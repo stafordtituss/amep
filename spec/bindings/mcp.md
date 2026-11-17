@@ -12,18 +12,28 @@ The key words MUST, SHOULD and MAY are used as in BCP 14 (RFC 2119, RFC 8174).
 
 ## 1. Capability negotiation
 
-A party that supports this binding advertises it during initialization, under the `experimental` capabilities object (or under MCP's extension mechanism once one is standardized), using the identifier `dev.amep/v0.2`:
+This binding is an MCP extension with the identifier **`io.github.stafordtituss/amep-evidence`**, negotiated through MCP's `extensions` capability. It is proposed to MCP as an Extensions Track SEP (`proposals/mcp-sep-amep-evidence.md`).
+
+A server advertises it under `capabilities.extensions` in its `server/discover` result (or its `initialize` result for protocol versions up to `2025-11-25`):
 
 ```json
-"capabilities": { "experimental": { "dev.amep/v0.2": { "effect_receipts": true, "keys": "https://tools.example/.well-known/amep-keys.json" } } }
+"extensions": { "io.github.stafordtituss/amep-evidence": { "revision": "0.2", "effectReceipts": true, "keys": "https://tools.example/.well-known/amep-keys.json" } }
+```
+
+A client advertises it under `extensions` in `_meta["io.modelcontextprotocol/clientCapabilities"]` on each request (or in its `initialize` request for earlier protocol versions):
+
+```json
+"io.github.stafordtituss/amep-evidence": { "revision": "0.2", "wantsReceipts": true }
 ```
 
 | Member | Meaning |
 |---|---|
-| `effect_receipts` | The server returns `dev.amep/effect_receipt` in tool results (Section 3). |
-| `keys` | Where the party's AMEP key set is published (core 12.4). |
+| `revision` | The AMEP revision implemented; `"0.2"` for this document. |
+| `effectReceipts` | (server) The server returns effect receipts in tool results (Section 3). |
+| `keys` | (server) Where the server's AMEP key set is published (core 12.4). |
+| `wantsReceipts` | (client) The client wants receipts for this request. A server MUST NOT return receipts otherwise. |
 
-A party MUST NOT send the `_meta` members below to a peer that has not advertised the capability, except `dev.amep/invocation_id`, which is harmless to ignore.
+If either peer does not advertise the extension, both behave as in the core protocol.
 
 ## 2. Request metadata
 
@@ -31,17 +41,17 @@ A client or gateway calling `tools/call` SHOULD add to the request's `_meta`:
 
 | Key | Value |
 |---|---|
-| `dev.amep/invocation_id` | the AMEP Invocation `id` for this call |
-| `dev.amep/mandate_ref` | the `authority_ref` the call is made under |
+| `io.github.stafordtituss/amep-invocation-id` | the AMEP Invocation `id` for this call |
+| `io.github.stafordtituss/amep-mandate-ref` | the `authority_ref` the call is made under |
 | `traceparent` | W3C Trace Context of the call (core 4.3) |
 
 A server MUST NOT treat these references as authorization. They are for correlation only. Authorization comes from the transport's own credentials.
 
 ## 3. Effect receipts (L3)
 
-A server that advertised `effect_receipts` SHOULD return an ExecutedEffectReceipt (core 5.9) in the tool result's `_meta`, under `dev.amep/effect_receipt`:
+A server that advertised `effectReceipts`, and received a request with `wantsReceipts: true`, SHOULD return an ExecutedEffectReceipt (core 5.9) in the tool result's `_meta`, under `io.github.stafordtituss/amep-effect-receipt`:
 
-- `invocation` is the `dev.amep/invocation_id` from the request;
+- `invocation` is the `io.github.stafordtituss/amep-invocation-id` from the request;
 - `assurance` is `L3`, and `observed_by` names the server;
 - `executed` describes what the server actually did, not what was requested;
 - it is signed by a key with role `observer` that the server publishes.
