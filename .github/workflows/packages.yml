@@ -48,7 +48,7 @@ jobs:
       - name: License files in the package match the repository
         run: cmp LICENSE-CODE packages/js/LICENSE && cmp NOTICE packages/js/NOTICE
       - name: Unit tests
-        run: node --test packages/js/test/
+        run: node --test packages/js/test/*.test.mjs
       - name: Pack, install into a clean project, and run the installed CLI
         run: |
           (cd packages/js && npm pack --pack-destination /tmp)

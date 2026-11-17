@@ -39,7 +39,7 @@ jobs:
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
-      - run: node --test packages/js/test/
+      - run: node --test packages/js/test/*.test.mjs
       - run: npm publish --provenance --access public
         working-directory: packages/js
         env:
