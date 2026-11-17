@@ -53,6 +53,6 @@ jobs:
         run: |
           (cd packages/js && npm pack --pack-destination /tmp)
           mkdir /tmp/app && cd /tmp/app && npm init -y > /dev/null
-          npm install --no-audit --no-fund /tmp/amep-*.tgz
+          npm install --no-audit --no-fund /tmp/*amep-*.tgz
           npx amep-protocol version
           npx amep-protocol check-suite "$GITHUB_WORKSPACE/vectors"

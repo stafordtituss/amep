@@ -1,11 +1,11 @@
-# amep (JavaScript)
+# @stafordtituss/amep (JavaScript)
 
 Verify and produce **AMEP™** (Agentic Mandate Evidence Protocol) evidence: signed records proving that what an AI agent actually did stayed within the authority a person delegated.
 
 Specification and conformance suite: https://github.com/stafordtituss/amep
 
 ```
-npm install amep
+npm install @stafordtituss/amep
 ```
 
 Node.js 20 or later. No dependencies.
@@ -13,13 +13,13 @@ Node.js 20 or later. No dependencies.
 ## Verify a packet
 
 ```
-npx amep-protocol verify packet.json --keys keys.json
+npx -p @stafordtituss/amep amep-protocol verify packet.json --keys keys.json
 ```
 
 The exit code is 0 for `preserved`, 1 for `violated` and 2 for `unresolved`. `--json` prints machine-readable results; `--state` and `--state-out` carry approval use and risk budgets across a stream of packets.
 
 ```js
-import { verifyPacket } from "amep";
+import { verifyPacket } from "@stafordtituss/amep";
 
 const { verdict, results } = verifyPacket(packet, keys);
 console.log(verdict.outcome, verdict.invariant);
@@ -28,7 +28,7 @@ console.log(verdict.outcome, verdict.invariant);
 ## Produce evidence
 
 ```js
-import { Key, keyset, sdk } from "amep";
+import { Key, keyset, sdk } from "@stafordtituss/amep";
 
 const issuer = Key.generate("issuer-1", ["issuer", "approver"]);
 const host = Key.generate("host-1", ["host"]);
@@ -49,6 +49,6 @@ A key refuses to sign object kinds its roles don't allow.
 
 ## In the browser
 
-`import { evaluate, verdict } from "amep/core"` has no Node.js imports. Pass your own signature check (for example WebCrypto Ed25519, verified ahead of time) as the third argument to `evaluate`.
+`import { evaluate, verdict } from "@stafordtituss/amep/core"` has no Node.js imports. Pass your own signature check (for example WebCrypto Ed25519, verified ahead of time) as the third argument to `evaluate`.
 
 License: Apache 2.0. "AMEP" is a trademark of Staford Titus Selvaraj.

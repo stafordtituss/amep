@@ -4,5 +4,5 @@
 export { evaluate, verdict, canon, digest, approvalDigest, toTime, isGuardrail } from "./core.mjs";
 export { sigOk, verifyPacket, Key, keyset, ROLES } from "./node.mjs";
 export * as sdk from "./sdk.mjs";
-export const VERSION = "0.2.0-alpha.4";
+export const VERSION = "0.2.0-alpha.5";
 export const SPEC_VERSION = "0.2.0-draft.4";

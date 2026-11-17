@@ -14,8 +14,8 @@ AMEP defines portable, signed evidence for that chain, from a person's mandate t
 
 | Language | Package | Install |
 |---|---|---|
-| Python 3.10+ | `amep-protocol` | `pip install amep-protocol` |
-| Node.js 20+ | `amep` | `npm install amep` |
+| Python 3.10+ | `amep-protocol` | `pip install --pre amep-protocol` |
+| Node.js 20+ | `@stafordtituss/amep` | `npm install @stafordtituss/amep` |
 
 Both include a verifier, a producer SDK (keys, signing, and builders for every AMEP object) and the `amep-protocol` command-line tool:
 
@@ -25,7 +25,7 @@ amep-protocol keygen --kid issuer-1 --roles issuer,approver --out issuer-1
 amep-protocol check-suite vectors/
 ```
 
-See `packages/python/README.md` and `packages/js/README.md`. The packages are not yet published; see `PUBLISHING.md`.
+See `packages/python/README.md` and `packages/js/README.md`. Published at [amep-protocol on PyPI](https://pypi.org/project/amep-protocol/) and [@stafordtituss/amep on npm](https://www.npmjs.com/package/@stafordtituss/amep); releases are described in `PUBLISHING.md`.
 
 ## What's here
 
@@ -37,7 +37,7 @@ See `packages/python/README.md` and `packages/js/README.md`. The packages are no
 | `schemas/` | JSON Schemas (one per object) and CDDL |
 | `vectors/` | The conformance suite: positive and must-reject packets |
 | `packages/python/` | The `amep-protocol` Python package: verifier, SDK, CLI |
-| `packages/js/` | The `amep` npm package: the same, in JavaScript (independent implementation) |
+| `packages/js/` | The `@stafordtituss/amep` npm package: the same, in JavaScript (independent implementation) |
 | `verifier/python/` | Conformance-vector generator (uses the Python package) |
 | `verifier/typescript/` | Repository CLI for the JavaScript verifier |
 | `verifier/browser/` | The JavaScript verifier as an offline web page |
