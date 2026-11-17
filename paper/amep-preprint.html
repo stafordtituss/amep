@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AMEP: Verifiable Evidence That Agent Actions Stayed Within Delegated Authority</title>
+<style>
+  @page { size: Letter; margin: 22mm 20mm 22mm 20mm; }
+  body { font-family: "Times New Roman", Times, serif; font-size: 10.5pt; line-height: 1.38; color: #000; max-width: 175mm; margin: 0 auto; }
+  h1 { font-size: 17pt; text-align: center; margin: 0 0 6pt; line-height: 1.2; }
+  .authors { text-align: center; font-size: 11pt; margin-bottom: 2pt; }
+  .affil { text-align: center; font-size: 9.5pt; margin-bottom: 14pt; }
+  .abstract { margin: 0 8mm 12pt; font-size: 9.8pt; }
+  .abstract b { display: block; text-align: center; margin-bottom: 3pt; }
+  .keywords { margin: 0 8mm 14pt; font-size: 9.3pt; }
+  h2 { font-size: 12pt; margin: 14pt 0 5pt; }
+  h3 { font-size: 10.8pt; margin: 10pt 0 4pt; font-style: italic; }
+  p { margin: 0 0 6pt; text-align: justify; }
+  table { border-collapse: collapse; width: 100%; font-size: 9pt; margin: 6pt 0 4pt; page-break-inside: avoid; }
+  th, td { border-top: 0.5pt solid #000; border-bottom: 0.5pt solid #000; padding: 2.5pt 4pt; text-align: left; vertical-align: top; }
+  th { border-top: 1pt solid #000; }
+  .cap { font-size: 9pt; text-align: center; margin: 2pt 0 10pt; }
+  code { font-family: "Courier New", monospace; font-size: 8.8pt; }
+  pre { font-family: "Courier New", monospace; font-size: 8.4pt; line-height: 1.25; background: #f4f4f4; padding: 6pt; page-break-inside: avoid; white-space: pre-wrap; }
+  ol.refs { font-size: 8.9pt; padding-left: 18pt; }
+  ol.refs li { margin-bottom: 2.5pt; }
+  .note { font-size: 8.8pt; color: #222; }
+  ul { margin: 0 0 6pt; padding-left: 16pt; }
+  li { margin-bottom: 2pt; }
+</style>
+</head>
+<body>
+
+<h1>AMEP: Verifiable Evidence That Agent Actions<br>Stayed Within Delegated Authority</h1>
+<div class="authors">Staford Titus Selvaraj</div>
+<div class="affil">Independent Researcher · stafordtituss@gmail.com · ORCID 0009-0004-8227-7595</div>
+
+<div class="abstract"><b>Abstract</b>
+AI agents increasingly act for people through chains of sub-agents, tools and adapters. Identity tells a relying party who acted, and authorization tells it what a token allowed, but neither shows whether what was actually executed stayed within what a person authorized. We present the Agentic Mandate Evidence Protocol (AMEP), an open specification for portable, signed evidence of each link in that chain (mandate, delegation, intent, interpretation, invocation, approval and an independently observed executed effect) and a deterministic, three-valued evaluation over it. The evaluation returns <i>preserved</i>, <i>violated</i> or <i>unresolved</i>, and every non-preserved result names one of eleven invariants. Missing or unverifiable evidence yields <i>unresolved</i>, never permission. Authority is modelled as claim sets with a decidable order and meet, so attenuation across delegation hops can be checked offline by any third party with public keys alone. We describe the design, the claim algebra and invariants, and a conformance suite of 95 vectors on which two independently written verifiers agree. We also report two integrations: an MCP extension prototype in which tool servers return signed receipts of the effects they actually executed, and a 20-vector delegation suite mapped to an agent-identity registry protocol under discussion in a W3C Community Group. AMEP is published as an IETF Internet-Draft with open-source reference implementations.
+</div>
+<div class="keywords"><b>Keywords:</b> AI agents; delegation; authorization; attenuation; audit evidence; verifiable records; Model Context Protocol; capability tokens.</div>
+
+<h2>1. Introduction</h2>
+<p>An agent acting for a principal rarely acts directly. A user asks a host agent; the host spawns sub-agents; sub-agents call tools through adapters; adapters translate calls into effects on files, SaaS records, payment systems or other people's inboxes. At every hop, what is <i>done</i> can drift from what was <i>asked</i>. An approval for one command can be replayed for another. A sub-agent can receive broader scope than its parent held. Untrusted content, such as a README, an email or a web page, can steer a mutation. An adapter can map a declared call to a different effect. A revoked grant upstream can leave a live child downstream. And an enforcement point can say "deny" on a host that runs the action anyway.</p>
+<p>Existing standards answer adjacent questions. OAuth 2.0 Token Exchange [1] issues delegated tokens and OpenID AuthZEN [2] transports access decisions. Transparency services such as SCITT [3] and audit-record architectures [4] make records tamper-evident. Capability tokens such as Macaroons [5], Biscuit [6] and UCAN [7] make attenuation structural. None of them states, in a form a third party can check offline, <b>whether an executed effect stayed within the authority the principal delegated</b>, or how to treat the common case where the evidence needed to decide is missing.</p>
+<p>AMEP addresses that gap. Its contributions are:</p>
+<ul>
+<li>an <b>evidence model</b> that separates identity, authority, declared action, executed effect and approval into separately signed objects, each signed by a key holding a role permitted for that object (Section 3);</li>
+<li>a <b>claim algebra</b> with a decidable order (&#8849;), meet (&#8851;) and satisfaction (&#8872;) relation, which makes attenuation and effect containment mechanically checkable (Section 4);</li>
+<li>eleven <b>invariants</b> and a deterministic, three-valued <b>evaluation</b> in which missing evidence is never permission (Section 5);</li>
+<li>a public <b>conformance suite</b> with must-reject vectors and two independent verifiers that agree on it, plus conformance levels that separate deployment maturity from verifier interoperability (Section 6);</li>
+<li>two <b>integrations</b>: signed effect receipts for Model Context Protocol tool calls, and delegation-continuity vectors for an agent-identity registry protocol (Section 7).</li>
+</ul>
+
+<h2>2. Problem and threat model</h2>
+<p>We consider a principal <i>H</i> who authorizes an agent <i>A</i>, which may delegate to agents <i>B</i>, <i>C</i>, &hellip;, which invoke tools <i>T</i>. A relying party (a receiving tool, an auditor or a regulator) wants to know, for each executed effect: whose authority it was exercised under; whether the authority narrowed or widened along the chain; whether the executed effect matched what was declared; whether any approval covered exactly that effect; and whether any link had been revoked at the time.</p>
+<p>AMEP's guarantees are designed to hold under an <b>untrusted-model assumption</b>: every language model in the chain may be adversarial, and nothing a model says about itself counts as evidence. Hosts, adapters and observers are trusted only for the statements their keys are entitled to sign. We assume Ed25519 [8] is unforgeable and that verifiers obtain authentic key sets with role assignments. AMEP does not detect prompt injection, issue identities, or define a policy language. It records the findings of such systems and evaluates the evidence they leave.</p>
+<p>Three design principles shape the rest of the paper. <b>Declared &ne; executed:</b> what an agent declares and what a system executed are recorded separately and compared. <b>Fail-safe evidence:</b> missing, unsigned or unverifiable evidence yields <i>unresolved</i>, never <i>preserved</i>. <b>Independent observation:</b> effects that write shared state, send data externally, destroy data or move money need an observer other than the actor.</p>
+
+<h2>3. Evidence model</h2>
+<p>A <b>packet</b> is a set of signed objects submitted together for evaluation. Each object is a JSON document signed with Ed25519 over its RFC 8785 (JCS) canonical form [9], excluding the <code>proof</code> member. Every key in a key set carries roles, and a verifier treats an object as unsigned unless its key holds a role permitted for the object's kind. Without roles, a compromised host key could mint its own mandate or approve its own action, and the evidence would still verify.</p>
+<table>
+<tr><th>Object</th><th>Signed by (role)</th><th>States</th></tr>
+<tr><td>PrincipalMandate</td><td>issuer</td><td>The root claim set granted on behalf of a principal.</td></tr>
+<tr><td>Delegation</td><td>issuer</td><td>A claim set handed to a delegate, pointing at its parent.</td></tr>
+<tr><td>IntentCertificate</td><td>issuer</td><td>A narrower, per-request claim set (what this task is for).</td></tr>
+<tr><td>Interpretation</td><td>host</td><td>How an adapter maps a tool call to a canonical action, with its source and version.</td></tr>
+<tr><td>Invocation</td><td>host</td><td>The declared action, resource and effect class, citing its authority.</td></tr>
+<tr><td>ExecutedEffectReceipt</td><td>observer</td><td>What was actually executed, by whom it was observed, at what assurance level.</td></tr>
+<tr><td>ApprovalBinding</td><td>approver</td><td>A human approval bound to a digest of one exact effect body, single use.</td></tr>
+<tr><td>Revocation / status</td><td>issuer</td><td>Signed revocation of a link, or signed status as of a time.</td></tr>
+<tr><td>ContinuityDecision</td><td>PDP/PEP</td><td>An allow, deny, hold or quarantine decision, with its phase.</td></tr>
+</table>
+<div class="cap">Table 1. AMEP evidence objects and the signer roles permitted for each.</div>
+<p>Two choices are central. First, the <b>executed effect is observed, not claimed</b>: the receipt is signed by the system where the action took effect, or by a proxy or host hook, and carries an assurance level from L0 (self-reported) to L3 (the receiving system). Second, <b>decisions carry a phase</b> (<code>pre_execution</code>, <code>post_execution</code> or <code>simulation</code>), so detection after the fact is never presented as enforcement.</p>
+
+<h2>4. Claim algebra</h2>
+<p>Authority is a claim set <i>C</i> with action patterns, resource patterns, permitted data flows (<code>class&rarr;recipient</code>), an effect-class ceiling from the ordered set <code>read &lt; write_local &lt; write_shared &lt; external_send &lt; destructive &lt; financial</code>, a validity window, an optional purpose, deny lists, an optional risk budget and a delegation depth.</p>
+<p><b>Order.</b> <i>C</i><sub>1</sub> &#8849; <i>C</i><sub>2</sub> (the child is equal to or narrower than the parent) holds when every action and resource pattern of the child is subsumed by one of the parent's; the child's data flows are a subset of the parent's; its ceiling, expiry and budget are no greater; its not-before time is no earlier; its purpose is unchanged; its deny lists include every deny of the parent; and the depth rule holds. A parent with depth 0 may not be delegated, and a child of a parent with positive depth must carry a strictly smaller depth.</p>
+<p><b>Meet.</b> <i>C</i><sub>1</sub> &#8851; <i>C</i><sub>2</sub> is computed component-wise: patterns subsumed by the other side, intersected data flows, the lower ceiling, the tighter window, and the <i>union</i> of deny lists, so that no hop and no intent can lift a deny. The <b>effective claims</b> of an invocation are the meet of every claim set on its chain, met again with its intent when one is cited.</p>
+<p><b>Satisfaction.</b> An executed effect <i>x</i> satisfies <i>C</i> (<i>x</i> &#8872; <i>C</i>) when its action and resource match an allowed pattern and no deny pattern, its effect class is within the ceiling, every released data flow is permitted, and its time is within the window.</p>
+<p>These relations use only pattern subsumption, set inclusion and comparison, so they are decidable and cheap. Adding a hop can never widen effective claims (monotonicity). Capability tokens enforce the same attenuation rule <i>structurally</i>: a widened Macaroon or Biscuit simply fails to verify. AMEP instead records each delegation as a separately signed claim set and checks &#8849; afterwards, so a widening is <i>detected</i> and reported as a violation with the responsible hop. The two compose: tokens can carry mandates and delegations, and AMEP profiles map their facts onto claims.</p>
+
+<h2>5. Invariants and evaluation</h2>
+<table>
+<tr><th>ID</th><th>Invariant</th><th>Statement (abridged)</th><th>When broken</th></tr>
+<tr><td>I1</td><td>Attenuation</td><td>Every delegation &#8849; its parent.</td><td>violated</td></tr>
+<tr><td>I2</td><td>Effect within authority</td><td>Executed matches declared (or mediated), satisfies effective claims, stays within budgets unless a bound approval covers it.</td><td>violated</td></tr>
+<tr><td>I3</td><td>Interpretation</td><td>The adapter mapping is approved and matches the pinned version.</td><td>unresolved</td></tr>
+<tr><td>I4</td><td>Influence</td><td>Untrusted or quarantined content did not steer a mutation unless the principal confirmed it.</td><td>violated / unresolved</td></tr>
+<tr><td>I5</td><td>Release</td><td>Every released data flow is permitted.</td><td>violated</td></tr>
+<tr><td>I6</td><td>Liveness</td><td>No link was revoked at or before the invocation.</td><td>violated</td></tr>
+<tr><td>I7</td><td>Evidence</td><td>Required evidence is present, well-formed, signed by a permitted role and fresh.</td><td>unresolved</td></tr>
+<tr><td>I8</td><td>Approval binding</td><td>A cited approval matches the executed body, is in its window, and is used once.</td><td>violated</td></tr>
+<tr><td>I9</td><td>Self-protection</td><td>No agent action targets guardrail configuration, keys, instruction files or the evidence store.</td><td>violated</td></tr>
+<tr><td>I10</td><td>Observer independence</td><td>High-impact effects name their actor and are observed by someone else.</td><td>unresolved</td></tr>
+<tr><td>I11</td><td>No orphan effects</td><td>Every effect links to an invocation, and none follows a signed deny.</td><td>violated</td></tr>
+</table>
+<div class="cap">Table 2. AMEP invariants.</div>
+<p>Evaluation is a pure function of the packet, the key set, pinned adapters and, for streams of packets, verifier state (approvals already used and budget already spent). For each invocation the verifier resolves the chain to a root mandate, verifies every signature and role, checks interpretation, attenuation, liveness, influence, protected resources and receipts in a fixed order, and returns the first failing invariant. Orphan effects and decisions are reconciled across the packet. The packet verdict is <i>violated</i> if any result is violated, otherwise <i>unresolved</i> if any is unresolved, otherwise <i>preserved</i>. Because the order and the outcome of each check are fixed, the same inputs always give the same verdict and deciding invariant, which is what allows independent verifiers to be compared vector by vector.</p>
+<p>The three-valued outcome matters in practice. Audit pipelines that collapse "could not determine" into "allowed" turn missing logs into permission. AMEP keeps the two apart: a revocable mandate with no fresh status, a receipt signed by a key without the observer role, or a high-impact effect reported only by its actor all evaluate to <i>unresolved</i>, naming I7 or I10, while a provable widening or a revoked root evaluates to <i>violated</i>.</p>
+<p><b>Worked example.</b> A user's mandate allows <code>fs.*</code> on <code>repo:app/*</code> until t=100 with depth 2. The host delegates only <code>fs.write</code> on <code>repo:app/src/*</code> until t=90 with depth 1. The user revokes the mandate at t=5; at t=10 the sub-agent writes <code>repo:app/src/auth.ts</code>. The delegation is a valid attenuation (I1 holds), and the effect satisfies the effective claims (I2 holds), but the signed revocation precedes the invocation, so the verdict is <i>violated</i>, I6: the sub-agent's authority died with its root.</p>
+
+<h2>6. Conformance and implementations</h2>
+<p>The conformance suite (v0.2.0) has 95 vectors: 25 positive packets that must evaluate to <i>preserved</i> and 70 must-reject packets that must evaluate to a stated outcome <i>and</i> invariant. They cover attenuation (expand-then-shrink, depth, validity, purpose, deny removal), declared-versus-executed drift, revocation and status freshness, signer-role misuse, approval replay and time-of-check/time-of-use substitution, data release after a read, guardrail writes, self-reported high-impact effects, orphan effects and cross-packet budget accounting. Every normative change to the specification must add at least one positive and one must-reject vector that distinguish the new behaviour from the old.</p>
+<p>Two verifiers were written independently against the specification text: one in Python and one in JavaScript, which runs under Node.js and in the browser using WebCrypto. They agree on all 95 vectors, and the vector packets validate against both JSON Schemas and CDDL. Both are published as packages (<code>amep-protocol</code> on PyPI, <code>@stafordtituss/amep</code> on npm) with producer SDKs for signing evidence.</p>
+<p>Conformance is reported on two axes. Levels 0&ndash;3 describe where AMEP sits in a deployment: observation, mandate attached, pre-execution decision, delegated attenuation. Levels 4&ndash;5 describe what others can check: a verifier that passes the suite, and cross-vendor interoperability between two independent implementations. An "Attested" qualifier marks deployments whose high-impact effects are observed at L2 or above and registered with a transparency service.</p>
+
+<h2>7. Integrations</h2>
+<h3>7.1 Model Context Protocol</h3>
+<p>In the Model Context Protocol (MCP) [15], tool annotations such as <code>readOnlyHint</code> are a server's description of itself, and tool results are unsigned, so an organization reviewing an incident cannot distinguish "the server deleted three records" from "the agent said it did". We specified an optional MCP extension in which a client or gateway attaches an invocation identifier and a mandate reference to each <code>tools/call</code> in <code>_meta</code>. A server that supports the extension returns, in the result's <code>_meta</code>, a signed ExecutedEffectReceipt describing what it actually executed. The extension adds no methods and changes no result content, and peers that do not advertise it behave exactly as before.</p>
+<p>A prototype built on the official MCP Python SDK's extension interface includes a reference server, which signs receipts for its tools' real effects, and a reference gateway, which verifies the receipts and evaluates the evidence. Eight integration tests run real MCP sessions, in process and over stdio. In them an honest server yields <i>preserved</i>; a server that changes a different record than requested is exposed by its own receipt and yields <i>violated</i> (I2); a client that does not opt in receives no receipt and yields <i>unresolved</i> (I7); and a receipt tampered with in transit is rejected.</p>
+<h3>7.2 Delegation continuity for agent identity registries</h3>
+<p>Agent identity systems answer <i>who</i> an agent is; they do not by themselves answer whose authority a delegated agent exercises. We built a 20-vector suite on a hiring scenario discussed in the W3C Agent Identity Registry Protocol Community Group, extended with one delegation hop: an HR lead authorizes a hiring agent, which delegates interview scheduling for one requisition to a scheduling agent, which writes to a calendar service that signs what it did. Agents are identified by DIDs, and the registry's <code>namespace:resource:action</code> scopes are mapped to AMEP claims. The suite has 5 positive and 15 must-reject vectors. They cover scope widening, a raised effect class, a dropped deny, a delegation that outlives its parent, re-delegation without depth, effects outside the delegated requisition, executed-versus-declared drift, upstream revocation, stale status, identity without delegated authority, a self-issued delegation, and approval mismatch and replay. Both verifiers agree on all 20.</p>
+<p>Building the suite surfaced two questions for identity-registry designs. First, AMEP delegations name their parent but not their holder, so binding a delegation to the delegate's identifier must come from the credential that carries it. Second, status-list freshness measured at <i>verification</i> time differs from liveness at the time of the <i>action</i>, which is what an auditor needs: a link revoked after the action leaves the action <i>preserved</i>, and a status older than the action leaves it <i>unresolved</i>.</p>
+
+<h2>8. Related work</h2>
+<p><b>Delegation and authorization.</b> OAuth 2.0 Token Exchange [1] and transaction-token work issue delegated credentials; AuthZEN [2] standardizes decision requests. AMEP consumes these as sources of mandates and decisions and adds the check that executed effects stayed within them. <b>Capability tokens.</b> Macaroons [5], Biscuit [6] and UCAN [7] enforce attenuation structurally; AMEP shares their attenuation rule, detects rather than prevents widening, and covers what tokens do not record: interpretation, intent, independently observed effects and approvals bound to effects. <b>Audit and transparency.</b> SCITT [3] and audit-record architectures [4] make records tamper-evident and discoverable; AMEP objects can be registered as signed statements, and AMEP supplies the evaluation over such records. <b>Agent security.</b> AgentDojo [10] benchmarks prompt-injection robustness, and systems such as CaMeL [11], FIDES [12] and Progent [13] enforce control-flow, information-flow or privilege policies inside agents. These are complementary: they can emit AMEP evidence, and AMEP provides a portable, cross-system way to check the outcome. <b>Verifiable credentials.</b> AMEP evidence can be exchanged as W3C Verifiable Credentials [14] for audit, while the AMEP proofs inside determine the outcome.</p>
+
+<h2>9. Limitations and future work</h2>
+<p>AMEP verifies what it is given: a verifier cannot detect lineage or effects a host failed to record, which is why observer independence and transparency registration matter. Revocation in distributed deployments needs a quiescence window that v0.2 does not define. Token-profile vectors (Biscuit, Macaroon, UCAN) still require a profile-aware verifier. Verifier state across packets is local bookkeeping without a signed exchange format. A proposed EvaluationRecord, an append-only and supersedable signed record of verifier results, addresses how an <i>unresolved</i> result is later resolved without rewriting history. Finally, AMEP does not yet have deployment measurements; reporting overheads and coverage from production agent hosts is the next step.</p>
+
+<h2>10. Availability</h2>
+<p class="note">Specification, schemas, conformance suite, verifiers and prototypes: https://github.com/stafordtituss/amep (Apache 2.0 code; specification licence in the repository). Archived: Zenodo, DOI 10.5281/zenodo.24317758; Software Heritage, swh:1:snp:c5f303094bb36855d0de7729c6abc05ad0ae5d1f. IETF Internet-Draft: draft-stafordtituss-agentic-mandate-evidence-00. Packages: amep-protocol (PyPI), @stafordtituss/amep (npm).</p>
+
+<h2>References</h2>
+<ol class="refs">
+<li>M. Jones, A. Nadalin, B. Campbell, J. Bradley and C. Mortimore. OAuth 2.0 Token Exchange. RFC 8693, IETF, 2020.</li>
+<li>OpenID Foundation. AuthZEN Authorization API 1.0.</li>
+<li>H. Birkholz, A. Delignat-Lavaud, C. Fournet, Y. Deshpande and S. Lasker. An Architecture for Trustworthy and Transparent Digital Supply Chains. IETF SCITT Working Group, Internet-Draft draft-ietf-scitt-architecture.</li>
+<li>M. K&uuml;hlewind and H. Birkholz. Audit architecture. IETF Internet-Draft draft-kuehlewind-audit-architecture.</li>
+<li>A. Birgisson, J. G. Politz, &Uacute;. Erlingsson, A. Taly, M. Vrable and M. Lentczner. Macaroons: Cookies with Contextual Caveats for Decentralized Authorization in the Cloud. NDSS 2014.</li>
+<li>Biscuit authorization token specification. https://www.biscuitsec.org.</li>
+<li>UCAN: User Controlled Authorization Networks specification. https://ucan.xyz.</li>
+<li>S. Josefsson and I. Liusvaara. Edwards-Curve Digital Signature Algorithm (EdDSA). RFC 8032, IETF, 2017.</li>
+<li>A. Rundgren, B. Jordan and S. Erdtman. JSON Canonicalization Scheme (JCS). RFC 8785, IETF, 2020.</li>
+<li>E. Debenedetti, J. Zhang, M. Balunovi&#263;, L. Beurer-Kellner, M. Fischer and F. Tram&egrave;r. AgentDojo: A Dynamic Environment to Evaluate Prompt Injection Attacks and Defenses for LLM Agents. NeurIPS Datasets and Benchmarks, 2024.</li>
+<li>E. Debenedetti et al. Defeating Prompt Injections by Design. arXiv:2503.18813, 2025.</li>
+<li>M. Costa, B. K&ouml;pf et al. Securing AI Agents with Information-Flow Control. 2025.</li>
+<li>T. Shi et al. Progent: Programmable Privilege Control for LLM Agents. 2025.</li>
+<li>W3C. Verifiable Credentials Data Model v2.0. W3C Recommendation.</li>
+<li>Model Context Protocol specification. https://modelcontextprotocol.io.</li>
+</ol>
+</body>
+</html>
