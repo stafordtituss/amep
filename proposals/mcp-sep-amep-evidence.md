@@ -157,6 +157,6 @@ No backward-compatibility concerns. The extension is opt-in on both sides, adds 
 
 ## Open Questions
 
-1. Which working or interest group is the right home: authorization, security, or enterprise readiness?
+1. Home and sponsor. The problem sits in the Security Interest Group's "auditability and observability" scope (tamper-evident records of what a tool call did and under what authority). The Interceptors Working Group, whose charter covers audit mode semantics and an audit-logging sample interceptor, is the likely sponsor: an effect receipt is what an audit interceptor would emit and check. Is that the right routing, or should the extension instead build on the interceptor primitive (SEP-1763) once it is accepted?
 2. Should the extension also define a field in `server/discover` (or Server Cards) that links each tool to a pinned AMEP interpretation, so clients can detect tool-definition changes?
 3. Should multiple receipts per call be allowed in this revision, or deferred?
