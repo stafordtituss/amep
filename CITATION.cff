@@ -12,6 +12,8 @@ authors:
   - given-names: "Staford Titus"
     family-names: "Selvaraj"
     affiliation: "Independent"
+    orcid: "https://orcid.org/0009-0004-8227-7595"
+doi: "10.5281/zenodo.24317758"
 repository-code: "https://github.com/stafordtituss/amep"
 version: "0.2.0-draft.4"
 date-released: "2026-11-17"

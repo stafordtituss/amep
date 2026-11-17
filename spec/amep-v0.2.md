@@ -8,6 +8,8 @@
 | **Status** | Public Draft. Not endorsed by any standards body. |
 | **Author and editor** | Staford Titus Selvaraj (Independent) |
 | **Repository** | https://github.com/stafordtituss/amep |
+| **DOI** | [10.5281/zenodo.24317758](https://doi.org/10.5281/zenodo.24317758) (all versions) |
+| **IETF** | [draft-stafordtituss-agentic-mandate-evidence](https://datatracker.ietf.org/doc/draft-stafordtituss-agentic-mandate-evidence/) |
 | **Feedback** | Issues and `AMEP-Proposal-N` documents in the repository (see `CONTRIBUTING.md`) |
 | **Replaces** | AMEP v0.1 (unpublished working draft) |
 
