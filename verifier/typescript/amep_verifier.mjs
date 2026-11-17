@@ -28,7 +28,7 @@ const dir = process.argv[2] || "vectors";
 const keys = JSON.parse(readFileSync(join(dir, "keys.json"), "utf8"));
 let ok = 0, n = 0; const fails = [];
 for (const sub of ["positive", "must-reject"]) for (const f of readdirSync(join(dir, sub)).filter(f => f.endsWith(".json")).sort()) {
-  const d = JSON.parse(readFileSync(join(dir, sub, f), "utf8")); const r = verdict(evaluate(d.packet, keys, sigOk));
+  const d = JSON.parse(readFileSync(join(dir, sub, f), "utf8")); const r = verdict(evaluate(d.packet, keys, sigOk, [], d.state ? structuredClone(d.state) : {}));
   n++; if (r.outcome === d.expect.outcome && r.invariant === d.expect.invariant) ok++; else fails.push(`${sub}/${f}: got ${r.outcome}/${r.invariant} (${r.reason})`);
 }
 console.log(`node verifier agrees with expected outcomes on ${ok}/${n} vectors`); if (fails.length) console.log(fails.join("\n"));

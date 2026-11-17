@@ -192,6 +192,17 @@
     },
     "t": {
      "$ref": "#/$defs/time"
+    },
+    "accessed": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "pattern": "^[a-z_]+$"
+     }
+    },
+    "recipient": {
+     "type": "string",
+     "pattern": "^[a-z_]+$"
     }
    }
   },

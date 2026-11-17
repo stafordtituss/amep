@@ -53,7 +53,9 @@ schemas["common"] = {
                           "properties": {"action": {"type": "string"}, "resource": {"type": "string"},
                                          "effect": {"$ref": "#/$defs/effect_class"},
                                          "released": {"type": "array", "items": {"$ref": "#/$defs/data_flow"}},
-                                         "reversible": {"type": "boolean"}, "t": {"$ref": "#/$defs/time"}}},
+                                         "reversible": {"type": "boolean"}, "t": {"$ref": "#/$defs/time"},
+                                         "accessed": {"type": "array", "items": {"type": "string", "pattern": "^[a-z_]+$"}},
+                                         "recipient": {"type": "string", "pattern": "^[a-z_]+$"}}},
         "token": {"description": "Source token of a mandate or delegation (spec/profiles/). value only for expired or holder-bound tokens.",
                   "type": "object", "required": ["format", "digest"], "additionalProperties": False,
                   "properties": {"format": {"enum": ["biscuit", "macaroon", "ucan"]}, "block": {"type": "integer", "minimum": 0},
@@ -83,6 +85,7 @@ schemas["invocation"] = obj("invocation", "Invocation (spec 5.8). Signed by role
     "id": ref("ref"), "authority_ref": ref("ref"), "interpretation_ref": ref("ref"), "intent_ref": ref("ref"), "approval_ref": ref("ref"),
     "t": ref("time"), "actor": {"type": "string"}, "declared": ref("declared"), "mediated": ref("executed_body"),
     "influenced_by": {"type": "array", "items": ref("ref")}, "principal_confirmed": {"type": "boolean"},
+    "derived_from": {"type": "array", "items": ref("ref")},
     "budget_spent": {"type": "integer", "minimum": 0},
     "correlation": {"type": "object", "additionalProperties": False, "properties": {k: {"type": "string"} for k in ("session_ref", "prompt_ref", "tool_use_ref", "traceparent")}},
     "proof": ref("proof")}, "invocation")

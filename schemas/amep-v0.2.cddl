@@ -61,6 +61,8 @@ executed-body = {
   effect: effect-class
   ? released: [* data-flow]
   ? reversible: bool
+  ? accessed: [* tstr .regexp "[a-z_]+"]       ; data classes this effect read (spec 5.9.1)
+  ? recipient: tstr .regexp "[a-z_]+"          ; recipient class of what this effect sent or wrote
   t: amep-time
   * extension-key => any
 }
@@ -118,6 +120,7 @@ invocation = {                                 ; [host]
   ? mediated: executed-body
   ? influenced_by: [* ref]
   ? principal_confirmed: bool
+  ? derived_from: [* ref]                      ; earlier invocations whose outputs fed this one (spec 5.9.1)
   ? budget_spent: uint
   ? correlation: { ? session_ref: tstr, ? prompt_ref: tstr, ? tool_use_ref: tstr, ? traceparent: tstr }
   ? proof: proof

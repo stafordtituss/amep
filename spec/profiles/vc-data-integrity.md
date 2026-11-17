@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Document** | `amep-profile-vc` |
-| **Version** | 0.2.0-draft.3 |
+| **Version** | 0.2.0-draft.4 |
 | **Status** | Public Draft. Companion to `spec/amep-v0.2.md` (the "core"). |
 | **Author** | Staford Titus Selvaraj |
 

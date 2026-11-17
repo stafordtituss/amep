@@ -1,9 +1,9 @@
-# Agentic Mandate Evidence Protocol (AMEP) — Core Specification
+# Agentic Mandate Evidence Protocol (AMEP™) — Core Specification
 
 | | |
 |---|---|
 | **Document** | `amep-core` |
-| **Version** | 0.2.0-draft.3 |
+| **Version** | 0.2.0-draft.4 |
 | **Date** | 2026-11-17 |
 | **Status** | Public Draft. Not endorsed by any standards body. |
 | **Author and editor** | Staford Titus Selvaraj (Independent) |
@@ -339,6 +339,7 @@ A declared call.
 | `mediated` | no | An executed-effect body (Section 5.9) that a PEP substituted. |
 | `influenced_by` | no | Array of ContentFinding `id`s whose content was in the agent's context. |
 | `principal_confirmed` | no | `true` if the principal confirmed this invocation after seeing the influence. |
+| `derived_from` | no | `id`s of **earlier** invocations whose outputs fed this one (Section 5.9.1). |
 | `budget_spent` | no | Points charged for this invocation (Section 9). |
 | `correlation` | no | Section 4.3. |
 | `proof` | **yes**¹ | Signed by the host or PEP, not by the model. |
@@ -366,7 +367,21 @@ What was executed, recorded by an observer.
 | `effect` | **yes** | Effect class. |
 | `released` | no | Data flows released. Absent means none. |
 | `reversible` | no | `true` if the effect can be undone. Absent means `false`. |
+| `accessed` | no | Data classes this effect read or obtained, for example `["confidential"]` (Section 5.9.1). |
+| `recipient` | no | Recipient class of what this effect sent or wrote, for example `external` (Section 5.9.1). |
 | `t` | **yes** | Time of execution. |
+
+#### 5.9.1 Data lineage
+
+`released` records the data flows an effect *declares*. An agent that reads a confidential document and then posts "a summary" to an external service may declare no release at all. Lineage closes that gap:
+
+- An effect that reads data records the data classes it obtained in `accessed`.
+- An invocation whose input came from earlier steps lists them in `derived_from`.
+- An effect that sends or writes somewhere records the `recipient` class.
+
+The **carried classes** of an invocation are the `accessed` classes of its own effects, plus the carried classes of every earlier invocation it is `derived_from`, transitively. For each effect with a `recipient` r, every class d among its own `accessed` classes and the carried classes of the invocations it is derived from produces the flow `d->r`, which MUST be permitted by the effective claims' `data`. Otherwise the result is `violated` (I5).
+
+Hosts that cannot track precisely which outputs fed which inputs MUST be conservative: list in `derived_from` every earlier invocation of the same session whose output entered the agent's context. Lineage that is missing cannot be detected by a verifier. This is one reason profiles that handle sensitive data (AMEP-SaaS, AMEP-Health) require L2/L3 observers at the egress point.
 
 ### 5.10 ApprovalBinding (`kind: "approval"`)
 
@@ -746,6 +761,28 @@ The **packet verdict** is:
 
 Its **deciding invariant** is that of the first result, in result order, with the verdict's outcome. Verifiers MUST report every result, not only the verdict.
 
+### 10.6 Lineage checks
+
+Section 10.2 also applies these lineage checks (Section 5.9.1):
+
+- in step 2: if any id in `i.derived_from` does not name an invocation that comes **earlier** in the packet, the result is `unresolved` (I7);
+- in step 14, after the claim checks: for an effect body x with a `recipient`, every carried class `d` whose flow `d->x.recipient` is not in the effective claims' `data` makes the result `violated` (I5).
+
+### 10.7 State across packets
+
+Approval single use (I8) and risk budgets (Section 9) span more than one packet when a verifier evaluates a stream of packets, for example a day of activity sent in hourly batches. A verifier MAY therefore keep **state**:
+
+```json
+{ "approvals_used": { "<approval id>": ["<invocation id>", "<body digest>"] },
+  "spent":          { "<mandate or delegation id>": <points> } }
+```
+
+- On entry, `approvals_used` seeds the record of approval use, and `spent` seeds each node's running total.
+- On exit, the verifier returns the updated state.
+- Within one stream, state MUST be passed from each packet's evaluation to the next, in time order.
+
+State is the verifier's own bookkeeping, not evidence. A third party that wants to reproduce a result needs the same state, so verifiers that rely on it SHOULD publish it alongside their results, signed with their own key. A conformance vector MAY include a `state` member, which a verifier passes in before evaluating that vector's packet.
+
 ---
 
 ## 11. Decision modes and enforcement
@@ -873,6 +910,7 @@ AMEP evidence has exactly one mandatory format: objects canonicalized with JCS a
 | **AMEP-Biscuit** | Preferred carrier for mandates and delegations: public-key verifiable, attenuable offline, with a constrained fact vocabulary that maps onto AMEP claims. | `spec/profiles/biscuit.md` |
 | **AMEP-Macaroon** | Operational grants only. Macaroons are verified with a shared secret, so they are never third-party evidence; a verified Macaroon grant is restated as a signed AMEP mandate or delegation. | `spec/profiles/macaroon.md` |
 | **AMEP-PASETO** | Transport envelope (`v4.public` or `v4.local`) around AMEP objects that already carry their own proof. | `spec/profiles/paseto.md` |
+| **AMEP-UCAN** | Carrier for mandates and delegations between parties identified by DIDs. Holder-bound rather than bearer, so the token itself may be included in evidence. | `spec/profiles/ucan.md` |
 | **AMEP-VC** | Wraps AMEP evidence as W3C Verifiable Credentials for external audit exchange. | `spec/profiles/vc-data-integrity.md` |
 
 ---
@@ -914,7 +952,7 @@ Each vector file has the form:
   "packet": { ... } }
 ```
 
-A Verifier passes a vector when the packet verdict and deciding invariant (Section 10.5) equal `expect`. Suite v0.2.0 has 89 vectors (23 positive, 66 must-reject); Appendix B lists them. Two independently written reference verifiers (Python, and JavaScript run both under Node.js and in the browser with WebCrypto) agree on all 77. Every vector packet except `malformed-timestamp` validates against the JSON Schemas in `schemas/v0.2/`.
+A Verifier passes a vector when the packet verdict and deciding invariant (Section 10.5) equal `expect`. Suite v0.2.0 has 95 vectors (25 positive, 70 must-reject); Appendix B lists them. Two independently written reference verifiers (Python, and JavaScript run both under Node.js and in the browser with WebCrypto) agree on all 95. Every vector packet except `malformed-timestamp` validates against both the JSON Schemas in `schemas/v0.2/` and the CDDL.
 
 ### 15.3 Requirements on changes
 
@@ -1076,23 +1114,23 @@ Packet verdict: `violated`, I6. The sub-agent's own delegation was valid; its au
 <!-- vector-index:start -->
 *Generated by `tools/vector_index.py`; regenerate it whenever the suite changes.*
 
-Suite: 89 vectors (23 positive, 66 must-reject).
+Suite: 95 vectors (25 positive, 70 must-reject).
 
-**Positive (expect `preserved`):** `approved-adapter-revision--pinned`, `build-cleanup-within-scope`, `delegation-adds-a-deny`, `deny-honoured-on-fail-closed-host--no-effect`, `fresh-revocation-status`, `independently-observed-high-impact-effect`, `influence-confirmed-by-principal`, `influenced-read-only-action`, `jcs-canonical-form--unicode-keys--floats`, `mediated-effect-honored`, `mutation-influenced-only-by-trusted-content`, `quarantined-content-promoted-by-the-principal`, `reversible-write-is-cheaper`, `revoked-after-the-action--still-preserved`, `rfc-3339-timestamps`, `risk-budget-exceeded--human-approved`, `same-effect-observed-twice--host-and-backend`, `simulated-deny-is-not-enforcement`, `two-hop-chain-within-bounds`, `valid-bound-approval`, `valid-preserved-flow`, `validity-window-and-purpose-carried-through`, `within-risk-budget`.
+**Positive (expect `preserved`):** `approved-adapter-revision--pinned`, `budget-from-earlier-packets-still-within-limit`, `build-cleanup-within-scope`, `delegation-adds-a-deny`, `deny-honoured-on-fail-closed-host--no-effect`, `derived-data-sent-to-an-allowed-recipient`, `fresh-revocation-status`, `independently-observed-high-impact-effect`, `influence-confirmed-by-principal`, `influenced-read-only-action`, `jcs-canonical-form--unicode-keys--floats`, `mediated-effect-honored`, `mutation-influenced-only-by-trusted-content`, `quarantined-content-promoted-by-the-principal`, `reversible-write-is-cheaper`, `revoked-after-the-action--still-preserved`, `rfc-3339-timestamps`, `risk-budget-exceeded--human-approved`, `same-effect-observed-twice--host-and-backend`, `simulated-deny-is-not-enforcement`, `two-hop-chain-within-bounds`, `valid-bound-approval`, `valid-preserved-flow`, `validity-window-and-purpose-carried-through`, `within-risk-budget`.
 
 **Must-reject:**
 
 | Invariant | Outcome | Vectors |
 |---|---|---|
 | I1 | violated | `delegation-adds-data-class`, `delegation-changes-purpose`, `delegation-depth-not-decreasing`, `delegation-drops-nbf`, `delegation-extends-validity`, `delegation-from-a-zero-depth-parent`, `delegation-removes-a-deny`, `delegation-widens-resources`, `delegation-widens-risk-budget`, `delegation-without-depth-under-bounded-parent`, `expand-then-shrink-delegation` |
-| I2 | violated | `cumulative-spend-exceeds-budget`, `declared----executed--path-retarget`, `denied-action`, `destructive-command-drift--a3`, `effect-after-mandate-validity`, `effect-before-validity--nbf`, `effect-on-a-denied-resource`, `effect-outside-delegated-scope`, `intent-cannot-lift-a-deny`, `intent-narrower-than-grant`, `lying-adapter-caught-by-backend--l3`, `mediated-effect-not-honored`, `rfc-3339-effect-after-expiry`, `risk-budget-exceeded-without-approval`, `second-effect-outside-declared` |
+| I2 | violated | `budget-spent-in-earlier-packets`, `cumulative-spend-exceeds-budget`, `declared----executed--path-retarget`, `denied-action`, `destructive-command-drift--a3`, `effect-after-mandate-validity`, `effect-before-validity--nbf`, `effect-on-a-denied-resource`, `effect-outside-delegated-scope`, `intent-cannot-lift-a-deny`, `intent-narrower-than-grant`, `lying-adapter-caught-by-backend--l3`, `mediated-effect-not-honored`, `rfc-3339-effect-after-expiry`, `risk-budget-exceeded-without-approval`, `second-effect-outside-declared` |
 | I3 | unresolved | `interpretation-from-provider-hint-only`, `unapproved-adapter-revision`, `unknown-interpretation` |
 | I4 | violated | `injection-driven-mutation`, `quarantined-content-reached-the-agent--a1`, `unsigned-finding-claims-trusted` |
-| I5 | violated | `secret-released-externally--i5` |
+| I5 | violated | `data-leaving-after-a-read--a5`, `secret-released-externally--i5` |
 | I6 | violated | `revoked-root-with-live-child`, `status-shows-revoked-before-action` |
-| I7 | unresolved | `deny-on-fail-open-host--no-effect-record`, `forged-mandate--attacker-key`, `identity-only-authorization--no-mandate`, `intent-reference-unresolved`, `invocation-signed-by-unknown-key`, `malformed-timestamp`, `mandate-minted-by-host-key`, `missing-effect-receipt`, `missing-parent-lineage`, `post-execution-decision-cannot-claim-a-block`, `revocable-mandate-without-status`, `self-approval-signed-by-host-key`, `stale-revocation-status`, `tampered-effect-receipt`, `unsigned-approval`, `unsigned-intent`, `unsigned-invocation`, `unsigned-revocation-on-the-chain` |
+| I7 | unresolved | `deny-on-fail-open-host--no-effect-record`, `forged-mandate--attacker-key`, `identity-only-authorization--no-mandate`, `intent-reference-unresolved`, `invocation-signed-by-unknown-key`, `lineage-reference-not-found`, `malformed-timestamp`, `mandate-minted-by-host-key`, `missing-effect-receipt`, `missing-parent-lineage`, `post-execution-decision-cannot-claim-a-block`, `revocable-mandate-without-status`, `self-approval-signed-by-host-key`, `stale-revocation-status`, `tampered-effect-receipt`, `unsigned-approval`, `unsigned-intent`, `unsigned-invocation`, `unsigned-revocation-on-the-chain` |
 | I7 | violated | `recorded-budget-spend-mismatch` |
-| I8 | violated | `approval-digest-mismatch--toctou`, `approval-replay--consumed`, `approval-reused-for-a-second-invocation`, `stale-approval--expired` |
+| I8 | violated | `approval-digest-mismatch--toctou`, `approval-replay--consumed`, `approval-reused-across-packets`, `approval-reused-for-a-second-invocation`, `stale-approval--expired` |
 | I9 | violated | `guardrail-write--i9`, `guardrail-write-via-absolute-path--i9`, `mediated-into-a-guardrail-path--i9` |
 | I10 | unresolved | `high-impact-effect-without-actor`, `self-reported-high-impact-effect` |
 | I11 | violated | `audit-only-discovery-of-an-unknown-agent--a6`, `bypass--effect-without-invocation`, `deny-contradicted-by-executed-effect` |
@@ -1131,13 +1169,14 @@ Suite: 89 vectors (23 positive, 66 must-reject).
 - Added risk-budget accounting (Section 9).
 - Made canonical resource identifiers normative (Section 6.2).
 - Defined a deterministic evaluation order and packet verdict (Section 10).
-- Defined conformance levels and an 89-vector suite.
+- Defined conformance levels and a 95-vector suite.
 
 **Within v0.2 drafts:**
 
 - *draft.1:* attenuation now enforces `nbf`, `purpose` and the depth rules; cited intents must exist and be signed; I9 also applies to the executed resource.
 - *draft.2:* signer roles (Section 12.5); signed revocations and revocation status (Section 5.12); `actor` required for high-impact effects; every effect receipt of an invocation is evaluated; approval digests exclude `t`, with a validity window and single use; findings count as trusted only when signed; RFC 3339 times; exact RFC 8785 canonicalization; JSON Schemas per object; AuthZEN, MCP and host bindings.
 - *draft.3:* `phase` on every decision, so detection is never presented as mediation; `quarantine` decisions for untrusted content; deny lists in claims (`deny_actions`, `deny_resources`) that only grow along a chain; conformance Levels 0–5 with an "Attested" qualifier; Biscuit, Macaroon, PASETO and Verifiable Credential profiles; a mapping from common product decision labels; vectors for the injection-quarantine, destructive-drift and audit-only scenarios.
+- *draft.4:* data lineage (`accessed`, `recipient`, `derived_from`; Sections 5.9.1 and 10.6), which detects data leaving after a read; verifier state across packets (Section 10.7); a UCAN profile; a second, independent JSON Schema validator.
 
 ---
 
@@ -1145,10 +1184,8 @@ Suite: 89 vectors (23 positive, 66 must-reject).
 
 - **E.1 Workflow-level outcomes.** Composition and disclosure across many invocations (WorkflowContinuityDecision) are reserved for v0.3.
 - **E.2 Revocation quiescence.** A window Δ for revocations still propagating is needed for I6 in distributed deployments.
-- **E.3 Cross-packet state.** Approval single use and risk budgets are enforced within one packet. Verifiers that see a stream of packets need a defined way to carry this state across them.
-- **E.4 UCAN profile.** Biscuit and Macaroon profiles exist (Section 14.1); a UCAN profile is not yet written.
-- **E.5 Second JSON Schema validator.** The JSON Schemas are checked against every vector by the built-in validator in `tools/validate_schemas.py`; an independent JSON Schema library should also be run before 1.0.
-- **E.6 Data leaving after a read.** A read of sensitive data followed by an external send in a later step is not yet detected. This needs the reserved DataLineage object (Section 5.14) and a transitive form of I5. Target: v0.3.
-- **E.7 Token-profile vectors.** The Biscuit and Macaroon profiles have no conformance vectors yet. Vectors need reference token libraries in the suite's toolchain.
+- **E.3 Signed verifier state.** State across packets (Section 10.7) is the verifier's own bookkeeping. A standard signed format for publishing it is not yet defined.
+- **E.4 Token-profile vectors.** The Biscuit, Macaroon and UCAN profiles have no conformance vectors yet. They need a profile-aware verifier that maps tokens onto claims, built on reference token libraries.
+- **E.5 Lineage completeness.** A verifier can check the lineage it is given (Section 5.9.1) but cannot detect lineage a host failed to record.
 
-*Resolved in draft.2:* exact JCS, approval timing and key-to-role binding, and the reference-verifier divergences found in draft.1. *Resolved in draft.3:* the capability-token profile (Biscuit, Macaroon), and CDDL validation: the CDDL is checked with the `cddl` tool and every vector validates against it (`tools/validate_cddl.py`). That check found and fixed a clash between AMEP's time type and the `time` type built into the CDDL prelude.
+*Resolved in draft.2:* exact JCS, approval timing and key-to-role binding, and the reference-verifier divergences found in draft.1. *Resolved in draft.3:* the capability-token profile (Biscuit, Macaroon), and CDDL validation: the CDDL is checked with the `cddl` tool and every vector validates against it (`tools/validate_cddl.py`). That check found and fixed a clash between AMEP's time type and the `time` type built into the CDDL prelude. *Resolved in draft.4:* state across packets, data leaving after a read, the UCAN profile, and a second JSON Schema validator (the `jsonschema` library now runs alongside the built-in one, and the two must agree on every vector).

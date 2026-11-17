@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Document** | `amep-binding-mcp` |
-| **Version** | 0.2.0-draft.3 |
+| **Version** | 0.2.0-draft.4 |
 | **Status** | Public Draft. Companion to `spec/amep-v0.2.md` (the "core"). |
 
 This binding lets MCP clients, gateways and servers exchange AMEP references, so that a tool call made through MCP can be linked to its mandate, and so that a server can return an effect receipt at assurance L3 (the receiving system confirms what it did).

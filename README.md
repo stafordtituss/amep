@@ -1,6 +1,6 @@
-# AMEP: Agentic Mandate Evidence Protocol
+# AMEP™: Agentic Mandate Evidence Protocol
 
-**Status:** draft v0.2.0-draft.3 · **Author and editor:** Staford Titus Selvaraj
+**Status:** draft v0.2.0-draft.4 · **Author and editor:** Staford Titus Selvaraj
 
 AI agents act for people through chains of delegation, tools and adapters. Identity tells you *who* acted, and authorization tells you what a token *allowed*. Neither proves that **what actually happened stayed within what a person authorized**.
 
@@ -31,10 +31,15 @@ python3 -I verifier/python/amep_verifier.py
 python3 -I verifier/python/amep_verifier.py --check vectors
 node verifier/typescript/amep_verifier.mjs vectors
 node verifier/browser/build.mjs && node verifier/browser/test_page.mjs
-python3 -I tools/validate_schemas.py
+python3 tools/validate_schemas.py           # uses the jsonschema library too, if installed
 python3 -I tools/validate_cddl.py          # needs the cddl tool: gem install cddl
 python3 -I tools/vector_index.py --check
+python3 -I tools/attribution_check.py
 ```
+
+GitHub Actions runs all of these on every push and pull request (`.github/workflows/conformance.yml`), and also fails if the committed vectors, schemas or browser page differ from what the generators produce.
+
+The IETF Internet-Draft is in `ietf/`: Markdown source, with XML, text and HTML rendered by kramdown-rfc and xml2rfc.
 
 ## What AMEP is not
 

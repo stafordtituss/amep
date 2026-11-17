@@ -14,7 +14,7 @@ const els = {};
 const el = id => (els[id] ??= { id, style: {}, hidden: true, textContent: id === "amep-data" ? data : "", innerHTML: "", value: "",
   insertAdjacentHTML(_, s) { this.innerHTML += s; }, querySelector() { return el(id + ":tbody"); } });
 const document = { getElementById: el, querySelector: sel => el(sel) };
-const ctx = vm.createContext({ document, crypto: globalThis.crypto, TextEncoder, console, Uint8Array, WeakMap, Promise, JSON });
+const ctx = vm.createContext({ structuredClone, document, crypto: globalThis.crypto, TextEncoder, console, Uint8Array, WeakMap, Promise, JSON });
 vm.runInContext(script, ctx);
 
 await el("run-suite").onclick();

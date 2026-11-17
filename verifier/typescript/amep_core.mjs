@@ -124,7 +124,9 @@ const cost = x => {
 };
 
 // ---- evaluation (spec 10) ----
-export function evaluate(pk, keys, sigOk, extraProtected = []) {
+// state (spec 10.6): { approvals_used: {id: [invocation, digest]}, spent: {node: points} }, read on entry and
+// updated on exit, so approval single use and risk budgets hold across a stream of packets.
+export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   // signature valid AND the signing key holds a role allowed for this object kind (spec 12.5)
   const verify = o => {
     if (!o || typeof o !== "object" || !o.proof || o.proof.alg !== "Ed25519") return false;
@@ -136,9 +138,18 @@ export function evaluate(pk, keys, sigOk, extraProtected = []) {
   for (const kind of ["mandates", "delegations", "intents", "interpretations", "invocations", "effects", "approvals", "findings"])
     for (const o of pk[kind] || []) if (o && typeof o === "object" && "id" in o) objs[o.id] = o;
   const revocations = pk.revocations || [], statuses = pk.statuses || [], effects = pk.effects || [];
-  const spent = {}, approvalUse = {}; let out = [];
+  const spent = { ...(state.spent || {}) };
+  const approvalUse = Object.fromEntries(Object.entries(state.approvals_used || {}).map(([k, v]) => [k, [...v]]));
+  let out = [];
   const invocations = pk.invocations || [];
   const order = new Map(invocations.map((i, n) => [i.id, n]));
+  // spec 5.9.1 data lineage: data classes each invocation's output carries, through derived_from, earlier only
+  const taint = new Map();
+  invocations.forEach((i, n) => {
+    const own = new Set(effects.filter(e => e.invocation === i.id).flatMap(e => (e.executed || {}).accessed || []));
+    for (const j of i.derived_from || []) if ((order.get(j) ?? n) < n) for (const d of taint.get(j) || []) own.add(d);
+    taint.set(i.id, own);
+  });
   const decisions = (pk.decisions || []).filter(d => verify(d));
   // spec 5.13: a verified pre-execution quarantine withholds findings from every LATER invocation
   const quarantined = new Map();
@@ -172,6 +183,7 @@ export function evaluate(pk, keys, sigOk, extraProtected = []) {
       needed.push(it);
     }
     check(needed.some(o => !verify(o)), "unresolved", "I7", "missing or invalid signature, or signer lacks the role");
+    check((inv.derived_from || []).some(j => (order.get(j) ?? order.get(id)) >= order.get(id)), "unresolved", "I7", "lineage reference not found among earlier invocations");
     check(!interp || !["curated", "customer"].includes(interp.source), "unresolved", "I3", "no approved interpretation");
     const pinned = pk.pinned_adapters || {};
     check(Object.keys(pinned).length > 0 && pinned[interp.adapter] !== interp.version, "unresolved", "I3", "adapter revision not approved (pin mismatch)");
@@ -208,6 +220,13 @@ export function evaluate(pk, keys, sigOk, extraProtected = []) {
       check(isGuardrail(x.resource, extraProtected), "violated", "I9", "executed effect targets guardrail/evidence store");
       const [ok, why] = effectOk(x, claims);
       check(!ok, "violated", why.startsWith("released") ? "I5" : "I2", why);
+      // spec 5.9.1: data classes carried in through lineage (or read by this effect) reach the recipient too
+      if ("recipient" in x) {
+        const inherited = new Set(x.accessed || []);
+        for (const j of inv.derived_from || []) for (const c of taint.get(j) || []) inherited.add(c);
+        const leaked = [...inherited].map(c => `${c}->${x.recipient}`).filter(f => !(claims.data || []).includes(f)).sort();
+        check(leaked.length > 0, "violated", "I5", `derived data released: ${leaked.join(", ")}`);
+      }
       const d = approvalDigest(x); if (!bodies.has(d)) bodies.set(d, x);
     }
     if ("approval_ref" in inv) {
@@ -239,6 +258,8 @@ export function evaluate(pk, keys, sigOk, extraProtected = []) {
   // spec 10.4 orphan effects
   const invIds = new Set((pk.invocations || []).map(i => i.id));
   for (const e of effects) if (!invIds.has(e.invocation)) out.push({ id: e.id ?? "?", outcome: "violated", invariant: "I11", reason: "effect without any authorized invocation (bypass)" });
+  state.spent = spent;
+  state.approvals_used = approvalUse;
   return out;
 }
 

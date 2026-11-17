@@ -243,17 +243,28 @@ def _check(cond, outcome, invariant, reason):
         raise Stop(outcome, invariant, reason)
 
 
-def evaluate(packet: dict, keys: dict, extra_protected=()) -> list[Result]:
+def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = None) -> list[Result]:
+    """state (spec 10.6): carries approval use and risk-budget spending across packets. Read on entry, updated on exit."""
     objs = {o["id"]: o for kind in ("mandates", "delegations", "intents", "interpretations", "invocations",
                                     "effects", "approvals", "findings")
             for o in packet.get(kind, []) if isinstance(o, dict) and "id" in o}
     revocations, statuses = packet.get("revocations", []), packet.get("statuses", [])
     effects = packet.get("effects", [])
-    spent: dict[str, int] = {}
-    approval_use: dict[str, tuple] = {}   # approval id -> (invocation id, body digest) of its first use
+    state = {} if state is None else state
+    spent: dict[str, int] = dict(state.get("spent", {}))
+    # approval id -> (invocation id, body digest) of its first use, including uses in earlier packets
+    approval_use: dict[str, tuple] = {k: tuple(v) for k, v in state.get("approvals_used", {}).items()}
     out: list[Result] = []
     invocations = packet.get("invocations", [])
     order = {i.get("id"): n for n, i in enumerate(invocations)}
+    # spec 5.9.1 data lineage: data classes each invocation's output carries, through derived_from, earlier only
+    taint: dict[str, set] = {}
+    for n, i in enumerate(invocations):
+        own = {d for e in effects if e.get("invocation") == i.get("id") for d in (e.get("executed") or {}).get("accessed", [])}
+        for j in i.get("derived_from", []):
+            if order.get(j, n) < n:
+                own |= taint.get(j, set())
+        taint[i.get("id")] = own
     decisions = [d for d in packet.get("decisions", []) if verify_sig(d, keys)]
     # spec 5.13: a verified pre-execution quarantine withholds findings from every LATER invocation
     quarantined: dict[str, int] = {}
@@ -266,7 +277,7 @@ def evaluate(packet: dict, keys: dict, extra_protected=()) -> list[Result]:
         try:
             leaked = [f for f in inv.get("influenced_by", []) if f in quarantined and n > quarantined[f]]
             _check(bool(leaked) and not inv.get("principal_confirmed"), "violated", "I4", f"quarantined content reached the agent ({', '.join(leaked)})")
-            _evaluate_invocation(inv, packet, objs, keys, revocations, statuses, effects, spent, approval_use, extra_protected)
+            _evaluate_invocation(inv, packet, objs, keys, revocations, statuses, effects, spent, approval_use, extra_protected, order, taint)
             out.append(Result(rid, "preserved", "-", "continuity preserved"))
         except Stop as s:
             out.append(Result(rid, *s.r))
@@ -291,10 +302,12 @@ def evaluate(packet: dict, keys: dict, extra_protected=()) -> list[Result]:
     for e in effects:
         if e.get("invocation") not in inv_ids:
             out.append(Result(e.get("id", "?"), "violated", "I11", "effect without any authorized invocation (bypass)"))
+    state["spent"] = spent
+    state["approvals_used"] = {k: list(v) for k, v in approval_use.items()}
     return out
 
 
-def _evaluate_invocation(inv, packet, objs, keys, revocations, statuses, effects, spent, approval_use, extra_protected):
+def _evaluate_invocation(inv, packet, objs, keys, revocations, statuses, effects, spent, approval_use, extra_protected, order, taint):
     rid, t_inv = inv["id"], to_time(inv["t"])
     # 1. chain
     chain, node, seen = [], objs.get(inv.get("authority_ref")), set()
@@ -310,6 +323,8 @@ def _evaluate_invocation(inv, packet, objs, keys, revocations, statuses, effects
         _check(not intent or intent.get("kind") != "intent", "unresolved", "I7", "cited intent not found")
         needed.append(intent)
     _check(any(not verify_sig(o, keys) for o in needed), "unresolved", "I7", "missing or invalid signature, or signer lacks the role")
+    _check(any(order.get(j, order[rid]) >= order[rid] for j in inv.get("derived_from", [])),
+           "unresolved", "I7", "lineage reference not found among earlier invocations")
     # 3-4. interpretation
     _check(not interp or interp.get("source") not in ("curated", "customer"), "unresolved", "I3", "no approved interpretation")
     pinned = packet.get("pinned_adapters", {})
@@ -361,6 +376,13 @@ def _evaluate_invocation(inv, packet, objs, keys, revocations, statuses, effects
         _check(is_guardrail(x["resource"], extra_protected), "violated", "I9", "executed effect targets guardrail/evidence store")
         ok, why = effect_ok(x, eff_claims)
         _check(not ok, "violated", "I5" if why.startswith("released") else "I2", why)
+        # spec 5.9.1: data classes carried in through lineage (or read by this effect) reach the recipient too
+        if "recipient" in x:
+            inherited = set(x.get("accessed", []))
+            for j in inv.get("derived_from", []):
+                inherited |= taint.get(j, set())
+            leaked = sorted(f"{d}->{x['recipient']}" for d in inherited if f"{d}->{x['recipient']}" not in eff_claims.get("data", []))
+            _check(bool(leaked), "violated", "I5", f"derived data released: {', '.join(leaked)}")
         bodies.setdefault(approval_digest(x), x)
     if "approval_ref" in inv:
         _check(not appr or not verify_sig(appr, keys), "unresolved", "I7", "approval missing, unsigned or not signed by an approver")
@@ -416,10 +438,10 @@ def vectors():
     keys = {s.kid: s.public() for s in (I, H, O)}
     V = []
 
-    def add(name, expect, mutate):
+    def add(name, expect, mutate, state=None):
         p = base(I, H, O)
         mutate(p, I, H, O, X)
-        V.append((name, expect, p))
+        V.append((name, expect, p, state))
 
     def claims_of(p, which, **kw):
         return {**p[which][0]["claims"], **kw}
@@ -660,6 +682,34 @@ def vectors():
                                   "executed": {"action": "fs.delete", "resource": executed_resource, "effect": "destructive", "released": [], "t": 11}})])
     add("build cleanup within scope", ("preserved", "-"), lambda p, I, H, O, X: build_cleanup(p, I, H, O, "repo:app/build/"))
     add("destructive command drift (A3)", ("violated", "I2"), lambda p, I, H, O, X: build_cleanup(p, I, H, O, "repo:app/"))
+
+    # ---- draft.4: data lineage (A5) and cross-packet state ----
+    def read_then_send(p, I, H, O, recipient="external", derived=("i-1",)):
+        c = {"actions": ["fs.read", "http.post"], "resources": ["repo:app/*", "https://api.example/*"],
+             "data": ["confidential->internal"], "ceiling": "external_send"}
+        p.update(mandates=[I.sign({**p["mandates"][0], "claims": {**c, "exp": 100, "depth": 2}})])
+        p.update(delegations=[I.sign({**p["delegations"][0], "claims": {**c, "exp": 90, "depth": 1}})])
+        read = H.sign({**p["invocations"][0], "declared": {"action": "fs.read", "resource": "repo:app/docs/plan.md", "effect": "read"}})
+        send = H.sign({**p["invocations"][0], "id": "i-2", "t": 20, "actor": "agent:assistant-1", "derived_from": list(derived),
+                       "declared": {"action": "http.post", "resource": "https://api.example/upload", "effect": "external_send"}})
+        p.update(invocations=[read, send], effects=[
+            O.sign({**p["effects"][0], "executed": {"action": "fs.read", "resource": "repo:app/docs/plan.md", "effect": "read",
+                                                    "released": [], "accessed": ["confidential"], "t": 11}}),
+            O.sign({**p["effects"][0], "id": "e-2", "invocation": "i-2", "observed_by": "proxy:egress", "assurance": "L2",
+                    "executed": {"action": "http.post", "resource": "https://api.example/upload", "effect": "external_send",
+                                 "released": [], "recipient": recipient, "t": 21}})])
+    add("data leaving after a read (A5)", ("violated", "I5"), lambda p, I, H, O, X: read_then_send(p, I, H, O))
+    add("derived data sent to an allowed recipient", ("preserved", "-"), lambda p, I, H, O, X: read_then_send(p, I, H, O, recipient="internal"))
+    add("lineage reference not found", ("unresolved", "I7"), lambda p, I, H, O, X: read_then_send(p, I, H, O, derived=("i-404",)))
+    # cross-packet state (spec 10.6): the verifier carries approval use and budget spending between packets
+    body_digest = approval_digest({"action": "fs.write", "resource": "repo:app/src/auth.ts", "effect": "write_local", "released": []})
+    add("approval reused across packets", ("violated", "I8"), lambda p, I, H, O, X: (
+        p.update(approvals=[approve(p, "ap-9", expiry=50)]), p.update(invocations=[H.sign({**p["invocations"][0], "approval_ref": "ap-9"})])),
+        state={"approvals_used": {"ap-9": ["i-0", body_digest]}, "spent": {}})
+    add("budget spent in earlier packets", ("violated", "I2"), lambda p, I, H, O, X: budgets(p, I, H, 10, 5, 3),
+        state={"approvals_used": {}, "spent": {"m-1": 4, "d-1": 4}})
+    add("budget from earlier packets still within limit", ("preserved", "-"), lambda p, I, H, O, X: budgets(p, I, H, 10, 5, 3),
+        state={"approvals_used": {}, "spent": {"m-1": 2, "d-1": 2}})
     return keys, V
 
 
@@ -671,7 +721,7 @@ def check_dir(d: str) -> int:
             if not f.endswith(".json"):
                 continue
             v = json.load(open(os.path.join(d, sub, f)))
-            r = verdict(evaluate(v["packet"], keys))
+            r = verdict(evaluate(v["packet"], keys, state=v.get("state")))
             n += 1
             if (r.outcome, r.invariant) == (v["expect"]["outcome"], v["expect"]["invariant"]):
                 ok += 1
@@ -693,12 +743,14 @@ if __name__ == "__main__":
             if f.endswith(".json"):
                 os.remove(f"{out_dir}/{sub}/{f}")
     json.dump(keys, open(f"{out_dir}/keys.json", "w"), indent=1)
-    for name, (exp_out, exp_inv), packet in V:
-        r = verdict(evaluate(packet, keys))
+    for name, (exp_out, exp_inv), packet, state in V:
+        doc = {"name": name, "expect": {"outcome": exp_out, "invariant": exp_inv}, "packet": packet}
+        if state is not None:
+            doc["state"] = json.loads(json.dumps(state))   # stored before evaluation mutates it
+        r = verdict(evaluate(packet, keys, state=state))
         slug = "".join(ch if ch.isalnum() else "-" for ch in name.lower()).strip("-")
         folder = "positive" if exp_out == "preserved" else "must-reject"
-        json.dump({"name": name, "expect": {"outcome": exp_out, "invariant": exp_inv}, "packet": packet},
-                  open(f"{out_dir}/{folder}/{slug}.json", "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+        json.dump(doc, open(f"{out_dir}/{folder}/{slug}.json", "w", encoding="utf-8"), indent=1, ensure_ascii=False)
         ok = (r.outcome, r.invariant) == (exp_out, exp_inv)
         passed += ok
         if not ok:

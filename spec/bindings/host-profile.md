@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Document** | `amep-binding-host` |
-| **Version** | 0.2.0-draft.3 |
+| **Version** | 0.2.0-draft.4 |
 | **Status** | Public Draft. Companion to `spec/amep-v0.2.md` (the "core"). |
 
 This profile maps agent-host lifecycle hooks (in coding agents and similar hosts) onto AMEP objects, and defines how a PEP running as a hook must declare and record what the host can enforce.

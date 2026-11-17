@@ -23,8 +23,6 @@ author:
     email: "stafordtituss@gmail.com"
 
 normative:
-  RFC2119:
-  RFC8174:
   RFC8785:
   RFC8032:
   RFC3339:
@@ -111,6 +109,8 @@ Verifier:
 | Grant, revocation, status | Authorization Transition Record | liveness, I6 |
 | Continuity decision | (none) | the output of this document, with its phase |
 
+Mandates and delegations commonly originate in OAuth 2.0 Token Exchange chains {{RFC8693}}. Records MAY be carried as COSE_Sign1 objects {{RFC9052}}, and MAY be registered with a transparency service {{I-D.ietf-scitt-architecture}}, which makes selective omission of records detectable.
+
 This document doesn't define new transport or storage. It requires only that records carry the fields listed in {{fields}}, and that records can be linked using the AUDIT audit context: trace, parent, actor, and on-behalf-of.
 
 # Claim Model {#claims}
@@ -170,39 +170,56 @@ Without roles, a compromised host key could mint its own mandate or approve its 
 For each invocation, in recorded order, a verifier MUST apply the following checks in order and return the first outcome that applies. "Verified" means signed by a key holding a permitted role ({{roles}}).
 
 ~~~
-quarantined content in influence set, unconfirmed       -> violated,   I4
-no root mandate                                         -> unresolved, I7
-cited intent missing; any needed record not verified    -> unresolved, I7
-no approved interpretation, or a pin mismatch           -> unresolved, I3
-any delegation edge with not (child ⊑ parent)           -> violated,   I1
-verified revocation or status shows an ancestor revoked -> violated,   I6
-unverified revocation on the chain; or a revocable
-  record without a fresh verified status                -> unresolved, I7
-guardrail target                                        -> violated,   I9
-untrusted influence on a mutation, unconfirmed          -> violated if an effect exists, else unresolved, I4
-no effect record                                        -> unresolved, I7
-for every effect record of the invocation:
-  record not verified                                   -> unresolved, I7
-  e >= write_shared and actor absent, self-observed,
-    or assurance L0                                     -> unresolved, I10
-  executed != declared (and not the mediated effect)    -> violated,   I2
-  executed resource is a guardrail                      -> violated,   I9
-  x does not satisfy (meet of chain, and intent)        -> violated,   I2, or I5 for a release
-approval missing or not verified                        -> unresolved, I7
-approval unbound, outside its window, consumed, reused  -> violated,   I8
-recorded budget spend != recomputed cost                -> violated,   I7
-risk budget exceeded without a bound approval           -> violated,   I2
-otherwise                                               -> preserved
+ID   Outcome     Condition
+I4   violated    quarantined content in the influence set,
+                 not confirmed by the principal
+I7   unresolved  no root mandate
+I7   unresolved  cited intent missing, or a needed record
+                 not verified
+I7   unresolved  lineage names an invocation that is not earlier
+I3   unresolved  no approved interpretation, or a pin mismatch
+I1   violated    a delegation edge where not (child ⊑ parent)
+I6   violated    verified revocation or status shows an
+                 ancestor revoked
+I7   unresolved  unverified revocation on the chain, or a
+                 revocable record without a fresh verified status
+I9   violated    guardrail target
+I4   violated    untrusted influence on a mutation, unconfirmed
+                 (unresolved instead if no effect exists)
+I7   unresolved  no effect record
+     For every effect record of the invocation:
+I7   unresolved    record not verified
+I10  unresolved    e >= write_shared and the actor is absent,
+                   the effect is self-observed, or assurance L0
+I2   violated      executed != declared (and != the mediated
+                   effect)
+I9   violated      executed resource is a guardrail
+I2   violated      x does not satisfy the meet of the chain and
+                   intent (I5 when the failure is a release)
+I5   violated      data classes carried in through lineage reach
+                   a recipient class the claims do not permit
+I7   unresolved  approval missing or not verified
+I8   violated    approval unbound, outside its window,
+                 consumed, or reused
+I7   violated    recorded budget spend != recomputed cost
+I2   violated    risk budget exceeded without a bound approval
+-    preserved   otherwise
 ~~~
 
 After all invocations:
 
 ~~~
-pre-execution deny/hold decision, effect exists         -> violated,   I11 (enforcement contradicted)
-pre-execution deny/hold decision, no effect, enforcement
-  fail-closed or applied = confirmed                    -> preserved (denied before execution)
-effect with no invocation                               -> violated,   I11
+ID   Outcome     Condition
+I11  violated    pre-execution deny/hold decision, and an effect
+                 exists (enforcement contradicted)
+-    preserved   pre-execution deny/hold decision, no effect,
+                 enforcement fail-closed or applied = confirmed
+I11  violated    effect with no invocation
 ~~~
+
+Lineage: an effect may record the data classes it read (accessed) and the recipient class of what it sent; an invocation may name the earlier invocations its input came from (derived_from). The data classes an invocation carries are those its own effects read plus those carried by the invocations it derives from, transitively. This detects sensitive data leaving in a later step even when that step declares no release.
+
+A verifier evaluating a stream of packets MAY carry approval use and risk-budget spending from one packet to the next, so that single use and budgets hold across the stream.
 
 Decisions carry a phase: pre_execution, post_execution, or simulation. Only pre-execution decisions can confirm or contradict a block. A post-execution decision is detection and MUST NOT be presented as having prevented the action.
 
@@ -223,15 +240,15 @@ Records are canonicalized with JCS {{RFC8785}} and signed with Ed25519 {{RFC8032
 
 # Test Vectors
 
-{{AMEP}} publishes 89 vectors: 23 positive and 66 must-reject. The must-reject vectors cover all eleven invariants, signer roles, revocation status, decision phase, deny lists, risk-budget accounting, and a deny that an executed effect contradicts. Each vector is a packet of signed records, with the expected outcome and invariant. Two independently written implementations (Python, and JavaScript run under Node.js and in a browser) agree on all 89.
+{{AMEP}} publishes 95 vectors: 25 positive and 70 must-reject. The must-reject vectors cover all eleven invariants, signer roles, revocation status, decision phase, deny lists, data lineage, state across packets, risk-budget accounting, and a deny that an executed effect contradicts. Each vector is a packet of signed records, with the expected outcome and invariant. Two independently written implementations (Python, and JavaScript run under Node.js and in a browser) agree on all 95.
 
 A conforming verifier MUST return the expected outcome and invariant for every vector.
 
 # Implementation Status
 
-[Note to the RFC Editor: please remove this section before publication, per {{RFC7942}}.]
+**Note to the RFC Editor:** please remove this section before publication, per {{RFC7942}}.
 
-- **AMEP reference verifiers.** Two independent implementations: Python, and JavaScript (run as a Node.js command-line tool and as an offline browser page using WebCrypto). Both evaluate the procedure in {{evaluation}} and agree on all 89 published vectors. License: Apache 2.0. Location: https://github.com/stafordtituss/amep. Maturity: prototype.
+- **AMEP reference verifiers.** Two independent implementations: Python, and JavaScript (run as a Node.js command-line tool and as an offline browser page using WebCrypto). Both evaluate the procedure in {{evaluation}} and agree on all 95 published vectors. License: Apache 2.0. Location: https://github.com/stafordtituss/amep. Maturity: prototype.
 - **Natsar control plane** (agent-authority enforcement for coding-agent hosts and MCP). It emits decision records before tool execution from host hooks. Maturity: pre-release.
 
 Implementation experience motivated several parts of this document: canonical resource identifiers (absolute-path forms bypassed relative-prefix rules); recording the enforcement context and phase (hosts differ in whether they support "ask" and whether hook failures block); and treating an effect that contradicts a deny as evidence of bypass.

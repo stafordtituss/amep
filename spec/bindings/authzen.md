@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Document** | `amep-binding-authzen` |
-| **Version** | 0.2.0-draft.3 |
+| **Version** | 0.2.0-draft.4 |
 | **Status** | Public Draft. Companion to `spec/amep-v0.2.md` (the "core"). |
 
 This binding lets a Policy Enforcement Point (PEP) that already speaks the OpenID AuthZEN Authorization API obtain AMEP ContinuityDecisions from a Policy Decision Point (PDP) without a second protocol. It defines how an AMEP Invocation maps onto an AuthZEN evaluation request, how the decision and its evidence come back, and how `step_up` and `mediate` are carried.

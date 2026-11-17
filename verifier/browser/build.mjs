@@ -75,7 +75,7 @@ code { font:12.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
 <div class="summary" id="packet-summary" aria-live="polite"></div>
 <div class="table-wrap"><table id="packet-table" hidden><thead><tr><th>Object</th><th>Outcome</th><th>Invariant</th><th>Reason</th></tr></thead><tbody></tbody></table></div>
 </section>
-<p class="note">AMEP v0.2.0-draft.3 · evaluation code generated from <code>verifier/typescript/amep_core.mjs</code> · suite of ${suite.length} vectors.</p>
+<p class="note">AMEP v0.2.0-draft.4 · evaluation code generated from <code>verifier/typescript/amep_core.mjs</code> · suite of ${suite.length} vectors.</p>
 </main>
 <script id="amep-data" type="application/json">${embed}</script>
 <script>
@@ -98,7 +98,7 @@ async function precompute(packet, keys) {
   }
   return (o) => cache.get(o) === true;
 }
-async function run(packet, keys) { return evaluate(packet, keys, await precompute(packet, keys)); }
+async function run(packet, keys, state) { return evaluate(packet, keys, await precompute(packet, keys), [], state ? structuredClone(state) : {}); }
 const pill = o => '<span class="pill ' + o + '">' + o + '</span>';
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -109,7 +109,7 @@ async function ed25519Supported() {
 document.getElementById("run-suite").onclick = async () => {
   const body = document.querySelector("#suite-table tbody"); body.innerHTML = ""; let ok = 0;
   for (const v of DATA.suite) {
-    const r = verdict(await run(v.packet, DATA.keys));
+    const r = verdict(await run(v.packet, DATA.keys, v.state));
     const pass = r.outcome === v.expect.outcome && r.invariant === v.expect.invariant; ok += pass;
     body.insertAdjacentHTML("beforeend", "<tr><td><code>" + esc(v.file) + "</code></td><td>" + pill(v.expect.outcome) + " " + esc(v.expect.invariant) +
       "</td><td>" + pill(r.outcome) + " " + esc(r.invariant) + (pass ? "" : " ✗") + "</td><td>" + esc(r.reason) + "</td></tr>");

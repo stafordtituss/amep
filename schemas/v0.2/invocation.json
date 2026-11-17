@@ -52,6 +52,12 @@
   "principal_confirmed": {
    "type": "boolean"
   },
+  "derived_from": {
+   "type": "array",
+   "items": {
+    "$ref": "common.json#/$defs/ref"
+   }
+  },
   "budget_spent": {
    "type": "integer",
    "minimum": 0

@@ -81,11 +81,27 @@ def validate(v, s, doc, path="$"):
     return errs
 
 
+def library_validators():
+    """The independent `jsonschema` library (Draft 2020-12), if installed: returns (packet_validator, keyset_validator)."""
+    try:
+        from jsonschema import Draft202012Validator
+        from referencing import Registry, Resource
+    except ImportError:
+        return None
+    registry = Registry().with_resources([(s["$id"], Resource.from_contents(s)) for s in SCHEMAS.values()])
+    return (Draft202012Validator(SCHEMAS["packet.json"], registry=registry),
+            Draft202012Validator(SCHEMAS["keyset.json"], registry=registry))
+
+
 def main():
     bad = 0
+    lib = library_validators()
     keys = json.load(open(os.path.join(ROOT, "vectors", "keys.json")))
     for e in validate(keys, SCHEMAS["keyset.json"], SCHEMAS["keyset.json"]):
         print("keys.json:", e); bad += 1
+    if lib:
+        for e in lib[1].iter_errors(keys):
+            print("keys.json (jsonschema):", e.message); bad += 1
     n = 0
     for sub in ("positive", "must-reject"):
         for f in sorted(os.listdir(os.path.join(ROOT, "vectors", sub))):
@@ -95,18 +111,19 @@ def main():
             name = f"{sub}/{f}"
             packet = json.load(open(os.path.join(ROOT, "vectors", sub, f)))["packet"]
             errs = validate(packet, SCHEMAS["packet.json"], SCHEMAS["packet.json"])
+            lib_errs = [e.message for e in lib[0].iter_errors(packet)] if lib else None
+            if lib is not None and bool(errs) != bool(lib_errs):   # the two validators must agree on every vector
+                bad += 1
+                print(f"{name}: validators disagree (built-in: {errs[:2]}, jsonschema: {lib_errs[:2]})")
+                continue
             if name in EXPECTED_INVALID:
                 if not errs:
                     print(f"{name}: expected schema errors, found none"); bad += 1
             elif errs:
                 bad += 1
                 print(name, *errs[:5], sep="\n  ")
-    print(f"schema check: {n - bad}/{n} vectors as expected ({len(EXPECTED_INVALID)} deliberately invalid), keys.json checked")
-    try:
-        import jsonschema  # optional second opinion
-        print("jsonschema installed: run it against schemas/v0.2 for an independent check")
-    except ImportError:
-        print("note: `jsonschema` not installed; only the built-in validator ran")
+    which = "built-in validator and jsonschema (agreeing)" if lib else "built-in validator only (`jsonschema` not installed)"
+    print(f"schema check: {n - bad}/{n} vectors as expected ({len(EXPECTED_INVALID)} deliberately invalid), keys.json checked; {which}")
     return 1 if bad else 0
 
 

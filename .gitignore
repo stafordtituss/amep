@@ -8,3 +8,9 @@ OVERVIEW-ALIGNMENT.md
 __pycache__/
 *.pyc
 .DS_Store
+
+# IETF tooling cache
+ietf/.refcache/
+
+# Files Natsar redirected for a person to move
+natsar-out/

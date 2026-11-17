@@ -1,0 +1,163 @@
+{
+ "name": "lineage reference not found",
+ "expect": {
+  "outcome": "unresolved",
+  "invariant": "I7"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "fs.read",
+      "http.post"
+     ],
+     "resources": [
+      "repo:app/*",
+      "https://api.example/*"
+     ],
+     "data": [
+      "confidential->internal"
+     ],
+     "ceiling": "external_send",
+     "exp": 100,
+     "depth": 2
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "d4a7d5665d5d4d439343ea9484852cf253a7876cf5a86a9052a14049e62841b419088493489df9105c1b31f2e80f6c46e4d554d3fdf3a74e12e3445ab1ee9906"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "fs.read",
+      "http.post"
+     ],
+     "resources": [
+      "repo:app/*",
+      "https://api.example/*"
+     ],
+     "data": [
+      "confidential->internal"
+     ],
+     "ceiling": "external_send",
+     "exp": 90,
+     "depth": 1
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "1338fcb1d052e9c74848af9fc848530b0bfdc002e68076e57935a1a201f51d232b029abbcdb852b1d4a8de8b7d543445348f5bf9d76ec349ead5741fe476320b"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "host_shell",
+    "version": "r9",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "185d02d49c8440af31134eec4b820a71cfa92a89dd007f0b912acbcb9bf860641ff6e3ff58e7a08754e6bf9c27d2269d166521b86e39293ad09957a61fe75a09"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "fs.read",
+     "resource": "repo:app/docs/plan.md",
+     "effect": "read"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "0b2a1c420d20f12527eec0b8431324f2cea6614d2cea1a0397c4e0ef5d5236236923de7981b151a241e33b5128ab633f2b8f6abfc6e1d7b4ad733a4514137e04"
+    }
+   },
+   {
+    "id": "i-2",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 20,
+    "declared": {
+     "action": "http.post",
+     "resource": "https://api.example/upload",
+     "effect": "external_send"
+    },
+    "actor": "agent:assistant-1",
+    "derived_from": [
+     "i-404"
+    ],
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "4470942a8b97de6583f24db113631c9f944360f120fcfb68a7daecb824bcab04300b490c7a8d0ace1c56f58099a83bea20dcce4d38e05ea94154ee8fd2e2d80f"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "hook:host",
+    "assurance": "L1",
+    "executed": {
+     "action": "fs.read",
+     "resource": "repo:app/docs/plan.md",
+     "effect": "read",
+     "released": [],
+     "accessed": [
+      "confidential"
+     ],
+     "t": 11
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "sig": "de75cd484b2d577f83aefa6cf720ec349a00e8d26f4157e4801aa525bbf6b665b45a51b268cb16916f811e6632be864883c1c85aa5fe1e51498f52e81517480b"
+    }
+   },
+   {
+    "id": "e-2",
+    "kind": "effect",
+    "invocation": "i-2",
+    "observed_by": "proxy:egress",
+    "assurance": "L2",
+    "executed": {
+     "action": "http.post",
+     "resource": "https://api.example/upload",
+     "effect": "external_send",
+     "released": [],
+     "recipient": "external",
+     "t": 21
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "sig": "0248d6e9f19062bebbabf7077032f4cfa611b9192e9ad4d8453c333269181fc0cd74c7b6dbd52114623af83fa47b0da858ca9f75d52d8feedb1da80cf4aa6d01"
+    }
+   }
+  ]
+ }
+}
