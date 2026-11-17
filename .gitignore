@@ -1,0 +1,10 @@
+# Private working notes: never published
+PROTECTION-AND-LAUNCH.md
+OVERVIEW-ALIGNMENT.md
+
+# Local tooling state
+.natsar-trash/
+.claude/
+__pycache__/
+*.pyc
+.DS_Store

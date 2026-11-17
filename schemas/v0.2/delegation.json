@@ -1,0 +1,41 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://amep.example/schemas/v0.2/delegation.json",
+ "title": "delegation",
+ "description": "Delegation (spec 5.5). Signed by a key with role issuer or host.",
+ "type": "object",
+ "required": [
+  "kind",
+  "id",
+  "parent",
+  "claims"
+ ],
+ "properties": {
+  "kind": {
+   "const": "delegation"
+  },
+  "id": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "parent": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "delegate": {
+   "type": "string"
+  },
+  "claims": {
+   "$ref": "common.json#/$defs/claims"
+  },
+  "token": {
+   "$ref": "common.json#/$defs/token"
+  },
+  "proof": {
+   "$ref": "common.json#/$defs/proof"
+  }
+ },
+ "patternProperties": {
+  "^x-": {},
+  "\\.": {}
+ },
+ "additionalProperties": false
+}

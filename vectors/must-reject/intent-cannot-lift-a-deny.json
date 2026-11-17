@@ -1,0 +1,147 @@
+{
+ "name": "intent cannot lift a deny",
+ "expect": {
+  "outcome": "violated",
+  "invariant": "I2"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "fs.*",
+      "process.exec"
+     ],
+     "resources": [
+      "repo:app/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 100,
+     "depth": 2,
+     "deny_resources": [
+      "repo:app/src/secrets/*"
+     ]
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "fd771a4b94998d0b6d1e5aca72e81d69da1d9008b2cb9024925cb7aaab7b2f378a80b811a8163679a1cf02802d30a31226a863ecd8ecebacfdf99b335faf300a"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "fs.write"
+     ],
+     "resources": [
+      "repo:app/src/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 90,
+     "depth": 1,
+     "deny_resources": [
+      "repo:app/src/secrets/*"
+     ]
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "7467949dd301f444764345fa1781d741dfa5e51799ece06693a8cc52570b059c74a696fbbdeed3fe89afc1725cba15b9ac5ebc2df3b18dcf4f8fd68afc51000f"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "host_shell",
+    "version": "r9",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "185d02d49c8440af31134eec4b820a71cfa92a89dd007f0b912acbcb9bf860641ff6e3ff58e7a08754e6bf9c27d2269d166521b86e39293ad09957a61fe75a09"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "fs.write",
+     "resource": "repo:app/src/secrets/key.ts",
+     "effect": "write_local"
+    },
+    "intent_ref": "n-3",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "4013f31b1f4674d2afc08903e75ec1f6c2f7b7c7160d34b571947a1e5f26e93eddaacbac602ef2eebbf10144a457b12dd3f382fd184f8bea77ae91302d83330e"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "hook:host",
+    "assurance": "L1",
+    "executed": {
+     "action": "fs.write",
+     "resource": "repo:app/src/secrets/key.ts",
+     "effect": "write_local",
+     "released": [],
+     "t": 11
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "sig": "b92c58cc45fd677a1d0a295bd998d5b5849399800f3fdd5c7a97ceeb13c26be679c1769481a64bbcc5e2c4a9ff74dcffec78465c09be7263a35594841517b80f"
+    }
+   }
+  ],
+  "intents": [
+   {
+    "id": "n-3",
+    "kind": "intent",
+    "claims": {
+     "actions": [
+      "fs.write"
+     ],
+     "resources": [
+      "repo:app/src/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 90
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "6d1131a2fa0d96ad2df3f8bb1172ec9d9314670cd44733f402c4d154d09b2391fa5a19e622884651799bf569af28ff8f9ec5a18939f784b0b88377de2415cb0b"
+    }
+   }
+  ]
+ }
+}

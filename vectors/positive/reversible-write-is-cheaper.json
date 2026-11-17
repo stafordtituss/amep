@@ -1,0 +1,120 @@
+{
+ "name": "reversible write is cheaper",
+ "expect": {
+  "outcome": "preserved",
+  "invariant": "-"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "fs.*",
+      "process.exec"
+     ],
+     "resources": [
+      "repo:app/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 100,
+     "depth": 2,
+     "budget": 10
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "9f9a7e5d85c86788a4beb8257d902c7d254a95c603a89904a273bb60a60e070b8e7b5519c3257d22f093c32aadeb930ba5c7f11a16a59da2fe3682e531838707"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "fs.write"
+     ],
+     "resources": [
+      "repo:app/src/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 90,
+     "depth": 1,
+     "budget": 1
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "1602cc38c6613b06ae7e817523a684ec8097d68e3f2517884c5abac4bc8c798de9c4d39b5fab036c9882e633a031863ed06fb1faaaf7a9159b80f04bba134a09"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "host_shell",
+    "version": "r9",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "185d02d49c8440af31134eec4b820a71cfa92a89dd007f0b912acbcb9bf860641ff6e3ff58e7a08754e6bf9c27d2269d166521b86e39293ad09957a61fe75a09"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "write_local"
+    },
+    "budget_spent": 1,
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "51444fb585198f675b0cba9311fd6c01a5c73f2e2b7979ad007457d5c25e6049d7919facb43fab68b81d2a50c6411c873bc004f2559f4f9e2f1687d5647bcf0f"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "hook:host",
+    "assurance": "L1",
+    "executed": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "write_local",
+     "released": [],
+     "t": 11,
+     "reversible": true
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "sig": "944d67db9be2b621de5f2503d319c919b74ba4e1a555bb78a2b0244d5387e201252532207df90e051b5760f83a013b8f3b4281ad8684a52a5c7cd74f68d2a70c"
+    }
+   }
+  ]
+ }
+}

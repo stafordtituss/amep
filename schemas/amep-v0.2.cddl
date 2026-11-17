@@ -1,0 +1,213 @@
+; AMEP v0.2 objects in CDDL (RFC 8610). Companion to spec/amep-v0.2.md section 5 and schemas/v0.2/*.json.
+; Encoding: JSON (RFC 8259) or CBOR (RFC 8949). Signatures: Ed25519 over the RFC 8785 (JCS) form of the object
+; without `proof` (spec 12); deployments MAY instead use COSE_Sign1 over deterministic CBOR.
+; Status: checked with the `cddl` tool; all 89 conformance vectors validate (tools/validate_cddl.py).
+
+amep-packet = {
+  ? amep_version: tstr
+  ? mandates: [* principal-mandate]
+  ? delegations: [* delegation]
+  ? intents: [* intent]
+  ? interpretations: [* interpretation]
+  ? invocations: [* invocation]                 ; in the order they occurred
+  ? effects: [* executed-effect]
+  ? approvals: [* approval]
+  ? revocations: [* revocation]
+  ? statuses: [* revocation-status]
+  ? findings: [* content-finding]
+  ? decisions: [* continuity-decision]
+  ? pinned_adapters: { * tstr => tstr }         ; adapter id => approved version
+  * extension-key => any
+}
+
+; ---------------- shared ----------------
+ref = tstr .size (1..1024)
+amep-time = number / rfc3339                          ; spec 5.1.1
+rfc3339 = tstr .regexp "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?(Z|[+-]\\d{2}:\\d{2})"
+effect-class = "read" / "write_local" / "write_shared" / "external_send" / "destructive" / "financial"
+assurance = "L0" / "L1" / "L2" / "L3"
+data-flow = tstr .regexp "[a-z_]+->[a-z_]+"     ; data_class->recipient_class
+extension-key = tstr .regexp "x-.*|.*\\..*"      ; x- prefix or reverse-DNS (spec 16)
+proof = { alg: "Ed25519" / "ES256", kid: tstr, sig: tstr, ? timestamp_token: tstr }
+
+claims = {
+  actions: [+ tstr]
+  resources: [+ tstr]
+  ? data: [* data-flow]
+  ceiling: effect-class
+  exp: amep-time
+  ? nbf: amep-time
+  ? purpose: tstr
+  ? deny_actions: [* tstr]                     ; denies only grow along a chain (spec 7.1)
+  ? deny_resources: [* tstr]
+  ? depth: uint
+  ? budget: uint
+  * extension-key => any
+}
+
+declared-effect = { action: tstr, resource: tstr, effect: effect-class }
+
+; source token of a mandate or delegation (spec/profiles/); value only for expired or holder-bound tokens
+source-token = {
+  format: "biscuit" / "macaroon" / "ucan"
+  ? block: uint
+  digest: tstr .regexp "[0-9a-f]{64}"
+  ? value: tstr
+}
+
+executed-body = {
+  action: tstr
+  resource: tstr
+  effect: effect-class
+  ? released: [* data-flow]
+  ? reversible: bool
+  t: amep-time
+  * extension-key => any
+}
+
+; ---------------- objects (signer role in brackets, spec 12.5) ----------------
+principal-mandate = {                          ; [issuer]
+  id: ref, kind: "mandate", principal: tstr
+  ? issuer: tstr
+  ? subject_agent: tstr
+  claims: claims
+  ? revocation: { status_ref: tstr }
+  ? token: source-token
+  ? proof: proof
+  * extension-key => any
+}
+
+delegation = {                                 ; [issuer, host]
+  id: ref, kind: "delegation"
+  parent: ref
+  ? delegate: tstr
+  claims: claims                               ; MUST be narrower-or-equal to the parent (I1)
+  ? token: source-token
+  ? proof: proof
+  * extension-key => any
+}
+
+intent = {                                     ; [issuer, host]
+  id: ref, kind: "intent"
+  ? prompt_ref: ref
+  claims: claims
+  ? derivation: "template" / "judge" / "confirmed"
+  ? proof: proof
+  * extension-key => any
+}
+
+interpretation = {                             ; [host]
+  id: ref, kind: "interpretation"
+  source: "curated" / "customer" / "provider_hint" / "judge" / "none"
+  adapter: tstr
+  version: tstr
+  ? integrity_hash: tstr
+  ? proof: proof
+  * extension-key => any
+}
+
+invocation = {                                 ; [host]
+  id: ref, kind: "invocation"
+  authority_ref: ref
+  interpretation_ref: ref
+  ? intent_ref: ref
+  ? approval_ref: ref
+  t: amep-time
+  ? actor: tstr                                ; REQUIRED when declared.effect >= write_shared (I10)
+  declared: declared-effect
+  ? mediated: executed-body
+  ? influenced_by: [* ref]
+  ? principal_confirmed: bool
+  ? budget_spent: uint
+  ? correlation: { ? session_ref: tstr, ? prompt_ref: tstr, ? tool_use_ref: tstr, ? traceparent: tstr }
+  ? proof: proof
+  * extension-key => any
+}
+
+executed-effect = {                            ; [observer]
+  id: ref, kind: "effect"
+  invocation: ref
+  observed_by: tstr
+  assurance: assurance
+  executed: executed-body
+  ? backend_receipt: any
+  ? proof: proof
+  * extension-key => any
+}
+
+approval = {                                   ; [approver]
+  id: ref, kind: "approval"
+  effect_digest: tstr .regexp "[0-9a-f]{64}"   ; SHA-256 of JCS(executed-body without t)
+  presence: "webauthn" / "chat_user" / "host_ui" / "none"
+  ? approver: tstr
+  ? resource_version: tstr
+  ? nbf: amep-time
+  ? expiry: amep-time
+  ? consumed: bool
+  ? proof: proof
+  * extension-key => any
+}
+
+revocation = {                                 ; [issuer]
+  ? id: ref, kind: "revocation"
+  target: ref
+  t: amep-time
+  ? reason: tstr
+  ? proof: proof
+}
+
+revocation-status = {                          ; [issuer]
+  ? id: ref, kind: "status"
+  target: ref
+  as_of: amep-time
+  ? revoked_at: amep-time
+  ? proof: proof
+}
+
+content-finding = {                            ; [host, observer]
+  id: ref, kind: "finding"
+  source_locator: tstr
+  content_hash: tstr
+  ? span: { start: uint, end: uint, ? excerpt: tstr }
+  ? hidden_mechanism: "none" / "html_comment" / "zero_width" / "unicode_tags" / "white_text" / "alt_text" / "metadata" / "other"
+  integrity_label: "trusted" / "untrusted"
+  ? requested: { ? action: tstr, ? object: tstr, ? recipient: tstr }
+  ? proof: proof
+  * extension-key => any
+}
+
+continuity-decision = {                        ; [host]
+  ? id: ref, kind: "decision"
+  invocation: ref
+  outcome: "preserved" / "violated" / "unresolved"
+  ? invariant: "-" / "I1" / "I2" / "I3" / "I4" / "I5" / "I6" / "I7" / "I8" / "I9" / "I10" / "I11"
+  ? mode: "observe" / "allow" / "mediate" / "step_up" / "hold" / "deny" / "quarantine"
+  phase: "pre_execution" / "post_execution" / "simulation"
+  ? quarantined: [* ref]                       ; finding ids withheld from later invocations
+  ? reason: tstr
+  ? safe_alternatives: [* executed-body]
+  ? evidence_refs: [* ref]
+  ? enforcement: enforcement
+  ? proof: proof
+  * extension-key => any
+}
+
+enforcement = {
+  pep: tstr
+  fail_mode: "closed" / "open" / "unknown"
+  ? host_supports: [* ("ask" / "deny" / "rewrite_input" / "replace_output")]
+  ? encoded_as: tstr
+  ? applied: "confirmed" / "not_observed" / "contradicted"
+}
+
+; ---------------- key set (spec 12.4, 12.5) ----------------
+keyset = { * tstr => key-entry }
+key-entry = {
+  kid: tstr
+  alg: "Ed25519" / "ES256"
+  x: tstr
+  roles: [+ ("issuer" / "host" / "observer" / "approver")]
+  ? nbf: amep-time
+  ? exp: amep-time
+  ? revoked: bool
+}

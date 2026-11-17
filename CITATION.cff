@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use or refer to AMEP, please cite it as below."
+type: software
+title: "AMEP: Agentic Mandate Evidence Protocol"
+abstract: >-
+  An open protocol for proving that actions taken by AI agents stayed within
+  the authority a person delegated. It defines signed evidence objects for
+  each link from mandate to independently observed effect, a deterministic
+  three-valued evaluation (preserved, violated, unresolved), and a
+  conformance suite.
+authors:
+  - given-names: "Staford Titus"
+    family-names: "Selvaraj"
+    affiliation: "Independent"
+repository-code: "https://github.com/stafordtituss/amep"
+version: "0.2.0-draft.3"
+date-released: "2026-11-17"
+license:
+  - Apache-2.0
+keywords:
+  - AI agents
+  - delegation
+  - authorization
+  - audit evidence
+  - open standard

@@ -1,0 +1,86 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://amep.example/schemas/v0.2/invocation.json",
+ "title": "invocation",
+ "description": "Invocation (spec 5.8). Signed by role host.",
+ "type": "object",
+ "required": [
+  "kind",
+  "id",
+  "authority_ref",
+  "interpretation_ref",
+  "t",
+  "declared"
+ ],
+ "properties": {
+  "kind": {
+   "const": "invocation"
+  },
+  "id": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "authority_ref": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "interpretation_ref": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "intent_ref": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "approval_ref": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "t": {
+   "$ref": "common.json#/$defs/time"
+  },
+  "actor": {
+   "type": "string"
+  },
+  "declared": {
+   "$ref": "common.json#/$defs/declared"
+  },
+  "mediated": {
+   "$ref": "common.json#/$defs/executed_body"
+  },
+  "influenced_by": {
+   "type": "array",
+   "items": {
+    "$ref": "common.json#/$defs/ref"
+   }
+  },
+  "principal_confirmed": {
+   "type": "boolean"
+  },
+  "budget_spent": {
+   "type": "integer",
+   "minimum": 0
+  },
+  "correlation": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "session_ref": {
+     "type": "string"
+    },
+    "prompt_ref": {
+     "type": "string"
+    },
+    "tool_use_ref": {
+     "type": "string"
+    },
+    "traceparent": {
+     "type": "string"
+    }
+   }
+  },
+  "proof": {
+   "$ref": "common.json#/$defs/proof"
+  }
+ },
+ "patternProperties": {
+  "^x-": {},
+  "\\.": {}
+ },
+ "additionalProperties": false
+}

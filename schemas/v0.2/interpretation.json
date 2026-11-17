@@ -1,0 +1,48 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://amep.example/schemas/v0.2/interpretation.json",
+ "title": "interpretation",
+ "description": "AdapterInterpretation (spec 5.7). Signed by role host.",
+ "type": "object",
+ "required": [
+  "kind",
+  "id",
+  "source",
+  "adapter",
+  "version"
+ ],
+ "properties": {
+  "kind": {
+   "const": "interpretation"
+  },
+  "id": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "source": {
+   "enum": [
+    "curated",
+    "customer",
+    "provider_hint",
+    "judge",
+    "none"
+   ]
+  },
+  "adapter": {
+   "type": "string"
+  },
+  "version": {
+   "type": "string"
+  },
+  "integrity_hash": {
+   "type": "string"
+  },
+  "proof": {
+   "$ref": "common.json#/$defs/proof"
+  }
+ },
+ "patternProperties": {
+  "^x-": {},
+  "\\.": {}
+ },
+ "additionalProperties": false
+}

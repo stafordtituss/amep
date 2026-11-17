@@ -1,0 +1,97 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://amep.example/schemas/v0.2/decision.json",
+ "title": "decision",
+ "description": "ContinuityDecision (spec 5.13). Signed by role host.",
+ "type": "object",
+ "required": [
+  "kind",
+  "invocation",
+  "outcome",
+  "phase"
+ ],
+ "properties": {
+  "kind": {
+   "const": "decision"
+  },
+  "id": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "invocation": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "outcome": {
+   "enum": [
+    "preserved",
+    "violated",
+    "unresolved"
+   ]
+  },
+  "invariant": {
+   "enum": [
+    "-",
+    "I1",
+    "I2",
+    "I3",
+    "I4",
+    "I5",
+    "I6",
+    "I7",
+    "I8",
+    "I9",
+    "I10",
+    "I11"
+   ]
+  },
+  "mode": {
+   "enum": [
+    "observe",
+    "allow",
+    "mediate",
+    "step_up",
+    "hold",
+    "deny",
+    "quarantine"
+   ]
+  },
+  "phase": {
+   "enum": [
+    "pre_execution",
+    "post_execution",
+    "simulation"
+   ]
+  },
+  "quarantined": {
+   "type": "array",
+   "items": {
+    "$ref": "common.json#/$defs/ref"
+   }
+  },
+  "reason": {
+   "type": "string"
+  },
+  "safe_alternatives": {
+   "type": "array",
+   "items": {
+    "$ref": "common.json#/$defs/executed_body"
+   }
+  },
+  "evidence_refs": {
+   "type": "array",
+   "items": {
+    "$ref": "common.json#/$defs/ref"
+   }
+  },
+  "enforcement": {
+   "$ref": "common.json#/$defs/enforcement"
+  },
+  "proof": {
+   "$ref": "common.json#/$defs/proof"
+  }
+ },
+ "patternProperties": {
+  "^x-": {},
+  "\\.": {}
+ },
+ "additionalProperties": false
+}

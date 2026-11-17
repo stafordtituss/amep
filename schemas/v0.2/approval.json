@@ -1,0 +1,56 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://amep.example/schemas/v0.2/approval.json",
+ "title": "approval",
+ "description": "ApprovalBinding (spec 5.10). Signed by role approver. The digest excludes t.",
+ "type": "object",
+ "required": [
+  "kind",
+  "id",
+  "effect_digest",
+  "presence"
+ ],
+ "properties": {
+  "kind": {
+   "const": "approval"
+  },
+  "id": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "effect_digest": {
+   "type": "string",
+   "pattern": "^[0-9a-f]{64}$"
+  },
+  "presence": {
+   "enum": [
+    "webauthn",
+    "chat_user",
+    "host_ui",
+    "none"
+   ]
+  },
+  "approver": {
+   "type": "string"
+  },
+  "resource_version": {
+   "type": "string"
+  },
+  "nbf": {
+   "$ref": "common.json#/$defs/time"
+  },
+  "expiry": {
+   "$ref": "common.json#/$defs/time"
+  },
+  "consumed": {
+   "type": "boolean"
+  },
+  "proof": {
+   "$ref": "common.json#/$defs/proof"
+  }
+ },
+ "patternProperties": {
+  "^x-": {},
+  "\\.": {}
+ },
+ "additionalProperties": false
+}

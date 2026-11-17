@@ -1,0 +1,37 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://amep.example/schemas/v0.2/status.json",
+ "title": "status",
+ "description": "Revocation status assertion (spec 5.12). Signed by role issuer.",
+ "type": "object",
+ "required": [
+  "kind",
+  "target",
+  "as_of"
+ ],
+ "properties": {
+  "kind": {
+   "const": "status"
+  },
+  "id": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "target": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "as_of": {
+   "$ref": "common.json#/$defs/time"
+  },
+  "revoked_at": {
+   "$ref": "common.json#/$defs/time"
+  },
+  "proof": {
+   "$ref": "common.json#/$defs/proof"
+  }
+ },
+ "patternProperties": {
+  "^x-": {},
+  "\\.": {}
+ },
+ "additionalProperties": false
+}

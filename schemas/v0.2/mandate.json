@@ -1,0 +1,56 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://amep.example/schemas/v0.2/mandate.json",
+ "title": "mandate",
+ "description": "PrincipalMandate (spec 5.4). Signed by a key with role issuer.",
+ "type": "object",
+ "required": [
+  "kind",
+  "id",
+  "principal",
+  "claims"
+ ],
+ "properties": {
+  "kind": {
+   "const": "mandate"
+  },
+  "id": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "principal": {
+   "type": "string"
+  },
+  "issuer": {
+   "type": "string"
+  },
+  "subject_agent": {
+   "type": "string"
+  },
+  "claims": {
+   "$ref": "common.json#/$defs/claims"
+  },
+  "revocation": {
+   "type": "object",
+   "required": [
+    "status_ref"
+   ],
+   "properties": {
+    "status_ref": {
+     "type": "string"
+    }
+   },
+   "additionalProperties": false
+  },
+  "token": {
+   "$ref": "common.json#/$defs/token"
+  },
+  "proof": {
+   "$ref": "common.json#/$defs/proof"
+  }
+ },
+ "patternProperties": {
+  "^x-": {},
+  "\\.": {}
+ },
+ "additionalProperties": false
+}

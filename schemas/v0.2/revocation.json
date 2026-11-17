@@ -1,0 +1,37 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://amep.example/schemas/v0.2/revocation.json",
+ "title": "revocation",
+ "description": "Revocation (spec 5.12). Signed by role issuer; unsigned revocations on a chain make it unresolved.",
+ "type": "object",
+ "required": [
+  "kind",
+  "target",
+  "t"
+ ],
+ "properties": {
+  "kind": {
+   "const": "revocation"
+  },
+  "id": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "target": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "t": {
+   "$ref": "common.json#/$defs/time"
+  },
+  "reason": {
+   "type": "string"
+  },
+  "proof": {
+   "$ref": "common.json#/$defs/proof"
+  }
+ },
+ "patternProperties": {
+  "^x-": {},
+  "\\.": {}
+ },
+ "additionalProperties": false
+}

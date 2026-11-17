@@ -1,0 +1,112 @@
+{
+ "name": "build cleanup within scope",
+ "expect": {
+  "outcome": "preserved",
+  "invariant": "-"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "fs.delete"
+     ],
+     "resources": [
+      "repo:app/build/*"
+     ],
+     "data": [],
+     "ceiling": "destructive",
+     "exp": 100,
+     "depth": 2
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "54779c2d94061117f6a61f8edbd17f099f83bc8f44831afab3493c6824e3499e26e0f99e70d8c422097e7a17b0a5172eee57cfd08c326a3d88f7d2c7be988504"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "fs.delete"
+     ],
+     "resources": [
+      "repo:app/build/*"
+     ],
+     "data": [],
+     "ceiling": "destructive",
+     "exp": 90,
+     "depth": 1
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "648cd49381650593ac1d1e8001efcc66b03cd6a9cbc118648b74d1ad9d944e3fb2d686327c68a3cad2d94ac3e28d65a3a7387685b7c6b467d91955e7f4eab108"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "host_shell",
+    "version": "r9",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "185d02d49c8440af31134eec4b820a71cfa92a89dd007f0b912acbcb9bf860641ff6e3ff58e7a08754e6bf9c27d2269d166521b86e39293ad09957a61fe75a09"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "fs.delete",
+     "resource": "repo:app/build/",
+     "effect": "destructive"
+    },
+    "actor": "agent:assistant-1",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "bfeaa1b91687c90aded295921701106a5cd8af263bfac07cc0bf3eb3b4d62c3815a6b4b8f141d2f205c33d0951506ba463f061e28c9dc939d6b9996fa5f70907"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "fs-audit:host",
+    "assurance": "L2",
+    "executed": {
+     "action": "fs.delete",
+     "resource": "repo:app/build/",
+     "effect": "destructive",
+     "released": [],
+     "t": 11
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "sig": "90f6f1d855aca7e55e7ac26a19b18a6c6323cc30530a4bf8032efbeea772469d953ab38d29fde59fcd50e63c11f3110a5b313f0184c4bdeb6399d06980431e03"
+    }
+   }
+  ]
+ }
+}

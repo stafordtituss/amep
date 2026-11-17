@@ -1,0 +1,269 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://amep.example/schemas/v0.2/common.json",
+ "title": "common",
+ "description": "Shared AMEP v0.2 types (spec 5.1, 5.3, 5.9).",
+ "$defs": {
+  "ref": {
+   "type": "string",
+   "minLength": 1
+  },
+  "time": {
+   "description": "Seconds since the Unix epoch, or an RFC 3339 date-time with offset (spec 5.1.1).",
+   "anyOf": [
+    {
+     "type": "number"
+    },
+    {
+     "type": "string",
+     "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?(Z|[+-]\\d{2}:\\d{2})$"
+    }
+   ]
+  },
+  "effect_class": {
+   "enum": [
+    "read",
+    "write_local",
+    "write_shared",
+    "external_send",
+    "destructive",
+    "financial"
+   ]
+  },
+  "assurance": {
+   "enum": [
+    "L0",
+    "L1",
+    "L2",
+    "L3"
+   ]
+  },
+  "data_flow": {
+   "type": "string",
+   "pattern": "^[a-z_]+->[a-z_]+$"
+  },
+  "proof": {
+   "type": "object",
+   "required": [
+    "alg",
+    "kid",
+    "sig"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "alg": {
+     "enum": [
+      "Ed25519",
+      "ES256"
+     ]
+    },
+    "kid": {
+     "type": "string",
+     "minLength": 1
+    },
+    "sig": {
+     "type": "string",
+     "minLength": 1
+    },
+    "timestamp_token": {
+     "type": "string"
+    }
+   }
+  },
+  "claims": {
+   "type": "object",
+   "required": [
+    "actions",
+    "resources",
+    "ceiling",
+    "exp"
+   ],
+   "additionalProperties": false,
+   "patternProperties": {
+    "^x-": {},
+    "\\.": {}
+   },
+   "properties": {
+    "actions": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "minItems": 1
+    },
+    "resources": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "minItems": 1
+    },
+    "data": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/data_flow"
+     }
+    },
+    "ceiling": {
+     "$ref": "#/$defs/effect_class"
+    },
+    "exp": {
+     "$ref": "#/$defs/time"
+    },
+    "nbf": {
+     "$ref": "#/$defs/time"
+    },
+    "purpose": {
+     "type": "string"
+    },
+    "deny_actions": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "deny_resources": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "depth": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "budget": {
+     "type": "integer",
+     "minimum": 0
+    }
+   }
+  },
+  "declared": {
+   "type": "object",
+   "required": [
+    "action",
+    "resource",
+    "effect"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "action": {
+     "type": "string"
+    },
+    "resource": {
+     "type": "string"
+    },
+    "effect": {
+     "$ref": "#/$defs/effect_class"
+    }
+   }
+  },
+  "executed_body": {
+   "type": "object",
+   "required": [
+    "action",
+    "resource",
+    "effect",
+    "t"
+   ],
+   "additionalProperties": false,
+   "patternProperties": {
+    "^x-": {},
+    "\\.": {}
+   },
+   "properties": {
+    "action": {
+     "type": "string"
+    },
+    "resource": {
+     "type": "string"
+    },
+    "effect": {
+     "$ref": "#/$defs/effect_class"
+    },
+    "released": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/data_flow"
+     }
+    },
+    "reversible": {
+     "type": "boolean"
+    },
+    "t": {
+     "$ref": "#/$defs/time"
+    }
+   }
+  },
+  "token": {
+   "description": "Source token of a mandate or delegation (spec/profiles/). value only for expired or holder-bound tokens.",
+   "type": "object",
+   "required": [
+    "format",
+    "digest"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "format": {
+     "enum": [
+      "biscuit",
+      "macaroon",
+      "ucan"
+     ]
+    },
+    "block": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "digest": {
+     "type": "string",
+     "pattern": "^[0-9a-f]{64}$"
+    },
+    "value": {
+     "type": "string"
+    }
+   }
+  },
+  "enforcement": {
+   "type": "object",
+   "required": [
+    "pep",
+    "fail_mode"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "pep": {
+     "type": "string"
+    },
+    "fail_mode": {
+     "enum": [
+      "closed",
+      "open",
+      "unknown"
+     ]
+    },
+    "host_supports": {
+     "type": "array",
+     "items": {
+      "enum": [
+       "ask",
+       "deny",
+       "rewrite_input",
+       "replace_output"
+      ]
+     }
+    },
+    "encoded_as": {
+     "type": "string"
+    },
+    "applied": {
+     "enum": [
+      "confirmed",
+      "not_observed",
+      "contradicted"
+     ]
+    }
+   }
+  }
+ }
+}

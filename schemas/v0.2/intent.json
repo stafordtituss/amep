@@ -1,0 +1,41 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://amep.example/schemas/v0.2/intent.json",
+ "title": "intent",
+ "description": "IntentCertificate (spec 5.6).",
+ "type": "object",
+ "required": [
+  "kind",
+  "id",
+  "claims"
+ ],
+ "properties": {
+  "kind": {
+   "const": "intent"
+  },
+  "id": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "prompt_ref": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "claims": {
+   "$ref": "common.json#/$defs/claims"
+  },
+  "derivation": {
+   "enum": [
+    "template",
+    "judge",
+    "confirmed"
+   ]
+  },
+  "proof": {
+   "$ref": "common.json#/$defs/proof"
+  }
+ },
+ "patternProperties": {
+  "^x-": {},
+  "\\.": {}
+ },
+ "additionalProperties": false
+}

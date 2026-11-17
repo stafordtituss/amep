@@ -1,0 +1,90 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://amep.example/schemas/v0.2/packet.json",
+ "title": "packet",
+ "description": "A packet of AMEP objects submitted for evaluation (spec 5.2).",
+ "type": "object",
+ "required": [],
+ "properties": {
+  "amep_version": {
+   "type": "string"
+  },
+  "mandates": {
+   "type": "array",
+   "items": {
+    "$ref": "mandate.json"
+   }
+  },
+  "delegations": {
+   "type": "array",
+   "items": {
+    "$ref": "delegation.json"
+   }
+  },
+  "intents": {
+   "type": "array",
+   "items": {
+    "$ref": "intent.json"
+   }
+  },
+  "interpretations": {
+   "type": "array",
+   "items": {
+    "$ref": "interpretation.json"
+   }
+  },
+  "invocations": {
+   "type": "array",
+   "items": {
+    "$ref": "invocation.json"
+   }
+  },
+  "effects": {
+   "type": "array",
+   "items": {
+    "$ref": "effect.json"
+   }
+  },
+  "approvals": {
+   "type": "array",
+   "items": {
+    "$ref": "approval.json"
+   }
+  },
+  "revocations": {
+   "type": "array",
+   "items": {
+    "$ref": "revocation.json"
+   }
+  },
+  "statuses": {
+   "type": "array",
+   "items": {
+    "$ref": "status.json"
+   }
+  },
+  "findings": {
+   "type": "array",
+   "items": {
+    "$ref": "finding.json"
+   }
+  },
+  "decisions": {
+   "type": "array",
+   "items": {
+    "$ref": "decision.json"
+   }
+  },
+  "pinned_adapters": {
+   "type": "object",
+   "additionalProperties": {
+    "type": "string"
+   }
+  }
+ },
+ "patternProperties": {
+  "^x-": {},
+  "\\.": {}
+ },
+ "additionalProperties": false
+}

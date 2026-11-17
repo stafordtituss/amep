@@ -1,0 +1,90 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://amep.example/schemas/v0.2/finding.json",
+ "title": "finding",
+ "description": "ContentFinding (spec 5.11). Counts as trusted only when signed (role host or observer).",
+ "type": "object",
+ "required": [
+  "kind",
+  "id",
+  "source_locator",
+  "content_hash",
+  "integrity_label"
+ ],
+ "properties": {
+  "kind": {
+   "const": "finding"
+  },
+  "id": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "source_locator": {
+   "type": "string"
+  },
+  "content_hash": {
+   "type": "string"
+  },
+  "span": {
+   "type": "object",
+   "required": [
+    "start",
+    "end"
+   ],
+   "properties": {
+    "start": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "end": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "excerpt": {
+     "type": "string"
+    }
+   },
+   "additionalProperties": false
+  },
+  "hidden_mechanism": {
+   "enum": [
+    "none",
+    "html_comment",
+    "zero_width",
+    "unicode_tags",
+    "white_text",
+    "alt_text",
+    "metadata",
+    "other"
+   ]
+  },
+  "integrity_label": {
+   "enum": [
+    "trusted",
+    "untrusted"
+   ]
+  },
+  "requested": {
+   "type": "object",
+   "properties": {
+    "action": {
+     "type": "string"
+    },
+    "object": {
+     "type": "string"
+    },
+    "recipient": {
+     "type": "string"
+    }
+   },
+   "additionalProperties": false
+  },
+  "proof": {
+   "$ref": "common.json#/$defs/proof"
+  }
+ },
+ "patternProperties": {
+  "^x-": {},
+  "\\.": {}
+ },
+ "additionalProperties": false
+}

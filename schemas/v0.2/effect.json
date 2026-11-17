@@ -1,0 +1,44 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://amep.example/schemas/v0.2/effect.json",
+ "title": "effect",
+ "description": "ExecutedEffectReceipt (spec 5.9). Signed by role observer.",
+ "type": "object",
+ "required": [
+  "kind",
+  "id",
+  "invocation",
+  "observed_by",
+  "assurance",
+  "executed"
+ ],
+ "properties": {
+  "kind": {
+   "const": "effect"
+  },
+  "id": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "invocation": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "observed_by": {
+   "type": "string"
+  },
+  "assurance": {
+   "$ref": "common.json#/$defs/assurance"
+  },
+  "executed": {
+   "$ref": "common.json#/$defs/executed_body"
+  },
+  "backend_receipt": {},
+  "proof": {
+   "$ref": "common.json#/$defs/proof"
+  }
+ },
+ "patternProperties": {
+  "^x-": {},
+  "\\.": {}
+ },
+ "additionalProperties": false
+}
