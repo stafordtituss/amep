@@ -152,7 +152,8 @@ No backward-compatibility concerns. The extension is opt-in on both sides, adds 
 ## Reference Implementation
 
 - **Evidence format and verifiers (available):** the AMEP specification, conformance suite and two independent verifiers: https://github.com/stafordtituss/amep, published as `amep-protocol` on PyPI and `@stafordtituss/amep` on npm. Both include a producer SDK that creates and signs effect receipts.
-- **MCP prototype (to do, required before review):** a branch of an official MCP SDK in which a server advertises the extension and returns signed receipts, and a client or gateway verifies and stores them, with integration tests and setup instructions. Per the extension process, the extension would first be published as Experimental (in an `experimental-ext-` repository associated with the sponsoring group).
+- **MCP prototype (available):** https://github.com/stafordtituss/amep/tree/main/prototypes/mcp-amep-evidence, built on the official MCP Python SDK (`mcp` 2.3.0) through its extension interface (`Extension.intercept_tool_call` on the server, `ClientExtension` on the client). A reference server advertises the extension and signs receipts for what each tool actually executed. A reference gateway verifies them and evaluates the evidence. Eight integration tests run real MCP sessions, in-process and over stdio, covering: an honest server (`preserved`), a server whose receipt shows it changed a different resource than requested (`violated`), no opt-in (no receipt), a tampered receipt (rejected), a tool with no effect (no receipt), a server without the extension (unchanged behavior), and the stdio transport. Setup instructions are in its README.
+- **Next step:** per the extension process, publish the extension as Experimental in an `experimental-ext-` repository associated with the sponsoring group, and port the server half into an SDK branch if the group prefers.
 
 ## Open Questions
 
