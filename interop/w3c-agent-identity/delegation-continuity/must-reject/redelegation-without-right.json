@@ -1,0 +1,156 @@
+{
+ "name": "redelegation-without-right",
+ "question": "Did A have authority to re-delegate? (B, holding depth 0, delegates on to C)",
+ "aria": "§4 maxDelegationDepth, §6 delegationDepth",
+ "expect": {
+  "outcome": "violated",
+  "invariant": "I1"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "did:web:acme.example:people:hr-lead",
+    "claims": {
+     "actions": [
+      "hiring.read",
+      "calendar.write",
+      "communication.send"
+     ],
+     "resources": [
+      "hiring:candidate/*",
+      "calendar:interview/*",
+      "communication:candidate/*"
+     ],
+     "deny_resources": [
+      "calendar:interview/executive/*"
+     ],
+     "data": [
+      "candidate_pii->internal"
+     ],
+     "ceiling": "external_send",
+     "exp": 100,
+     "depth": 2
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "1b74976ee6e63b6b3143dbf05fae6e7d5f1b9329d94942adffae46b8bbf601d46db50d6c28b225a2fc6da64f5a1fea07b1b18c97f50a533dadbcdf06b0310f0c"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "calendar.write"
+     ],
+     "resources": [
+      "calendar:interview/req-1042/*"
+     ],
+     "deny_resources": [
+      "calendar:interview/executive/*"
+     ],
+     "data": [
+      "candidate_pii->internal"
+     ],
+     "ceiling": "write_shared",
+     "exp": 90,
+     "depth": 0
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "81df4cf9a7b11f2814b7a679bded3369c5cd44db4999869dee13e13a3220b93c4ae688e8b061ee3cd2a7d70429b933384628cf0b0f2bf10fe81cca68da86bf09"
+    }
+   },
+   {
+    "id": "d-2",
+    "kind": "delegation",
+    "parent": "d-1",
+    "claims": {
+     "actions": [
+      "calendar.write"
+     ],
+     "resources": [
+      "calendar:interview/req-1042/*"
+     ],
+     "deny_resources": [
+      "calendar:interview/executive/*"
+     ],
+     "data": [
+      "candidate_pii->internal"
+     ],
+     "ceiling": "write_shared",
+     "exp": 80,
+     "depth": 0
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "f723563e7512acf52cc4cd85d92a982e602e88582aee9be28dce0c397c6006e943baa6b784a01d4f37274fbd37bffa78990d8cfc5154ffd469d471012647c60d"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "calendar_api",
+    "version": "v3",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-2",
+    "interpretation_ref": "a-1",
+    "actor": "did:aria:acme.example:reminder-agent",
+    "t": 10,
+    "declared": {
+     "action": "calendar.write",
+     "resource": "calendar:interview/req-1042/slot-3",
+     "effect": "write_shared"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "002ec4b2c0020b6cde0cb8efe01bca110fe941c720fb6a0bce974de13559515eab99913a535f4bf0e9d01846b1d279908d44298564836321110833e3c0287105"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "service:calendar.acme.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "calendar.write",
+     "resource": "calendar:interview/req-1042/slot-3",
+     "effect": "write_shared",
+     "released": [],
+     "reversible": true,
+     "t": 11
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "sig": "5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"
+    }
+   }
+  ]
+ }
+}

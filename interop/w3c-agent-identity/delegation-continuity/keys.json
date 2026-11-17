@@ -1,0 +1,27 @@
+{
+ "issuer-1": {
+  "kid": "issuer-1",
+  "alg": "Ed25519",
+  "x": "f10ab371f310e425f6fd490914900d91dcbf0f8f9092b97a5b54db03fd159cfd",
+  "roles": [
+   "issuer",
+   "approver"
+  ]
+ },
+ "host-1": {
+  "kid": "host-1",
+  "alg": "Ed25519",
+  "x": "a47b0cbe987f84a9fe8cbd26c70ecd88af027be1bb6b3d238afc46deb644b24e",
+  "roles": [
+   "host"
+  ]
+ },
+ "observer-1": {
+  "kid": "observer-1",
+  "alg": "Ed25519",
+  "x": "0b9e3158bf50c36b257b0b765958ab985c83b568abb3b56e2ae990b666b2663f",
+  "roles": [
+   "observer"
+  ]
+ }
+}

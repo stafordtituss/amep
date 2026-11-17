@@ -1,0 +1,129 @@
+{
+ "name": "self-issued-delegation",
+ "question": "B signs its own delegation with a key that holds no issuer role.",
+ "aria": "§6 every hop signed by the delegator",
+ "expect": {
+  "outcome": "unresolved",
+  "invariant": "I7"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "did:web:acme.example:people:hr-lead",
+    "claims": {
+     "actions": [
+      "hiring.read",
+      "calendar.write",
+      "communication.send"
+     ],
+     "resources": [
+      "hiring:candidate/*",
+      "calendar:interview/*",
+      "communication:candidate/*"
+     ],
+     "deny_resources": [
+      "calendar:interview/executive/*"
+     ],
+     "data": [
+      "candidate_pii->internal"
+     ],
+     "ceiling": "external_send",
+     "exp": 100,
+     "depth": 2
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "1b74976ee6e63b6b3143dbf05fae6e7d5f1b9329d94942adffae46b8bbf601d46db50d6c28b225a2fc6da64f5a1fea07b1b18c97f50a533dadbcdf06b0310f0c"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "calendar.write"
+     ],
+     "resources": [
+      "calendar:interview/req-1042/*"
+     ],
+     "deny_resources": [
+      "calendar:interview/executive/*"
+     ],
+     "data": [
+      "candidate_pii->internal"
+     ],
+     "ceiling": "write_shared",
+     "exp": 90,
+     "depth": 0
+    },
+    "proof": {
+     "kid": "attacker",
+     "alg": "Ed25519",
+     "sig": "b09097a78ec55662fed54c6bacd0bf1ce6885bad8e37895754c663a2e357c469d808106e9699911f679f57af1735c2d04699d3e540090897f1c4166b908baf00"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "calendar_api",
+    "version": "v3",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "actor": "did:aria:acme.example:scheduling-agent",
+    "t": 10,
+    "declared": {
+     "action": "calendar.write",
+     "resource": "calendar:interview/req-1042/slot-3",
+     "effect": "write_shared"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "fb9095ec5110caaa76e6665c7cb7ee55243aad85a1793a013e82fdb54751597550acdb246b43132323bb78fb3f3495e5c15f7d704521f6a7e69dfca721aca20c"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "service:calendar.acme.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "calendar.write",
+     "resource": "calendar:interview/req-1042/slot-3",
+     "effect": "write_shared",
+     "released": [],
+     "reversible": true,
+     "t": 11
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "sig": "5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"
+    }
+   }
+  ]
+ }
+}

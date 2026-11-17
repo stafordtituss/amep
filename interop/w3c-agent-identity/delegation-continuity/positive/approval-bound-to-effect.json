@@ -1,0 +1,144 @@
+{
+ "name": "approval-bound-to-effect",
+ "question": "A required human approval covers exactly the effect executed.",
+ "aria": "hitlRequired: approval present and bound",
+ "expect": {
+  "outcome": "preserved",
+  "invariant": "-"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "did:web:acme.example:people:hr-lead",
+    "claims": {
+     "actions": [
+      "hiring.read",
+      "calendar.write",
+      "communication.send"
+     ],
+     "resources": [
+      "hiring:candidate/*",
+      "calendar:interview/*",
+      "communication:candidate/*"
+     ],
+     "deny_resources": [
+      "calendar:interview/executive/*"
+     ],
+     "data": [
+      "candidate_pii->internal"
+     ],
+     "ceiling": "external_send",
+     "exp": 100,
+     "depth": 2
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "1b74976ee6e63b6b3143dbf05fae6e7d5f1b9329d94942adffae46b8bbf601d46db50d6c28b225a2fc6da64f5a1fea07b1b18c97f50a533dadbcdf06b0310f0c"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "calendar.write"
+     ],
+     "resources": [
+      "calendar:interview/req-1042/*"
+     ],
+     "deny_resources": [
+      "calendar:interview/executive/*"
+     ],
+     "data": [
+      "candidate_pii->internal"
+     ],
+     "ceiling": "write_shared",
+     "exp": 90,
+     "depth": 0
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "81df4cf9a7b11f2814b7a679bded3369c5cd44db4999869dee13e13a3220b93c4ae688e8b061ee3cd2a7d70429b933384628cf0b0f2bf10fe81cca68da86bf09"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "calendar_api",
+    "version": "v3",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "actor": "did:aria:acme.example:scheduling-agent",
+    "t": 10,
+    "declared": {
+     "action": "calendar.write",
+     "resource": "calendar:interview/req-1042/slot-3",
+     "effect": "write_shared"
+    },
+    "approval_ref": "ap-1",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "9755f3ad39a182eb343330912af14f1e78976d9012667d5ddde6d69974f431c39cf81f3097545701347d22b522db0df0be308bcf6bec09d8956fce09034c500f"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "service:calendar.acme.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "calendar.write",
+     "resource": "calendar:interview/req-1042/slot-3",
+     "effect": "write_shared",
+     "released": [],
+     "reversible": true,
+     "t": 11
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "sig": "5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"
+    }
+   }
+  ],
+  "approvals": [
+   {
+    "id": "ap-1",
+    "kind": "approval",
+    "effect_digest": "20d18ff78360c8520dfae23069432616da48ff7d2963a7e5483619f3aabed30b",
+    "presence": "webauthn",
+    "expiry": 50,
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "0ba5da238f46146517fffae9e03f73fc33fa898c193f1ab3e359e210eba9c03143c50856d9c19638f0013a9803c3d72a6416c7d329120b32135eb810f3a98504"
+    }
+   }
+  ]
+ }
+}
