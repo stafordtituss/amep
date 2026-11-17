@@ -1,0 +1,58 @@
+name: packages
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: License files in the package match the repository
+        run: cmp LICENSE-CODE packages/python/LICENSE && cmp NOTICE packages/python/NOTICE
+      - name: Build the wheel and install it into a clean environment
+        run: |
+          python -m pip install --quiet build
+          python -m build packages/python --outdir dist
+          python -m venv /tmp/venv
+          /tmp/venv/bin/pip install --quiet dist/*.whl
+      - name: Installed CLI passes the conformance suite
+        run: |
+          /tmp/venv/bin/amep-protocol version
+          /tmp/venv/bin/amep-protocol check-suite vectors
+      - name: Unit tests
+        run: |
+          python -m pip install --quiet cryptography
+          python -m unittest discover -s packages/python/tests
+
+  javascript:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ["20", "22"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: License files in the package match the repository
+        run: cmp LICENSE-CODE packages/js/LICENSE && cmp NOTICE packages/js/NOTICE
+      - name: Unit tests
+        run: node --test packages/js/test/
+      - name: Pack, install into a clean project, and run the installed CLI
+        run: |
+          (cd packages/js && npm pack --pack-destination /tmp)
+          mkdir /tmp/app && cd /tmp/app && npm init -y > /dev/null
+          npm install --no-audit --no-fund /tmp/amep-*.tgz
+          npx amep-protocol version
+          npx amep-protocol check-suite "$GITHUB_WORKSPACE/vectors"
