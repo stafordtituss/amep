@@ -4,7 +4,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { createPublicKey, verify as edVerify, createHash } from "node:crypto";
-import { evaluate, verdict, canon, stripProof, sha256Hex } from "./amep_core.mjs";
+import { evaluate, verdict, canon, stripProof, sha256Hex } from "../../packages/js/src/core.mjs";
 
 function sigOk(obj, key) {
   const der = Buffer.concat([Buffer.from("302a300506032b6570032100", "hex"), Buffer.from(key.x, "hex")]); // Ed25519 SPKI prefix

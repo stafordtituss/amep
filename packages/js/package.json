@@ -1,0 +1,44 @@
+{
+  "name": "amep",
+  "version": "0.2.0-alpha.4",
+  "description": "Verify and produce AMEP (Agentic Mandate Evidence Protocol) evidence: proof that AI agent actions stayed within delegated authority.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./core": "./src/core.mjs",
+    "./sdk": "./src/sdk.mjs",
+    "./node": "./src/node.mjs"
+  },
+  "bin": {
+    "amep-protocol": "./bin/amep-protocol.mjs"
+  },
+  "files": [
+    "src",
+    "bin",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "keywords": [
+    "ai-agents",
+    "delegation",
+    "authorization",
+    "audit",
+    "evidence",
+    "amep"
+  ],
+  "author": "Staford Titus Selvaraj",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/stafordtituss/amep",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stafordtituss/amep.git",
+    "directory": "packages/js"
+  }
+}

@@ -1,12 +1,12 @@
 // Builds verifier/browser/amep-verify.html: a single offline page that runs the shared evaluation core
-// (verifier/typescript/amep_core.mjs) with WebCrypto Ed25519, embeds the conformance suite, and lets anyone
+// (packages/js/src/core.mjs) with WebCrypto Ed25519, embeds the conformance suite, and lets anyone
 // paste a packet. Run from the repo root: node verifier/browser/build.mjs
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const core = readFileSync(join(root, "verifier/typescript/amep_core.mjs"), "utf8").replace(/^export /gm, "");
+const core = readFileSync(join(root, "packages/js/src/core.mjs"), "utf8").replace(/^export /gm, "");
 const keys = JSON.parse(readFileSync(join(root, "vectors/keys.json"), "utf8"));
 const suite = [];
 for (const sub of ["positive", "must-reject"])
@@ -75,7 +75,7 @@ code { font:12.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
 <div class="summary" id="packet-summary" aria-live="polite"></div>
 <div class="table-wrap"><table id="packet-table" hidden><thead><tr><th>Object</th><th>Outcome</th><th>Invariant</th><th>Reason</th></tr></thead><tbody></tbody></table></div>
 </section>
-<p class="note">AMEP v0.2.0-draft.4 · evaluation code generated from <code>verifier/typescript/amep_core.mjs</code> · suite of ${suite.length} vectors.</p>
+<p class="note">AMEP v0.2.0-draft.4 · evaluation code generated from <code>packages/js/src/core.mjs</code> · suite of ${suite.length} vectors.</p>
 </main>
 <script id="amep-data" type="application/json">${embed}</script>
 <script>

@@ -2,6 +2,7 @@
 PROTECTION-AND-LAUNCH.md
 OVERVIEW-ALIGNMENT.md
 OUTREACH.md
+OUTREACH-EMAILS.md
 
 # Local tooling state
 .natsar-trash/
@@ -15,3 +16,10 @@ ietf/.refcache/
 
 # Files Natsar redirected for a person to move
 natsar-out/
+
+# Package build output
+build/
+dist/
+*.egg-info/
+node_modules/
+*.tgz

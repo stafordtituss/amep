@@ -10,19 +10,38 @@ AMEP defines portable, signed evidence for that chain, from a person's mandate t
 - `violated`: it went beyond, and the result names the broken invariant;
 - `unresolved`: evidence is missing, which is never treated as permission.
 
+## Install
+
+| Language | Package | Install |
+|---|---|---|
+| Python 3.10+ | `amep-protocol` | `pip install amep-protocol` |
+| Node.js 20+ | `amep` | `npm install amep` |
+
+Both include a verifier, a producer SDK (keys, signing, and builders for every AMEP object) and the `amep-protocol` command-line tool:
+
+```
+amep-protocol verify packet.json --keys keys.json      # exit 0 preserved, 1 violated, 2 unresolved
+amep-protocol keygen --kid issuer-1 --roles issuer,approver --out issuer-1
+amep-protocol check-suite vectors/
+```
+
+See `packages/python/README.md` and `packages/js/README.md`. The packages are not yet published; see `PUBLISHING.md`.
+
 ## What's here
 
 | Path | Contents |
 |---|---|
 | `spec/amep-v0.2.md` | The core specification |
 | `spec/bindings/` | AuthZEN, MCP and agent-host bindings |
-| `spec/profiles/` | Biscuit, Macaroon, PASETO and Verifiable Credential profiles |
+| `spec/profiles/` | Biscuit, Macaroon, PASETO, UCAN and Verifiable Credential profiles |
 | `schemas/` | JSON Schemas (one per object) and CDDL |
 | `vectors/` | The conformance suite: positive and must-reject packets |
-| `verifier/python/` | Reference verifier and vector generator (Python) |
-| `verifier/typescript/` | Independent reference verifier (JavaScript, Node.js CLI) |
-| `verifier/browser/` | The same JavaScript verifier as an offline web page |
-| `tools/` | Schema builder and validator, Appendix B generator |
+| `packages/python/` | The `amep-protocol` Python package: verifier, SDK, CLI |
+| `packages/js/` | The `amep` npm package: the same, in JavaScript (independent implementation) |
+| `verifier/python/` | Conformance-vector generator (uses the Python package) |
+| `verifier/typescript/` | Repository CLI for the JavaScript verifier |
+| `verifier/browser/` | The JavaScript verifier as an offline web page |
+| `tools/` | Schema builder and validators, Appendix B generator, attribution check |
 
 ## Check everything
 
