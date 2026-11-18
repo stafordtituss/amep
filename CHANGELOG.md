@@ -7,6 +7,7 @@ Specification drafts, conformance-suite versions and package versions are listed
 - **Conformance suite v0.2.1** (no normative change): 16 vectors found by mutation analysis of the reference evaluator, covering the action-widening and effect-ceiling rules, `write_shared` as high impact, intent references to non-intent objects, approval `nbf`, verdict precedence within a packet, and the inclusive edge of every time, budget and approval-window bound. 111 vectors (32 positive, 79 must-reject).
 - **Mutation analysis tool** (`paper/eval/mutation.py`) with a `--check` mode for CI, and verification benchmarks (`paper/eval/bench.py`, `bench.mjs`).
 - **`amep-mcp`**: the verifier as an MCP server (`packages/mcp`), with both conformance suites bundled.
+- **`amep-agents`**: evidence recording for the OpenAI Agents SDK (tracing processor) and LangGraph/LangChain (callback handler), with end-to-end tests (`packages/agents`).
 - **Delegation-continuity test materials** for the W3C Agent Identity Registry Protocol Community Group (`interop/w3c-agent-identity/delegation-continuity/`): 20 vectors and an offline browser verifier.
 - **AMEP-Proposal-1: EvaluationRecord** (`proposals/`).
 - `RESEARCH.md`, `CONTRIBUTING.md` and this changelog.

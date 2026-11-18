@@ -19,6 +19,7 @@ AMEP defines portable, signed evidence for that chain, from a person's mandate t
 | Python 3.10+ | `amep-protocol` | `pip install --pre amep-protocol` |
 | Node.js 20+ | `@stafordtituss/amep` | `npm install @stafordtituss/amep` |
 | Any MCP client | `amep-mcp` (MCP server) | `uvx amep-mcp` |
+| OpenAI Agents SDK, LangGraph | `amep-agents` | `pip install --pre "amep-agents[openai-agents]"` or `[langgraph]` |
 
 Both include a verifier, a producer SDK (keys, signing, and builders for every AMEP object) and the `amep-protocol` command-line tool:
 
@@ -44,6 +45,7 @@ See `packages/python/README.md` and `packages/js/README.md`. Published at [amep-
 | `packages/python/` | The `amep-protocol` Python package: verifier, SDK, CLI |
 | `packages/js/` | The `@stafordtituss/amep` npm package: the same, in JavaScript (independent implementation) |
 | `packages/mcp/` | The `amep-mcp` MCP server: the verifier and both conformance suites as MCP tools |
+| `packages/agents/` | The `amep-agents` package: evidence for every tool call in OpenAI Agents SDK and LangGraph/LangChain agents |
 | `verifier/python/` | Conformance-vector generator (uses the Python package) |
 | `verifier/typescript/` | Repository CLI for the JavaScript verifier |
 | `verifier/browser/` | The JavaScript verifier as an offline web page |
