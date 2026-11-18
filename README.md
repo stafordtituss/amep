@@ -2,7 +2,7 @@
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24317758.svg)](https://doi.org/10.5281/zenodo.24317758) [![PyPI](https://img.shields.io/pypi/v/amep-protocol)](https://pypi.org/project/amep-protocol/) [![npm](https://img.shields.io/npm/v/@stafordtituss/amep)](https://www.npmjs.com/package/@stafordtituss/amep)
 
-**Status:** draft v0.2.0-draft.4 · **Author and editor:** Staford Titus Selvaraj ([ORCID 0009-0004-8227-7595](https://orcid.org/0009-0004-8227-7595)) · **IETF:** [draft-stafordtituss-agentic-mandate-evidence](https://datatracker.ietf.org/doc/draft-stafordtituss-agentic-mandate-evidence/)
+**Status:** draft v0.2.0-draft.4 · **Author and editor:** Staford Titus Selvaraj ([ORCID 0009-0004-8227-7595](https://orcid.org/0009-0004-8227-7595)) · **IETF:** [draft-stafordtituss-agentic-mandate-evidence](https://datatracker.ietf.org/doc/draft-stafordtituss-agentic-mandate-evidence/) · **Paper:** [Preprints.org, doi:10.20944/preprints202611.1865.v1](https://doi.org/10.20944/preprints202611.1865.v1)
 
 AI agents act for people through chains of delegation, tools and adapters. Identity tells you *who* acted, and authorization tells you what a token *allowed*. Neither proves that **what actually happened stayed within what a person authorized**.
 

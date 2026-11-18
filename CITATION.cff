@@ -14,6 +14,13 @@ authors:
     affiliation: "Independent"
     orcid: "https://orcid.org/0009-0004-8227-7595"
 doi: "10.5281/zenodo.24317758"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.24317758"
+    description: "Software and specification archive (Zenodo, all versions)"
+  - type: doi
+    value: "10.20944/preprints202611.1865.v1"
+    description: "Paper: AMEP: Verifiable Evidence That Agent Actions Stayed Within Delegated Authority (Preprints.org)"
 repository-code: "https://github.com/stafordtituss/amep"
 version: "0.2.0-draft.4-r2"
 date-released: "2026-11-17"
