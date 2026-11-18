@@ -1,0 +1,29 @@
+name: release-mcp
+
+# Publishes the amep-mcp package when an mcp-v* tag is pushed, for example: git tag mcp-v0.1.0a1 && git push --tags
+# One-time setup (see PUBLISHING.md): on pypi.org add a pending trusted publisher for project amep-mcp ->
+# this repository, workflow release-mcp.yml, environment pypi. No token needed.
+
+on:
+  push:
+    tags: ["mcp-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  pypi:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write          # trusted publishing to PyPI
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          python -m pip install --quiet build
+          python -I packages/mcp/build_suite.py --check
+          python -m build packages/mcp --outdir dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
