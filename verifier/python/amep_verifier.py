@@ -343,6 +343,61 @@ def vectors():
         state={"approvals_used": {}, "spent": {"m-1": 4, "d-1": 4}})
     add("budget from earlier packets still within limit", ("preserved", "-"), lambda p, I, H, O, X: budgets(p, I, H, 10, 5, 3),
         state={"approvals_used": {}, "spent": {"m-1": 2, "d-1": 2}})
+
+    # Suite v0.2.1: vectors added from mutation analysis of the reference evaluator (paper/eval/mutation.py).
+    # Each one distinguishes a rule, or the inclusive edge of a bound, that no earlier vector isolated.
+    def deleg(p, I, **kw):
+        p.update(delegations=[I.sign({**p["delegations"][0], "claims": claims_of(p, "delegations", **kw)})])
+
+    def mand(p, I, **kw):
+        p.update(mandates=[I.sign({**p["mandates"][0], "claims": claims_of(p, "mandates", **kw)})])
+
+    def times(p, H, O, inv_t=None, eff_t=None):
+        if inv_t is not None:
+            p.update(invocations=[H.sign({**p["invocations"][0], "t": inv_t})])
+        if eff_t is not None:
+            p.update(effects=[O.sign({**p["effects"][0], "executed": {**p["effects"][0]["executed"], "t": eff_t}})])
+
+    def shared(p, I, H, O, observed_by, assurance, ceiling="write_shared"):
+        """A write_shared effect (high impact, spec 8.3) by a named actor."""
+        mand(p, I, ceiling="write_shared")
+        deleg(p, I, ceiling=ceiling)
+        p.update(invocations=[H.sign({**p["invocations"][0], "actor": "agent:assistant-1",
+                                      "declared": {**p["invocations"][0]["declared"], "effect": "write_shared"}})])
+        p.update(effects=[O.sign({**p["effects"][0], "observed_by": observed_by, "assurance": assurance,
+                                  "executed": {**p["effects"][0]["executed"], "effect": "write_shared"}})])
+
+    def with_approval(p, I, H, aid, **kw):
+        p.update(approvals=[approve(p, aid, **kw)])
+        p.update(invocations=[H.sign({**p["invocations"][0], "approval_ref": aid})])
+
+    # rules no earlier vector isolated
+    add("delegation widens actions", ("violated", "I1"), lambda p, I, H, O, X: deleg(p, I, actions=["fs.write", "net.send"]))
+    add("action outside delegated actions", ("violated", "I2"), lambda p, I, H, O, X: (
+        mand(p, I, actions=["fs.*", "process.exec"]),
+        p.update(invocations=[H.sign({**p["invocations"][0], "declared": {**p["invocations"][0]["declared"], "action": "process.exec"}})]),
+        p.update(effects=[O.sign({**p["effects"][0], "executed": {**p["effects"][0]["executed"], "action": "process.exec"}})])))
+    add("effect class above delegated ceiling", ("violated", "I2"), lambda p, I, H, O, X: shared(p, I, H, O, "proxy:egress", "L2", ceiling="write_local"))
+    add("write_shared effect only self-reported", ("unresolved", "I10"), lambda p, I, H, O, X: shared(p, I, H, O, "agent:assistant-1", "L1"))
+    add("intent reference names a non-intent object", ("unresolved", "I7"), lambda p, I, H, O, X:
+        p.update(invocations=[H.sign({**p["invocations"][0], "intent_ref": "d-1"})]))
+    add("approval not yet valid", ("violated", "I8"), lambda p, I, H, O, X: with_approval(p, I, H, "ap-10", nbf=20))
+    add("violation outranks unresolved in one packet", ("violated", "I2"), lambda p, I, H, O, X: (
+        p.update(invocations=[H.sign({**p["invocations"][0], "id": "i-0", "t": 9}), p["invocations"][0]]),
+        p.update(effects=[O.sign({**p["effects"][0], "executed": {**p["effects"][0]["executed"], "resource": "repo:app/.env"}})])))
+    # inclusive edges of every time, budget and window bound (spec 7.1 rule 5, 7.3 rule 7, 5.10, 5.12)
+    add("delegation expiring with its parent", ("preserved", "-"), lambda p, I, H, O, X: deleg(p, I, exp=100))
+    add("delegation keeps the parent's full budget", ("preserved", "-"), lambda p, I, H, O, X: (mand(p, I, budget=10), deleg(p, I, budget=10)))
+    add("effect at the last instant of validity", ("preserved", "-"), lambda p, I, H, O, X: times(p, H, O, eff_t=90))
+    add("effect at the first instant of validity", ("preserved", "-"), lambda p, I, H, O, X: (
+        mand(p, I, nbf=11), deleg(p, I, nbf=11), times(p, H, O, inv_t=11, eff_t=11)))
+    add("revoked at the instant of the action", ("violated", "I6"), lambda p, I, *a: p.update(revocations=[I.sign({"kind": "revocation", "target": "m-1", "t": 10})]))
+    add("status shows revocation at the instant of the action", ("violated", "I6"), lambda p, I, *a: (
+        revocable(p, I), p.update(statuses=[I.sign({"kind": "status", "target": "m-1", "as_of": 12, "revoked_at": 10})])))
+    add("status current as of the action", ("preserved", "-"), lambda p, I, *a: (
+        revocable(p, I), p.update(statuses=[I.sign({"kind": "status", "target": "m-1", "as_of": 10})])))
+    add("approval used at its expiry instant", ("preserved", "-"), lambda p, I, H, O, X: with_approval(p, I, H, "ap-11", expiry=11))
+    add("approval valid from the instant of the action", ("preserved", "-"), lambda p, I, H, O, X: with_approval(p, I, H, "ap-12", nbf=10))
     return keys, V
 
 

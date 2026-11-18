@@ -1,0 +1,912 @@
+{
+ "by_operator": {
+  "CHECK": {
+   "n": 32,
+   "core": 30,
+   "deleg": 9,
+   "either": 30
+  },
+  "RULE": {
+   "n": 21,
+   "core": 17,
+   "deleg": 6,
+   "either": 17
+  },
+  "BOUND": {
+   "n": 15,
+   "core": 5,
+   "deleg": 2,
+   "either": 5
+  },
+  "VERDICT": {
+   "n": 2,
+   "core": 1,
+   "deleg": 1,
+   "either": 1
+  }
+ },
+ "total": {
+  "n": 70,
+  "core": 53,
+  "deleg": 18,
+  "either": 53
+ },
+ "mutants": [
+  {
+   "op": "CHECK",
+   "line": 251,
+   "label": "I4",
+   "src": "_check(bool(leaked) and not inv.get(\"principal_confirmed\"), \"violated\", \"I4\", f\"quarantined content reached th",
+   "killed_by_core": [
+    "must-reject/quarantined-content-reached-the-agent--a1.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 268,
+   "label": "I11",
+   "src": "out.append(Result(d[\"invocation\"], \"violated\", \"I11\", \"effect executed despite a deny/hold decision (enforceme",
+   "killed_by_core": [
+    "must-reject/deny-contradicted-by-executed-effect.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 289,
+   "label": "I7",
+   "src": "_check(not chain or chain[0].get(\"kind\") != \"mandate\", \"unresolved\", \"I7\", \"no root mandate\")",
+   "killed_by_core": [
+    "must-reject/identity-only-authorization--no-mandate.json",
+    "must-reject/missing-parent-lineage.json"
+   ],
+   "killed_by_delegation": [
+    "must-reject/identity-only.json"
+   ]
+  },
+  {
+   "op": "CHECK",
+   "line": 295,
+   "label": "I7",
+   "src": "_check(not intent or intent.get(\"kind\") != \"intent\", \"unresolved\", \"I7\", \"cited intent not found\")",
+   "killed_by_core": [],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 297,
+   "label": "I7",
+   "src": "_check(any(not verify_sig(o, keys) for o in needed), \"unresolved\", \"I7\", \"missing or invalid signature, or sig",
+   "killed_by_core": [
+    "must-reject/forged-mandate--attacker-key.json",
+    "must-reject/invocation-signed-by-unknown-key.json",
+    "must-reject/mandate-minted-by-host-key.json",
+    "must-reject/unsigned-intent.json",
+    "must-reject/unsigned-invocation.json"
+   ],
+   "killed_by_delegation": [
+    "must-reject/self-issued-delegation.json"
+   ]
+  },
+  {
+   "op": "CHECK",
+   "line": 298,
+   "label": "I7",
+   "src": "_check(any(order.get(j, order[rid]) >= order[rid] for j in inv.get(\"derived_from\", [])),",
+   "killed_by_core": [
+    "must-reject/lineage-reference-not-found.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 301,
+   "label": "I3",
+   "src": "_check(not interp or interp.get(\"source\") not in (\"curated\", \"customer\"), \"unresolved\", \"I3\", \"no approved int",
+   "killed_by_core": [
+    "must-reject/interpretation-from-provider-hint-only.json",
+    "must-reject/unknown-interpretation.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 303,
+   "label": "I3",
+   "src": "_check(bool(pinned) and pinned.get(interp.get(\"adapter\")) != interp.get(\"version\"), \"unresolved\", \"I3\", \"adapt",
+   "killed_by_core": [
+    "must-reject/unapproved-adapter-revision.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 307,
+   "label": "I1",
+   "src": "_check(not ok, \"violated\", \"I1\", f\"{c['id']}: {why}\")",
+   "killed_by_core": [
+    "must-reject/delegation-adds-data-class.json",
+    "must-reject/delegation-changes-purpose.json",
+    "must-reject/delegation-depth-not-decreasing.json",
+    "must-reject/delegation-drops-nbf.json",
+    "must-reject/delegation-extends-validity.json",
+    "must-reject/delegation-from-a-zero-depth-parent.json",
+    "must-reject/delegation-removes-a-deny.json",
+    "must-reject/delegation-widens-resources.json",
+    "must-reject/delegation-widens-risk-budget.json",
+    "must-reject/delegation-without-depth-under-bounded-parent.json",
+    "must-reject/expand-then-shrink-delegation.json"
+   ],
+   "killed_by_delegation": [
+    "must-reject/delegation-drops-a-deny.json",
+    "must-reject/delegation-outlives-parent.json",
+    "must-reject/delegation-raises-effect-class.json",
+    "must-reject/delegation-widens-scope.json",
+    "must-reject/depth-not-decreasing.json",
+    "must-reject/redelegation-without-right.json"
+   ]
+  },
+  {
+   "op": "CHECK",
+   "line": 311,
+   "label": "I6",
+   "src": "_check(any(verify_sig(r, keys) and to_time(r[\"t\"]) <= t_inv for r in revs), \"violated\", \"I6\", \"ancestor revoke",
+   "killed_by_core": [
+    "must-reject/revoked-root-with-live-child.json"
+   ],
+   "killed_by_delegation": [
+    "must-reject/root-revoked-before-action.json"
+   ]
+  },
+  {
+   "op": "CHECK",
+   "line": 313,
+   "label": "I6",
+   "src": "_check(any(s.get(\"revoked_at\") is not None and to_time(s[\"revoked_at\"]) <= t_inv for s in sts), \"violated\", \"I",
+   "killed_by_core": [
+    "must-reject/status-shows-revoked-before-action.json"
+   ],
+   "killed_by_delegation": [
+    "must-reject/status-shows-revoked.json"
+   ]
+  },
+  {
+   "op": "CHECK",
+   "line": 314,
+   "label": "I7",
+   "src": "_check(any(not verify_sig(r, keys) for r in revs), \"unresolved\", \"I7\", \"unverifiable revocation on the chain\")",
+   "killed_by_core": [
+    "must-reject/unsigned-revocation-on-the-chain.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 318,
+   "label": "I7",
+   "src": "_check(not fresh, \"unresolved\", \"I7\", f\"no signed revocation status for {n['id']} as of the invocation\")",
+   "killed_by_core": [
+    "must-reject/revocable-mandate-without-status.json",
+    "must-reject/stale-revocation-status.json"
+   ],
+   "killed_by_delegation": [
+    "must-reject/stale-status.json"
+   ]
+  },
+  {
+   "op": "CHECK",
+   "line": 320,
+   "label": "I9",
+   "src": "_check(is_guardrail(inv[\"declared\"][\"resource\"], extra_protected), \"violated\", \"I9\", \"targets guardrail/eviden",
+   "killed_by_core": [
+    "must-reject/guardrail-write--i9.json",
+    "must-reject/guardrail-write-via-absolute-path--i9.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 325,
+   "label": "I4",
+   "src": "_check(bool(untrusted) and inv[\"declared\"][\"effect\"] != \"read\" and not inv.get(\"principal_confirmed\"),",
+   "killed_by_core": [
+    "must-reject/injection-driven-mutation.json",
+    "must-reject/unsigned-finding-claims-trusted.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 328,
+   "label": "I7",
+   "src": "_check(not mine, \"unresolved\", \"I7\", \"no executed-effect receipt\")",
+   "killed_by_core": [
+    "must-reject/deny-on-fail-open-host--no-effect-record.json",
+    "must-reject/missing-effect-receipt.json",
+    "must-reject/post-execution-decision-cannot-claim-a-block.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 339,
+   "label": "I7",
+   "src": "_check(not verify_sig(e, keys), \"unresolved\", \"I7\", \"effect receipt unsigned or signer lacks the role\")",
+   "killed_by_core": [
+    "must-reject/tampered-effect-receipt.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 341,
+   "label": "I10",
+   "src": "_check(not inv.get(\"actor\"), \"unresolved\", \"I10\", \"actor not recorded; observer independence cannot be shown\")",
+   "killed_by_core": [
+    "must-reject/high-impact-effect-without-actor.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 342,
+   "label": "I10",
+   "src": "_check(e.get(\"observed_by\") == inv[\"actor\"] or e.get(\"assurance\") == \"L0\", \"unresolved\", \"I10\", \"high-impact e",
+   "killed_by_core": [
+    "must-reject/self-reported-high-impact-effect.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 345,
+   "label": "I2",
+   "src": "_check(canon(x) != canon(inv[\"mediated\"]), \"violated\", \"I2\", \"executed differs from mediated effect\")",
+   "killed_by_core": [
+    "must-reject/mediated-effect-not-honored.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 347,
+   "label": "I2",
+   "src": "_check((x[\"action\"], x[\"resource\"]) != (inv[\"declared\"][\"action\"], inv[\"declared\"][\"resource\"]), \"violated\", \"",
+   "killed_by_core": [
+    "must-reject/second-effect-outside-declared.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 348,
+   "label": "I9",
+   "src": "_check(is_guardrail(x[\"resource\"], extra_protected), \"violated\", \"I9\", \"executed effect targets guardrail/evid",
+   "killed_by_core": [
+    "must-reject/mediated-into-a-guardrail-path--i9.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 350,
+   "label": "I5",
+   "src": "_check(not ok, \"violated\", \"I5\" if why.startswith(\"released\") else \"I2\", why)",
+   "killed_by_core": [
+    "must-reject/denied-action.json",
+    "must-reject/effect-after-mandate-validity.json",
+    "must-reject/effect-before-validity--nbf.json",
+    "must-reject/effect-on-a-denied-resource.json",
+    "must-reject/effect-outside-delegated-scope.json",
+    "must-reject/intent-cannot-lift-a-deny.json",
+    "must-reject/intent-narrower-than-grant.json",
+    "must-reject/rfc-3339-effect-after-expiry.json",
+    "must-reject/secret-released-externally--i5.json"
+   ],
+   "killed_by_delegation": [
+    "must-reject/effect-outside-delegated-scope.json"
+   ]
+  },
+  {
+   "op": "CHECK",
+   "line": 357,
+   "label": "I5",
+   "src": "_check(bool(leaked), \"violated\", \"I5\", f\"derived data released: {', '.join(leaked)}\")",
+   "killed_by_core": [
+    "must-reject/data-leaving-after-a-read--a5.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 360,
+   "label": "I7",
+   "src": "_check(not appr or not verify_sig(appr, keys), \"unresolved\", \"I7\", \"approval missing, unsigned or not signed b",
+   "killed_by_core": [
+    "must-reject/self-approval-signed-by-host-key.json",
+    "must-reject/unsigned-approval.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 363,
+   "label": "I8",
+   "src": "_check(appr[\"effect_digest\"] != d, \"violated\", \"I8\", \"approval not bound to the executed effect\")",
+   "killed_by_core": [
+    "must-reject/approval-digest-mismatch--toctou.json"
+   ],
+   "killed_by_delegation": [
+    "must-reject/approval-for-a-different-effect.json"
+   ]
+  },
+  {
+   "op": "CHECK",
+   "line": 364,
+   "label": "I8",
+   "src": "_check(bool(appr.get(\"consumed\")), \"violated\", \"I8\", \"approval already consumed\")",
+   "killed_by_core": [
+    "must-reject/approval-replay--consumed.json"
+   ],
+   "killed_by_delegation": [
+    "must-reject/approval-replayed.json"
+   ]
+  },
+  {
+   "op": "CHECK",
+   "line": 365,
+   "label": "I8",
+   "src": "_check(\"expiry\" in appr and to_time(appr[\"expiry\"]) < max(t_inv, t_x), \"violated\", \"I8\", \"approval expired\")",
+   "killed_by_core": [
+    "must-reject/stale-approval--expired.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 366,
+   "label": "I8",
+   "src": "_check(\"nbf\" in appr and to_time(appr[\"nbf\"]) > t_inv, \"violated\", \"I8\", \"approval not yet valid\")",
+   "killed_by_core": [],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 368,
+   "label": "I8",
+   "src": "_check(first != (rid, d), \"violated\", \"I8\", f\"approval already used by {first[0]}\")",
+   "killed_by_core": [
+    "must-reject/approval-reused-across-packets.json",
+    "must-reject/approval-reused-for-a-second-invocation.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 371,
+   "label": "I7",
+   "src": "_check(\"budget_spent\" in inv and inv[\"budget_spent\"] != c, \"violated\", \"I7\", \"recorded budget spend does not m",
+   "killed_by_core": [
+    "must-reject/recorded-budget-spend-mismatch.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "CHECK",
+   "line": 373,
+   "label": "I2",
+   "src": "_check(bool(over) and not appr, \"violated\", \"I2\", f\"risk budget of {over} exceeded without approval\")",
+   "killed_by_core": [
+    "must-reject/budget-spent-in-earlier-packets.json",
+    "must-reject/cumulative-spend-exceeds-budget.json",
+    "must-reject/risk-budget-exceeded-without-approval.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "RULE",
+   "line": 124,
+   "label": "I7 (signer role)",
+   "src": "return False  # valid key, wrong role: e.g. a host key minting a mandate or approving its own action",
+   "killed_by_core": [
+    "must-reject/mandate-minted-by-host-key.json",
+    "must-reject/self-approval-signed-by-host-key.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "RULE",
+   "line": 144,
+   "label": "I1 (attenuation)",
+   "src": "if not subsumed(child[\"actions\"], parent[\"actions\"]): return False, \"actions widened\"",
+   "killed_by_core": [],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "RULE",
+   "line": 145,
+   "label": "I1 (attenuation)",
+   "src": "if not subsumed(child[\"resources\"], parent[\"resources\"]): return False, \"resources widened\"",
+   "killed_by_core": [
+    "must-reject/delegation-widens-resources.json"
+   ],
+   "killed_by_delegation": [
+    "must-reject/delegation-widens-scope.json"
+   ]
+  },
+  {
+   "op": "RULE",
+   "line": 146,
+   "label": "I1 (attenuation)",
+   "src": "if not set(child.get(\"data\", [])) <= set(parent.get(\"data\", [])): return False, \"data classes widened\"",
+   "killed_by_core": [
+    "must-reject/delegation-adds-data-class.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "RULE",
+   "line": 147,
+   "label": "I1 (attenuation)",
+   "src": "if CEILING.index(child[\"ceiling\"]) > CEILING.index(parent[\"ceiling\"]): return False, \"effect ceiling raised\"",
+   "killed_by_core": [
+    "must-reject/expand-then-shrink-delegation.json"
+   ],
+   "killed_by_delegation": [
+    "must-reject/delegation-raises-effect-class.json"
+   ]
+  },
+  {
+   "op": "RULE",
+   "line": 148,
+   "label": "I1 (attenuation)",
+   "src": "if to_time(child[\"exp\"]) > to_time(parent[\"exp\"]): return False, \"validity extended\"",
+   "killed_by_core": [
+    "must-reject/delegation-extends-validity.json"
+   ],
+   "killed_by_delegation": [
+    "must-reject/delegation-outlives-parent.json"
+   ]
+  },
+  {
+   "op": "RULE",
+   "line": 150,
+   "label": "I1 (attenuation)",
+   "src": "return False, \"validity extended (nbf)\"",
+   "killed_by_core": [
+    "must-reject/delegation-drops-nbf.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "RULE",
+   "line": 151,
+   "label": "I1 (attenuation)",
+   "src": "if \"purpose\" in parent and child.get(\"purpose\") != parent[\"purpose\"]: return False, \"purpose changed\"",
+   "killed_by_core": [
+    "must-reject/delegation-changes-purpose.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "RULE",
+   "line": 155,
+   "label": "I1 (attenuation)",
+   "src": "return False, f\"{key} removed\"",
+   "killed_by_core": [
+    "must-reject/delegation-removes-a-deny.json"
+   ],
+   "killed_by_delegation": [
+    "must-reject/delegation-drops-a-deny.json"
+   ]
+  },
+  {
+   "op": "RULE",
+   "line": 156,
+   "label": "I1 (attenuation)",
+   "src": "if \"budget\" in parent and child.get(\"budget\", parent[\"budget\"]) > parent[\"budget\"]: return False, \"risk budget",
+   "killed_by_core": [
+    "must-reject/delegation-widens-risk-budget.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "RULE",
+   "line": 160,
+   "label": "I1 (attenuation)",
+   "src": "if parent[\"depth\"] == 0: return False, \"parent may not be delegated (depth 0)\"",
+   "killed_by_core": [],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "RULE",
+   "line": 161,
+   "label": "I1 (attenuation)",
+   "src": "if \"depth\" not in child: return False, \"delegation depth missing under a bounded parent\"",
+   "killed_by_core": [
+    "must-reject/delegation-without-depth-under-bounded-parent.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "RULE",
+   "line": 162,
+   "label": "I1 (attenuation)",
+   "src": "if child[\"depth\"] >= parent[\"depth\"]: return False, \"delegation depth not decreasing\"",
+   "killed_by_core": [
+    "must-reject/delegation-depth-not-decreasing.json"
+   ],
+   "killed_by_delegation": [
+    "must-reject/depth-not-decreasing.json"
+   ]
+  },
+  {
+   "op": "RULE",
+   "line": 181,
+   "label": "I2/I5 (effect)",
+   "src": "if not any(pat_match(x[\"action\"], p) for p in c[\"actions\"]): return False, \"action outside claims\"",
+   "killed_by_core": [],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "RULE",
+   "line": 182,
+   "label": "I2/I5 (effect)",
+   "src": "if any(pat_match(x[\"action\"], p) for p in c.get(\"deny_actions\", [])): return False, \"action denied\"",
+   "killed_by_core": [
+    "must-reject/denied-action.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "RULE",
+   "line": 183,
+   "label": "I2/I5 (effect)",
+   "src": "if not any(pat_match(x[\"resource\"], p) for p in c[\"resources\"]): return False, \"resource outside claims\"",
+   "killed_by_core": [
+    "must-reject/effect-outside-delegated-scope.json",
+    "must-reject/intent-narrower-than-grant.json"
+   ],
+   "killed_by_delegation": [
+    "must-reject/effect-outside-delegated-scope.json"
+   ]
+  },
+  {
+   "op": "RULE",
+   "line": 184,
+   "label": "I2/I5 (effect)",
+   "src": "if any(pat_match(x[\"resource\"], p) for p in c.get(\"deny_resources\", [])): return False, \"resource denied\"",
+   "killed_by_core": [
+    "must-reject/effect-on-a-denied-resource.json",
+    "must-reject/intent-cannot-lift-a-deny.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "RULE",
+   "line": 185,
+   "label": "I2/I5 (effect)",
+   "src": "if CEILING.index(x[\"effect\"]) > CEILING.index(c[\"ceiling\"]): return False, \"effect above ceiling\"",
+   "killed_by_core": [],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "RULE",
+   "line": 187,
+   "label": "I2/I5 (effect)",
+   "src": "if d not in c.get(\"data\", []): return False, f\"released {d} not allowed\"",
+   "killed_by_core": [
+    "must-reject/secret-released-externally--i5.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "RULE",
+   "line": 188,
+   "label": "I2/I5 (effect)",
+   "src": "if to_time(x[\"t\"]) > c[\"exp\"]: return False, \"after validity\"",
+   "killed_by_core": [
+    "must-reject/effect-after-mandate-validity.json",
+    "must-reject/rfc-3339-effect-after-expiry.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "RULE",
+   "line": 189,
+   "label": "I2/I5 (effect)",
+   "src": "if \"nbf\" in c and to_time(x[\"t\"]) < c[\"nbf\"]: return False, \"before validity\"",
+   "killed_by_core": [
+    "must-reject/effect-before-validity--nbf.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "BOUND",
+   "line": 147,
+   "label": ">->>=",
+   "src": "if CEILING.index(child[\"ceiling\"]) > CEILING.index(parent[\"ceiling\"]): return False, \"effect ceiling raised\"",
+   "killed_by_core": [
+    "positive/approved-adapter-revision--pinned.json",
+    "positive/budget-from-earlier-packets-still-within-limit.json",
+    "positive/build-cleanup-within-scope.json",
+    "positive/delegation-adds-a-deny.json",
+    "positive/derived-data-sent-to-an-allowed-recipient.json",
+    "positive/fresh-revocation-status.json",
+    "positive/independently-observed-high-impact-effect.json",
+    "positive/influence-confirmed-by-principal.json",
+    "positive/influenced-read-only-action.json",
+    "positive/jcs-canonical-form--unicode-keys--floats.json",
+    "positive/mediated-effect-honored.json",
+    "positive/mutation-influenced-only-by-trusted-content.json",
+    "positive/quarantined-content-promoted-by-the-principal.json",
+    "positive/reversible-write-is-cheaper.json",
+    "positive/revoked-after-the-action--still-preserved.json",
+    "positive/rfc-3339-timestamps.json",
+    "positive/risk-budget-exceeded--human-approved.json",
+    "positive/same-effect-observed-twice--host-and-backend.json",
+    "positive/simulated-deny-is-not-enforcement.json",
+    "positive/two-hop-chain-within-bounds.json",
+    "positive/valid-bound-approval.json",
+    "positive/valid-preserved-flow.json",
+    "positive/validity-window-and-purpose-carried-through.json",
+    "positive/within-risk-budget.json",
+    "must-reject/approval-digest-mismatch--toctou.json",
+    "must-reject/approval-replay--consumed.json",
+    "must-reject/approval-reused-across-packets.json",
+    "must-reject/approval-reused-for-a-second-invocation.json",
+    "must-reject/audit-only-discovery-of-an-unknown-agent--a6.json",
+    "must-reject/budget-spent-in-earlier-packets.json",
+    "must-reject/bypass--effect-without-invocation.json",
+    "must-reject/cumulative-spend-exceeds-budget.json",
+    "must-reject/data-leaving-after-a-read--a5.json",
+    "must-reject/declared----executed--path-retarget.json",
+    "must-reject/denied-action.json",
+    "must-reject/deny-on-fail-open-host--no-effect-record.json",
+    "must-reject/destructive-command-drift--a3.json",
+    "must-reject/effect-after-mandate-validity.json",
+    "must-reject/effect-before-validity--nbf.json",
+    "must-reject/effect-on-a-denied-resource.json",
+    "must-reject/effect-outside-delegated-scope.json",
+    "must-reject/guardrail-write--i9.json",
+    "must-reject/guardrail-write-via-absolute-path--i9.json",
+    "must-reject/high-impact-effect-without-actor.json",
+    "must-reject/injection-driven-mutation.json",
+    "must-reject/intent-cannot-lift-a-deny.json",
+    "must-reject/intent-narrower-than-grant.json",
+    "must-reject/lineage-reference-not-found.json",
+    "must-reject/lying-adapter-caught-by-backend--l3.json",
+    "must-reject/mediated-effect-not-honored.json",
+    "must-reject/mediated-into-a-guardrail-path--i9.json",
+    "must-reject/missing-effect-receipt.json",
+    "must-reject/post-execution-decision-cannot-claim-a-block.json",
+    "must-reject/quarantined-content-reached-the-agent--a1.json",
+    "must-reject/recorded-budget-spend-mismatch.json",
+    "must-reject/revocable-mandate-without-status.json",
+    "must-reject/revoked-root-with-live-child.json",
+    "must-reject/rfc-3339-effect-after-expiry.json",
+    "must-reject/risk-budget-exceeded-without-approval.json",
+    "must-reject/second-effect-outside-declared.json",
+    "must-reject/secret-released-externally--i5.json",
+    "must-reject/self-approval-signed-by-host-key.json",
+    "must-reject/self-reported-high-impact-effect.json",
+    "must-reject/stale-approval--expired.json",
+    "must-reject/stale-revocation-status.json",
+    "must-reject/status-shows-revoked-before-action.json",
+    "must-reject/tampered-effect-receipt.json",
+    "must-reject/unsigned-approval.json",
+    "must-reject/unsigned-finding-claims-trusted.json",
+    "must-reject/unsigned-revocation-on-the-chain.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "BOUND",
+   "line": 148,
+   "label": ">->>=",
+   "src": "if to_time(child[\"exp\"]) > to_time(parent[\"exp\"]): return False, \"validity extended\"",
+   "killed_by_core": [],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "BOUND",
+   "line": 149,
+   "label": "<-><=",
+   "src": "if \"nbf\" in parent and (\"nbf\" not in child or to_time(child[\"nbf\"]) < to_time(parent[\"nbf\"])):",
+   "killed_by_core": [
+    "must-reject/effect-before-validity--nbf.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "BOUND",
+   "line": 156,
+   "label": ">->>=",
+   "src": "if \"budget\" in parent and child.get(\"budget\", parent[\"budget\"]) > parent[\"budget\"]: return False, \"risk budget",
+   "killed_by_core": [],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "BOUND",
+   "line": 162,
+   "label": ">=->>",
+   "src": "if child[\"depth\"] >= parent[\"depth\"]: return False, \"delegation depth not decreasing\"",
+   "killed_by_core": [
+    "must-reject/delegation-depth-not-decreasing.json"
+   ],
+   "killed_by_delegation": [
+    "must-reject/depth-not-decreasing.json"
+   ]
+  },
+  {
+   "op": "BOUND",
+   "line": 185,
+   "label": ">->>=",
+   "src": "if CEILING.index(x[\"effect\"]) > CEILING.index(c[\"ceiling\"]): return False, \"effect above ceiling\"",
+   "killed_by_core": [
+    "positive/approved-adapter-revision--pinned.json",
+    "positive/budget-from-earlier-packets-still-within-limit.json",
+    "positive/build-cleanup-within-scope.json",
+    "positive/delegation-adds-a-deny.json",
+    "positive/derived-data-sent-to-an-allowed-recipient.json",
+    "positive/fresh-revocation-status.json",
+    "positive/independently-observed-high-impact-effect.json",
+    "positive/influence-confirmed-by-principal.json",
+    "positive/jcs-canonical-form--unicode-keys--floats.json",
+    "positive/mediated-effect-honored.json",
+    "positive/mutation-influenced-only-by-trusted-content.json",
+    "positive/reversible-write-is-cheaper.json",
+    "positive/revoked-after-the-action--still-preserved.json",
+    "positive/rfc-3339-timestamps.json",
+    "positive/risk-budget-exceeded--human-approved.json",
+    "positive/same-effect-observed-twice--host-and-backend.json",
+    "positive/simulated-deny-is-not-enforcement.json",
+    "positive/two-hop-chain-within-bounds.json",
+    "positive/valid-bound-approval.json",
+    "positive/valid-preserved-flow.json",
+    "positive/validity-window-and-purpose-carried-through.json",
+    "positive/within-risk-budget.json",
+    "must-reject/approval-digest-mismatch--toctou.json",
+    "must-reject/approval-replay--consumed.json",
+    "must-reject/approval-reused-across-packets.json",
+    "must-reject/approval-reused-for-a-second-invocation.json",
+    "must-reject/audit-only-discovery-of-an-unknown-agent--a6.json",
+    "must-reject/bypass--effect-without-invocation.json",
+    "must-reject/data-leaving-after-a-read--a5.json",
+    "must-reject/recorded-budget-spend-mismatch.json",
+    "must-reject/secret-released-externally--i5.json",
+    "must-reject/self-approval-signed-by-host-key.json",
+    "must-reject/stale-approval--expired.json",
+    "must-reject/unsigned-approval.json"
+   ],
+   "killed_by_delegation": [
+    "positive/approval-bound-to-effect.json",
+    "positive/deny-added-by-delegate.json",
+    "positive/fresh-status.json",
+    "positive/revoked-after-the-action.json",
+    "positive/within-bounds.json",
+    "must-reject/approval-for-a-different-effect.json",
+    "must-reject/approval-replayed.json"
+   ]
+  },
+  {
+   "op": "BOUND",
+   "line": 188,
+   "label": ">->>=",
+   "src": "if to_time(x[\"t\"]) > c[\"exp\"]: return False, \"after validity\"",
+   "killed_by_core": [],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "BOUND",
+   "line": 189,
+   "label": "<-><=",
+   "src": "if \"nbf\" in c and to_time(x[\"t\"]) < c[\"nbf\"]: return False, \"before validity\"",
+   "killed_by_core": [],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "BOUND",
+   "line": 311,
+   "label": "<=-><",
+   "src": "_check(any(verify_sig(r, keys) and to_time(r[\"t\"]) <= t_inv for r in revs), \"violated\", \"I6\", \"ancestor revoke",
+   "killed_by_core": [],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "BOUND",
+   "line": 313,
+   "label": "<=-><",
+   "src": "_check(any(s.get(\"revoked_at\") is not None and to_time(s[\"revoked_at\"]) <= t_inv for s in sts), \"violated\", \"I",
+   "killed_by_core": [],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "BOUND",
+   "line": 317,
+   "label": ">=->>",
+   "src": "fresh = [s for s in sts if s[\"target\"] == n[\"id\"] and to_time(s[\"as_of\"]) >= t_inv]",
+   "killed_by_core": [],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "BOUND",
+   "line": 329,
+   "label": ">=->>",
+   "src": "high_impact = CEILING.index(inv[\"declared\"][\"effect\"]) >= CEILING.index(\"write_shared\")",
+   "killed_by_core": [],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "BOUND",
+   "line": 365,
+   "label": "<-><=",
+   "src": "_check(\"expiry\" in appr and to_time(appr[\"expiry\"]) < max(t_inv, t_x), \"violated\", \"I8\", \"approval expired\")",
+   "killed_by_core": [],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "BOUND",
+   "line": 366,
+   "label": ">->>=",
+   "src": "_check(\"nbf\" in appr and to_time(appr[\"nbf\"]) > t_inv, \"violated\", \"I8\", \"approval not yet valid\")",
+   "killed_by_core": [],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "BOUND",
+   "line": 372,
+   "label": ">->>=",
+   "src": "over = next((n[\"id\"] for n in chain if \"budget\" in n[\"claims\"] and spent.get(n[\"id\"], 0) + c > n[\"claims\"][\"bu",
+   "killed_by_core": [
+    "positive/budget-from-earlier-packets-still-within-limit.json",
+    "positive/reversible-write-is-cheaper.json"
+   ],
+   "killed_by_delegation": []
+  },
+  {
+   "op": "VERDICT",
+   "line": 214,
+   "label": "fail-open",
+   "src": "if cond:",
+   "killed_by_core": [
+    "must-reject/deny-on-fail-open-host--no-effect-record.json",
+    "must-reject/forged-mandate--attacker-key.json",
+    "must-reject/high-impact-effect-without-actor.json",
+    "must-reject/identity-only-authorization--no-mandate.json",
+    "must-reject/interpretation-from-provider-hint-only.json",
+    "must-reject/invocation-signed-by-unknown-key.json",
+    "must-reject/lineage-reference-not-found.json",
+    "must-reject/mandate-minted-by-host-key.json",
+    "must-reject/missing-effect-receipt.json",
+    "must-reject/missing-parent-lineage.json",
+    "must-reject/post-execution-decision-cannot-claim-a-block.json",
+    "must-reject/revocable-mandate-without-status.json",
+    "must-reject/self-approval-signed-by-host-key.json",
+    "must-reject/self-reported-high-impact-effect.json",
+    "must-reject/stale-revocation-status.json",
+    "must-reject/tampered-effect-receipt.json",
+    "must-reject/unapproved-adapter-revision.json",
+    "must-reject/unknown-interpretation.json",
+    "must-reject/unsigned-approval.json",
+    "must-reject/unsigned-intent.json",
+    "must-reject/unsigned-invocation.json",
+    "must-reject/unsigned-revocation-on-the-chain.json"
+   ],
+   "killed_by_delegation": [
+    "must-reject/identity-only.json",
+    "must-reject/self-issued-delegation.json",
+    "must-reject/stale-status.json"
+   ]
+  },
+  {
+   "op": "VERDICT",
+   "line": 380,
+   "label": "precedence",
+   "src": "for o in (\"violated\", \"unresolved\"):",
+   "killed_by_core": [],
+   "killed_by_delegation": []
+  }
+ ]
+}

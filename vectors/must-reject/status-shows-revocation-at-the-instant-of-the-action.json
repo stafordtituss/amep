@@ -1,0 +1,132 @@
+{
+ "name": "status shows revocation at the instant of the action",
+ "expect": {
+  "outcome": "violated",
+  "invariant": "I6"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "fs.*",
+      "process.exec"
+     ],
+     "resources": [
+      "repo:app/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 100,
+     "depth": 2
+    },
+    "revocation": {
+     "status_ref": "https://issuer.example/status/m-1"
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "4b48174cff8d017409a054f2d85801a45344bd6be86354d3ed8b353b016f9ffad81684f7a1b7ec24a5800af84006c0bd176d99e08787e23084404be6d5370b05"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "fs.write"
+     ],
+     "resources": [
+      "repo:app/src/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 90,
+     "depth": 1
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "30b641f10bb3a83443762272c142231a860b948b58397c6ed14f8566e6f817edc1c06148bb0438043cde2cac99fdfeeb58a6ddb201aa19e1ec6abab03687150c"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "host_shell",
+    "version": "r9",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "185d02d49c8440af31134eec4b820a71cfa92a89dd007f0b912acbcb9bf860641ff6e3ff58e7a08754e6bf9c27d2269d166521b86e39293ad09957a61fe75a09"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "write_local"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "71490b9b0ba3d4f07e2c56fd46e94d12b6a67b2a961aacec4ecd9d055201ec03811d9d0dbb09a6ce53b49d2f129c94636be2a52d5fcee42c9ecf8460bca0a90b"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "hook:host",
+    "assurance": "L1",
+    "executed": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "write_local",
+     "released": [],
+     "t": 11
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "sig": "50525648c531e0be5cede8daa74a0d7c9199e767ab20e02ba5ce77bc0ffdcd02561f7987f36df79f2ce22f80b94b62a98fdda0301fff13d008a4d1f20154e505"
+    }
+   }
+  ],
+  "statuses": [
+   {
+    "kind": "status",
+    "target": "m-1",
+    "as_of": 12,
+    "revoked_at": 10,
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "2572da83d5738819b0d4ca29043e4276938939d68cd6bd9597736890414fc59617a90fd38ba0bca9971f43fb83068e8db66f1cc4fd29e5c68880b5c94a19d507"
+    }
+   }
+  ]
+ }
+}
