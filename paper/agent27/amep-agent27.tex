@@ -11,6 +11,9 @@
 \newcommand{\viol}{\textsf{violated}}
 \newcommand{\unres}{\textsf{unresolved}}
 \newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\vname}[1]{{\small\nolinkurl{#1}}}
+\def\UrlBreaks{\do\-\do\/}
+\def\UrlFont{\ttfamily}
 
 \begin{document}
 
@@ -50,6 +53,32 @@ The Agentic Mandate Evidence Protocol (AMEP) fills that gap. It is published as 
 A principal $H$ authorizes an agent $A$, which may delegate to agents $B, C, \dots$, which invoke tools $T$. A relying party (a receiving tool, an auditor or a regulator) wants to know, for each executed effect: whose authority it was exercised under; whether that authority narrowed or widened along the chain; whether the executed effect matched what was declared; whether any approval covered exactly that effect; and whether any link had been revoked at the time.
 
 AMEP assumes that every language model in the chain may be adversarial, so nothing a model says about itself counts as evidence. Hosts, adapters and observers are trusted only for the statements their keys are entitled to sign. We assume Ed25519~\cite{rfc8032} is unforgeable and that verifiers obtain authentic key sets with role assignments. AMEP does not detect prompt injection, issue identities or define a policy language; it records the findings of such systems and evaluates the evidence they leave. Three principles follow. \emph{Declared $\neq$ executed:} what an agent declares and what a system executed are recorded separately and compared. \emph{Fail-safe evidence:} missing, unsigned or unverifiable evidence yields \unres{}, never \pres{}. \emph{Independent observation:} effects that write shared state, send data externally, destroy data or move money need an observer other than the actor.
+
+Table~\ref{tab:failures} maps the failure modes from the introduction to the invariant that catches each and to one conformance vector that exercises it. Every row is a packet in which every signature verifies; what goes wrong is the relation between the objects, not their integrity.
+
+\begin{table}[t]
+\caption{Delegation failure modes, the invariant that decides each, and one vector that exercises it}\label{tab:failures}
+\centering\footnotesize
+\begin{tabular}{@{}p{3.1cm}p{0.5cm}p{4.1cm}@{}}
+\toprule
+Failure & Inv. & Example vector \\
+\midrule
+Sub-agent receives wider scope & I1 & \vname{delegation-widens-actions} \\
+Delegate drops a parent's deny & I1 & \vname{delegation-removes-a-deny} \\
+Adapter maps call to another effect & I2 & \vname{lying-adapter-caught-by-backend--l3} \\
+Command drifts to a destructive target & I2 & \vname{destructive-command-drift--a3} \\
+Unpinned adapter revision & I3 & \vname{unapproved-adapter-revision} \\
+Untrusted content steers a write & I4 & \vname{injection-driven-mutation} \\
+Data leaves after a read & I5 & \vname{data-leaving-after-a-read--a5} \\
+Revoked root, live child & I6 & \vname{revoked-root-with-live-child} \\
+Host key mints a mandate & I7 & \vname{mandate-minted-by-host-key} \\
+Approval replayed for another effect & I8 & \vname{approval-reused-for-a-second-invocation} \\
+Agent edits its own guardrails & I9 & \vname{guardrail-write--i9} \\
+High-impact effect only self-reported & I10 & \vname{self-reported-high-impact-effect} \\
+``Deny'' on a host that ran it anyway & I11 & \vname{deny-contradicted-by-executed-effect} \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \section{Evidence Model}\label{sec:model}
 
@@ -121,24 +150,25 @@ These relations use only pattern subsumption, set inclusion and comparison, so t
 \section{Invariants and Evaluation}\label{sec:eval}
 
 \begin{table}[t]
-\caption{Invariants and the outcome when each is broken (V: \viol{}, U: \unres{})}\label{tab:inv}
+\caption{Invariants, the outcome when each is broken (V: \viol{}, U: \unres{}), and the number of must-reject vectors in suite v0.2.1 that each decides}\label{tab:inv}
 \centering\footnotesize
-\begin{tabular}{@{}p{0.55cm}p{6.1cm}p{0.9cm}@{}}
+\begin{tabular}{@{}p{0.45cm}p{5.4cm}p{0.7cm}r@{}}
 \toprule
-ID & Statement (abridged) & Broken \\
+ID & Statement (abridged) & Out. & Vec. \\
 \midrule
-I1 & Every delegation $\sqsubseteq$ its parent & V \\
-I2 & Executed matches declared, satisfies effective claims, within budget unless approved & V \\
-I3 & Adapter mapping approved and pinned & U \\
-I4 & Untrusted content did not steer a mutation unconfirmed & V/U \\
-I5 & Every released data flow permitted & V \\
-I6 & No link revoked at or before the invocation & V \\
-I7 & Evidence present, well formed, role-signed, fresh & U \\
-I8 & Approval matches executed body, in window, used once & V \\
-I9 & No action targets guardrails, keys or evidence store & V \\
-I10 & High-impact effects observed by a non-actor & U \\
-I11 & Every effect has an invocation; none follows a deny & V \\
+I1 & Every delegation $\sqsubseteq$ its parent & V & 12 \\
+I2 & Executed matches declared, satisfies effective claims, within budget unless approved & V & 19 \\
+I3 & Adapter mapping approved and pinned & U & 3 \\
+I4 & Untrusted content did not steer a mutation unconfirmed & V/U & 3 \\
+I5 & Every released data flow permitted & V & 2 \\
+I6 & No link revoked at or before the invocation & V & 4 \\
+I7 & Evidence present, well formed, role-signed, fresh & U & 21$^*$ \\
+I8 & Approval matches executed body, in window, used once & V & 6 \\
+I9 & No action targets guardrails, keys or evidence store & V & 3 \\
+I10 & High-impact effects observed by a non-actor & U & 3 \\
+I11 & Every effect has an invocation; none follows a deny & V & 3 \\
 \bottomrule
+\multicolumn{4}{@{}p{\columnwidth}@{}}{\scriptsize $^*$20 \unres{}; one \viol{} (recorded budget spend contradicts the receipts).}
 \end{tabular}
 \end{table}
 
@@ -146,7 +176,33 @@ Evaluation is a pure function of the packet, the key set, pinned adapters and, f
 
 The third value matters. Audit pipelines that collapse ``could not determine'' into ``allowed'' turn missing logs into permission. In AMEP a revocable mandate with no fresh status, a receipt signed by a key without the observer role, or a high-impact effect reported only by its actor all evaluate to \unres{} (I7 or I10), while a provable widening or a revoked root is \viol{}.
 
-\emph{Example.} A mandate allows \code{fs.*} on \code{repo:app/*} until $t{=}100$ with depth 2. The host delegates only \code{fs.write} on \code{repo:app/src/*} until $t{=}90$. The user revokes the mandate at $t{=}5$; at $t{=}10$ the sub-agent writes \code{repo:app/src/auth.ts}. I1 and I2 hold, but the signed revocation precedes the invocation, so the verdict is \viol{}, I6: the sub-agent's authority died with its root.
+\emph{Example.} Figure~\ref{fig:packet} shows the conformance vector \code{revoked-root-with-live-child}, with signatures elided. A mandate allows \code{fs.*} on \code{repo:app/*} until $t{=}100$ with depth 2. The host delegates only \code{fs.write} on \code{repo:app/src/*} until $t{=}90$ with depth 1. The user revokes the mandate at $t{=}5$; at $t{=}10$ the sub-agent writes \code{repo:app/src/auth.ts}, and the host hook observes the write at $t{=}11$. The delegation is a valid attenuation (I1 holds), and the observed effect matches the declared one and satisfies the effective claims (I2 holds), but the signed revocation precedes the invocation, so the verdict is \viol{}, I6: the sub-agent's authority died with its root. Moving the revocation to $t{=}50$ makes the same packet \pres{}: a link revoked after the action does not invalidate it.
+
+\begin{figure}[t]
+\centering
+\begin{minipage}{\columnwidth}\scriptsize\ttfamily
+\{"mandates": [\{"id": "m-1",\hfill\textrm{\itshape issuer}\\
+\ \ \ "claims": \{"actions": ["fs.*", "process.exec"],\\
+\ \ \ \ \ "resources": ["repo:app/*"],\\
+\ \ \ \ \ "ceiling": "write\_local", "exp": 100, "depth": 2\}\}],\\
+\ "delegations": [\{"id": "d-1", "parent": "m-1",\hfill\textrm{\itshape issuer}\\
+\ \ \ "claims": \{"actions": ["fs.write"],\\
+\ \ \ \ \ "resources": ["repo:app/src/*"],\\
+\ \ \ \ \ "ceiling": "write\_local", "exp": 90, "depth": 1\}\}],\\
+\ "invocations": [\{"id": "i-1", "authority\_ref": "d-1",\hfill\textrm{\itshape host}\\
+\ \ \ "t": 10, "declared": \{"action": "fs.write",\\
+\ \ \ \ \ "resource": "repo:app/src/auth.ts",\\
+\ \ \ \ \ "effect": "write\_local"\}\}],\\
+\ "effects": [\{"id": "e-1", "invocation": "i-1",\hfill\textrm{\itshape observer}\\
+\ \ \ "observed\_by": "hook:host", "assurance": "L1",\\
+\ \ \ "executed": \{"action": "fs.write",\\
+\ \ \ \ \ "resource": "repo:app/src/auth.ts",\\
+\ \ \ \ \ "effect": "write\_local", "t": 11\}\}],\\
+\ "revocations": [\{"target": "m-1", "t": 5\}]\}\hfill\textrm{\itshape issuer}\\[3pt]
+\textrm{\itshape expect:} \{"outcome": "violated", "invariant": "I6"\}
+\end{minipage}
+\caption{The vector \code{revoked-root-with-live-child}, abridged: \code{kind} fields, the interpretation object, data classes and every \code{proof} are omitted. The role of the key that signs each object is shown in italics on the right.}\label{fig:packet}
+\end{figure}
 
 \section{Conformance Engineering}\label{sec:conf}
 
@@ -160,13 +216,7 @@ The third value matters. Audit pipelines that collapse ``could not determine'' i
 
 \subsection*{RQ1: How well does the suite detect a faulty verifier?}
 
-Table~\ref{tab:mut} reports the 70 mutants. The 95-vector suite (v0.2.0) killed 53 (76\%). Every CHECK mutant but two was killed, but only 5 of 15 BOUND mutants: the suite exercised each bound from one side and never at its edge. The 17 survivors each named a concrete gap:
-\begin{itemize}
-\item \emph{untested rules:} widening a delegation's \emph{actions} (only resources, data, ceiling and validity were tested); an executed action outside the effective claims; an effect class above the ceiling; an intent reference that names an object of another kind; an approval used before its \code{nbf};
-\item \emph{inclusive edges:} a delegation expiring with its parent, a budget equal to the parent's, an effect at the first and last instant of validity, a revocation or status \code{revoked\_at} at the instant of the action, a status current exactly as of the action, an approval at its expiry instant and from its \code{nbf} instant, and \code{write\_shared} as the lowest high-impact class;
-\item \emph{verdict precedence:} no packet contained both a \viol{} and an \unres{} result.
-\end{itemize}
-Setting aside one equivalent mutant (below), for each survivor we wrote one vector that the unmutated evaluator passes and the mutant fails, checking the expected outcome against the specification text (for example, its validity windows are inclusive at both ends). This produced 16 vectors (7 positive, 9 must-reject), released as suite v0.2.1 with 111 vectors. The hardened suite kills 69 of 70 mutants. The survivor deletes the rule that a depth-0 parent may not be delegated; because the schema requires depths to be non-negative, the strictly-decreasing rule already rejects every valid input it would, so the mutant is equivalent. Detection of non-equivalent mutants is therefore 100\%. Of the 69 killed mutants, 37 are killed by exactly one vector across both suites, so the suite has little redundancy to lose.
+Table~\ref{tab:mut} reports the 70 mutants. The 95-vector suite (v0.2.0) killed 53 (76\%). Every CHECK mutant but two was killed, but only 5 of 15 BOUND mutants: the suite exercised each bound from one side and never at its edge. The 17 survivors each named a concrete gap (Table~\ref{tab:surv}): five rules that no vector isolated, such as widening a delegation's \emph{actions} (only resources, data, ceiling and validity were tested); ten inclusive edges, such as an effect at the last instant of validity or a revocation at the very instant of the action; verdict precedence, since no packet contained both a \viol{} and an \unres{} result; and one equivalent mutant, discussed below. For each of the other 16 we wrote one vector that the unmutated evaluator passes and the mutant fails, checking the expected outcome against the specification text (for example, its validity windows are inclusive at both ends). This produced 16 vectors (7 positive, 9 must-reject), released as suite v0.2.1 with 111 vectors; Table~\ref{tab:surv} pairs each former survivor with the vector that now kills it. Each new vector kills exactly its target, so none is redundant with another. The hardened suite kills 69 of 70 mutants. The survivor deletes the rule that a depth-0 parent may not be delegated. The suite does exercise that case (\vname{delegation-from-a-zero-depth-parent}), but because the schema requires depths to be non-negative, the strictly-decreasing rule that follows rejects every valid input the deleted rule would, with the same outcome and invariant, so the mutant is equivalent. Detection of non-equivalent mutants is therefore 100\%. Of the 69 killed mutants, 37 are killed by exactly one vector across both suites, so the suite has little redundancy to lose.
 
 \emph{Example.} The specification says a link revoked ``at or before'' the invocation makes it \viol{} (I6). The v0.2.0 suite tested a revocation at $t{=}5$ before an action at $t{=}10$ (\viol{}) and one at $t{=}50$ after it (\pres{}), so an evaluator that compared with $<$ instead of $\le$ passed every vector, and would have accepted an action taken at the very instant of a revocation, exactly the race a distributed deployment is most likely to produce. The added vector places the signed revocation at $t{=}10$:
 \begin{center}\scriptsize\ttfamily
@@ -199,6 +249,34 @@ Total & 70 & 53 (76\%) & 69 (99\%) & 18 \\
 
 The fail-open mutant deserves comment. It models the common two-valued design in which a checker that cannot decide lets the action through. It is killed by 24 core vectors and 3 delegation vectors, which are exactly the cases where such a design would have reported a forged mandate, a missing receipt, stale revocation status or a self-reported high-impact effect as acceptable. Of the 79 must-reject vectors, 26 (33\%) expect \unres{}.
 
+\begin{table*}[t]
+\caption{Mutants that survived suite v0.2.0, and the v0.2.1 vector that kills each (P: positive, R: must-reject)}\label{tab:surv}
+\centering\footnotesize
+\begin{tabular}{@{}p{5.2cm}p{8.2cm}l@{}}
+\toprule
+Mutant & Killing vector & \\
+\midrule
+delete ``actions widened'' & \vname{delegation-widens-actions} & R \\
+delete ``action outside claims'' & \vname{action-outside-delegated-actions} & R \\
+delete ``effect above ceiling'' & \vname{effect-class-above-delegated-ceiling} & R \\
+delete intent-kind check & \vname{intent-reference-names-a-non-intent-object} & R \\
+delete approval \code{nbf} check & \vname{approval-not-yet-valid} & R \\
+child \code{exp} $>\to\ge$ parent & \vname{delegation-expiring-with-its-parent} & P \\
+child budget $>\to\ge$ parent & \vname{delegation-keeps-the-parent-s-full-budget} & P \\
+effect $t > \to \ge$ \code{exp} & \vname{effect-at-the-last-instant-of-validity} & P \\
+effect $t < \to \le$ \code{nbf} & \vname{effect-at-the-first-instant-of-validity} & P \\
+revocation $\le\to<$ action & \vname{revoked-at-the-instant-of-the-action} & R \\
+status \code{revoked\_at} $\le\to<$ & \vname{status-shows-revocation-at-the-instant-of-the-action} & R \\
+status \code{as\_of} $\ge\to>$ & \vname{status-current-as-of-the-action} & P \\
+high impact $\ge\to>$ \code{write\_shared} & \vname{write-shared-effect-only-self-reported} & R \\
+approval expiry $<\to\le$ & \vname{approval-used-at-its-expiry-instant} & P \\
+approval \code{nbf} $>\to\ge$ & \vname{approval-valid-from-the-instant-of-the-action} & P \\
+swap verdict precedence & \vname{violation-outranks-unresolved-in-one-packet} & R \\
+delete depth-0 rule & none (equivalent) & -- \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
 \subsection*{RQ2: Do independent implementations agree?}
 
 Both verifiers agree with the expected verdict and deciding invariant on all 111 core vectors and all 20 delegation vectors, under Node.js and in the browser page. The 16 new vectors were generated by the Python suite generator and passed by the JavaScript verifier without change, which is independent evidence that the expected outcomes follow from the specification rather than from one implementation.
@@ -223,6 +301,10 @@ Hops & Objects & Packet (JCS bytes) & Median time (ms) \\
 \end{tabular}
 \end{table}
 
+\subsection*{RQ4: How much does a scenario suite add?}
+
+The 20-vector delegation suite was written for one external use case, not to cover the evaluator. Run alone, it kills 18 of the 70 mutants (Table~\ref{tab:mut}): 9 CHECK, 6 RULE, 2 BOUND and the fail-open mutant, concentrated on attenuation, liveness, approval and evidence checks, which are the invariants its scenario raises. It kills no mutant that the core suite misses. Scenario suites are therefore valuable as interoperability material for a community (they speak its vocabulary of DIDs and registry scopes) but are not a substitute for a suite designed against the evaluator, and their coverage should be measured rather than assumed.
+
 \section{Integrations}\label{sec:integrations}
 
 \subsection{Model Context Protocol}
@@ -230,6 +312,29 @@ In MCP~\cite{mcp}, tool annotations such as \code{readOnlyHint} are a server's d
 
 \subsection{Delegation continuity for agent-identity registries}
 Agent-identity systems establish who an agent is; they do not by themselves establish whose authority a delegated agent exercises. For the W3C Agent Identity Registry Protocol Community Group we built a 20-vector suite on its hiring use case, extended by one delegation hop: an HR lead authorizes a hiring agent, which delegates interview scheduling for one requisition to a scheduling agent, which writes to a calendar service that signs what it did. Agents carry DIDs, and the registry's \code{namespace:resource:action} scopes map to claims. The suite covers widening, a raised effect class, a dropped deny, a delegation outliving its parent, re-delegation without depth, out-of-scope and drifted effects, upstream revocation, stale status, identity without delegated authority, self-issued delegation, and approval mismatch and replay. Building it surfaced two design questions for the registry: a delegation names its parent but not its holder, so holder binding must come from the credential that carries it; and status freshness at verification time differs from liveness at the time of the action, which is what an auditor needs. Group discussion has since proposed separating a failed revocation query from a negative answer, which AMEP already reports as \unres{} and which we plan as a second vector set.
+
+\section{Adopting AMEP Incrementally}
+
+A host does not have to emit every object on day one. The specification defines conformance on two axes (Table~\ref{tab:levels}): Levels 0--3 describe where AMEP sits in a workflow, and Levels 4--5 describe what other parties can check. Each level includes the ones below it. An implementation at Level 2 or above may add an \emph{Attested} qualifier when its effects of class \code{write\_shared} and above are observed at L2 or L3 and registered with a transparency service.
+
+\begin{table}[t]
+\caption{Conformance levels: deployment maturity (0--3) and independent checkability (4--5)}\label{tab:levels}
+\centering\footnotesize
+\begin{tabular}{@{}p{0.3cm}p{2.25cm}p{5.2cm}@{}}
+\toprule
+\# & Name & Requirement (abridged) \\
+\midrule
+0 & Observation & Signed invocations and effect receipts; log-derived decisions marked post-execution \\
+1 & Mandate attached & Every invocation cites a signed mandate chain, or shows that it has none (\unres{}) \\
+2 & Pre-execution decision & A policy enforcement point decides first and signs its decision, fail-closed or with a recorded compensating control \\
+3 & Delegated attenuation & Delegations and intents are emitted and narrow at every hop (I1 holds) \\
+4 & Independent verification & A verifier passes the whole suite on outcome and invariant \\
+5 & Cross-vendor interop. & Two independent implementations pass the same suite and verify each other's packets \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This ordering follows how agent hosts are built. Level 0 needs only a hook where tool calls already pass, such as a shell wrapper, an MCP gateway or an egress proxy, and immediately turns ``the agent said it did this'' into a signed receipt. Level 1 adds the user's grant, Level 2 the policy decision, and Level 3 the sub-agent chain. Levels 4 and 5 are where conformance testing matters: the mutation-hardened suite is the test a third-party verifier must pass before its verdicts can be compared with anyone else's.
 
 \section{Lessons for Agent-Governance Specifications}
 
@@ -255,7 +360,9 @@ Agent governance is moving into specifications: delegation semantics, identity r
 
 \section{Related Work}
 
-\emph{Delegation and authorization.} Token Exchange~\cite{rfc8693} and AuthZEN~\cite{authzen} issue delegated credentials and transport decisions; AMEP consumes these as sources of mandates and decisions and adds the check that executed effects stayed within them. \emph{Capability tokens.} Macaroons~\cite{macaroons}, Biscuit~\cite{biscuit} and UCAN~\cite{ucan} enforce attenuation structurally; AMEP shares their attenuation rule, detects rather than prevents widening, and covers what tokens do not record: interpretation, intent, observed effects and approvals bound to effects. \emph{Transparency.} SCITT~\cite{scitt} makes records tamper-evident; AMEP objects can be registered as signed statements, and AMEP supplies the evaluation over them. \emph{Agent security.} AgentDojo~\cite{agentdojo} benchmarks prompt-injection robustness, and CaMeL~\cite{camel}, FIDES~\cite{fides} and Progent~\cite{progent} enforce control-flow, information-flow or privilege policies inside agents. These are complementary: they can emit AMEP evidence, and AMEP gives a portable way to check the outcome across systems. \emph{Conformance and mutation testing.} Test suites with expected outcomes are standard practice for interoperable specifications, and mutation analysis~\cite{jia2011} is an established measure of test adequacy; we apply it to a protocol's conformance suite, where a surviving mutant is a behaviour two conforming verifiers could legitimately differ on.
+\emph{Delegation and authorization.} Token Exchange~\cite{rfc8693} and AuthZEN~\cite{authzen} issue delegated credentials and transport decisions; AMEP consumes these as sources of mandates and decisions and adds the check that executed effects stayed within them. \emph{Capability tokens.} Macaroons~\cite{macaroons}, Biscuit~\cite{biscuit} and UCAN~\cite{ucan} enforce attenuation structurally; AMEP shares their attenuation rule, detects rather than prevents widening, and covers what tokens do not record: interpretation, intent, observed effects and approvals bound to effects. \emph{Transparency.} SCITT~\cite{scitt} makes records tamper-evident; AMEP objects can be registered as signed statements, and AMEP supplies the evaluation over them. \emph{Agent security.} AgentDojo~\cite{agentdojo} benchmarks prompt-injection robustness, and CaMeL~\cite{camel}, FIDES~\cite{fides} and Progent~\cite{progent} enforce control-flow, information-flow or privilege policies inside agents. These are complementary: they can emit AMEP evidence, and AMEP gives a portable way to check the outcome across systems. \emph{Agent governance.} Chan et al.~\cite{chan2024} argue for visibility measures such as agent identifiers, real-time monitoring and activity logs; AMEP specifies what such logs must contain for a third party to reach a verdict. South et al.~\cite{south2025} propose authenticated, authorized and auditable delegation for AI agents by extending OAuth and OpenID Connect; AMEP is complementary, starting where those grants end and asking whether the executed effect stayed within them.
+
+\emph{Conformance and differential testing.} Shared test vectors are how cryptographic and web standards keep implementations consistent: Project Wycheproof~\cite{wycheproof} publishes vectors that have exposed many bugs in cryptographic libraries, and web-platform-tests~\cite{wpt} serves the same role for browsers. Differential testing~\cite{mckeeman1998} compares independent implementations on the same inputs, which is what our cross-verifier agreement does. \emph{Mutation analysis.} Mutation analysis~\cite{jia2011,papadakis2019} is an established measure of test adequacy, and mutant detection correlates with real-fault detection~\cite{just2014}. Its usual target is a program's own test suite. We apply it to a specification's conformance suite, where the question changes: a surviving mutant is not just an untested line of one program but a behaviour on which two conforming verifiers could legitimately disagree.
 
 \section{Conclusion}
 
@@ -281,6 +388,13 @@ Specification, schemas, suites, verifiers, prototypes and evaluation scripts: \u
 \bibitem{fides} M.~Costa, B.~K{\"o}pf \emph{et al.}, ``Securing AI agents with information-flow control,'' 2025.
 \bibitem{progent} T.~Shi \emph{et al.}, ``Progent: Programmable privilege control for LLM agents,'' 2025.
 \bibitem{jia2011} Y.~Jia and M.~Harman, ``An analysis and survey of the development of mutation testing,'' \emph{IEEE Trans. Softw. Eng.}, vol.~37, no.~5, pp.~649--678, 2011.
+\bibitem{chan2024} A.~Chan, C.~Ezell, M.~Kaufmann, K.~Wei, L.~Hammond, H.~Bradley, E.~Bluemke, N.~Rajkumar, D.~Krueger, N.~Kolt, L.~Heim, and M.~Anderljung, ``Visibility into AI agents,'' in \emph{Proc. ACM FAccT}, 2024.
+\bibitem{south2025} T.~South, S.~Marro, T.~Hardjono, R.~Mahari, C.~D. Whitney, D.~Greenwood, A.~Chan, and A.~Pentland, ``Authenticated delegation and authorized AI agents,'' arXiv:2501.09674, 2025.
+\bibitem{wycheproof} Google, ``Project Wycheproof,'' \url{https://github.com/C2SP/wycheproof}.
+\bibitem{wpt} ``web-platform-tests,'' \url{https://web-platform-tests.org}.
+\bibitem{mckeeman1998} W.~M. McKeeman, ``Differential testing for software,'' \emph{Digital Technical Journal}, vol.~10, no.~1, pp.~100--107, 1998.
+\bibitem{papadakis2019} M.~Papadakis, M.~Kintis, J.~Zhang, Y.~Jia, Y.~Le~Traon, and M.~Harman, ``Mutation testing advances: An analysis and survey,'' \emph{Advances in Computers}, vol.~112, pp.~275--378, 2019.
+\bibitem{just2014} R.~Just, D.~Jalali, L.~Inozemtseva, M.~D. Ernst, R.~Holmes, and G.~Fraser, ``Are mutants a valid substitute for real faults in software testing?'' in \emph{Proc. ACM SIGSOFT FSE}, 2014, pp.~654--665.
 \end{thebibliography}
 
 \end{document}
