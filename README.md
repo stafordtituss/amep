@@ -18,6 +18,7 @@ AMEP defines portable, signed evidence for that chain, from a person's mandate t
 |---|---|---|
 | Python 3.10+ | `amep-protocol` | `pip install --pre amep-protocol` |
 | Node.js 20+ | `@stafordtituss/amep` | `npm install @stafordtituss/amep` |
+| Any MCP client | `amep-mcp` (MCP server) | `uvx amep-mcp` |
 
 Both include a verifier, a producer SDK (keys, signing, and builders for every AMEP object) and the `amep-protocol` command-line tool:
 
@@ -26,6 +27,8 @@ amep-protocol verify packet.json --keys keys.json      # exit 0 preserved, 1 vio
 amep-protocol keygen --kid issuer-1 --roles issuer,approver --out issuer-1
 amep-protocol check-suite vectors/
 ```
+
+The MCP server exposes the verifier as tools (`verify_packet`, `explain_invariant`, `list_vectors`, `get_vector`, `check_suite`) so that agents and MCP clients can check evidence themselves; see `packages/mcp/README.md`.
 
 See `packages/python/README.md` and `packages/js/README.md`. Published at [amep-protocol on PyPI](https://pypi.org/project/amep-protocol/) and [@stafordtituss/amep on npm](https://www.npmjs.com/package/@stafordtituss/amep); releases are described in `PUBLISHING.md`.
 
@@ -37,9 +40,10 @@ See `packages/python/README.md` and `packages/js/README.md`. Published at [amep-
 | `spec/bindings/` | AuthZEN, MCP and agent-host bindings |
 | `spec/profiles/` | Biscuit, Macaroon, PASETO, UCAN and Verifiable Credential profiles |
 | `schemas/` | JSON Schemas (one per object) and CDDL |
-| `vectors/` | The conformance suite: positive and must-reject packets |
+| `vectors/` | The conformance suite: positive and must-reject packets (also on Hugging Face: [stafordtituss/amep-conformance](https://huggingface.co/datasets/stafordtituss/amep-conformance)) |
 | `packages/python/` | The `amep-protocol` Python package: verifier, SDK, CLI |
 | `packages/js/` | The `@stafordtituss/amep` npm package: the same, in JavaScript (independent implementation) |
+| `packages/mcp/` | The `amep-mcp` MCP server: the verifier and both conformance suites as MCP tools |
 | `verifier/python/` | Conformance-vector generator (uses the Python package) |
 | `verifier/typescript/` | Repository CLI for the JavaScript verifier |
 | `verifier/browser/` | The JavaScript verifier as an offline web page |
@@ -75,4 +79,8 @@ Not an identity provider, a policy engine or a prompt-injection detector. AMEP b
 
 ## Contributing
 
+Questions, vectors, implementations in other languages and research results are all welcome; see [`CONTRIBUTING.md`](CONTRIBUTING.md). Open problems suitable for papers and theses are in [`RESEARCH.md`](RESEARCH.md), and changes are listed in [`CHANGELOG.md`](CHANGELOG.md).
+
 Open an issue, then an `AMEP-Proposal-N` document. Every normative change needs at least one positive and one must-reject vector.
+
+**Implementations.** Python (`amep-protocol`), JavaScript (`@stafordtituss/amep`) and the browser verifier, all by the specification's author. Implementations by others are especially welcome; open an issue and yours will be listed here.

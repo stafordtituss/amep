@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.stafordtituss/amep-verifier",
+  "title": "AMEP Verifier",
+  "description": "Verify signed evidence that AI agent actions stayed within delegated authority (AMEP).",
+  "repository": {
+    "url": "https://github.com/stafordtituss/amep",
+    "source": "github",
+    "subfolder": "packages/mcp"
+  },
+  "websiteUrl": "https://github.com/stafordtituss/amep",
+  "version": "0.1.0a1",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "amep-mcp",
+      "version": "0.1.0a1",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
