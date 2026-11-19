@@ -4,7 +4,8 @@
 |---|---|
 | **Status** | Draft for discussion |
 | **Targets** | AMEP core v0.3 |
-| **Authors** | Staford Titus Selvaraj (editor); Tania Aizenman (Alygn); David Luna (Alygn) |
+| **Author** | Staford Titus Selvaraj (editor) |
+| **Contributors** | Tania Aizenman (Alygn); David Luna (Alygn) |
 | **Created** | 2026-11-17 |
 | **Discussion** | Issues in https://github.com/stafordtituss/amep |
 
