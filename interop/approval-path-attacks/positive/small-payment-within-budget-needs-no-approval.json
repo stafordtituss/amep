@@ -1,0 +1,97 @@
+{
+ "name": "small-payment-within-budget-needs-no-approval",
+ "attack": "baseline for AB12",
+ "source": "arXiv:2610.21063",
+ "question": "One payment within the mandate's risk budget; no approval is required.",
+ "expect": {
+  "outcome": "preserved",
+  "invariant": "-"
+ },
+ "note": "",
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "did:web:bank.example:customers:alice",
+    "claims": {
+     "actions": [
+      "payments.send"
+     ],
+     "resources": [
+      "payee:landlord-ltd",
+      "payee:city-utility"
+     ],
+     "ceiling": "financial",
+     "exp": 100,
+     "budget": 100
+    },
+    "proof": {
+     "kid": "alice-passkey",
+     "alg": "Ed25519",
+     "sig": "b011506b08930a4292ee5311c439d19f6a9c1e37663988af8ecb707aa11c3f9d68a498a4dbecefcdb18112501fd0efec62ef1cfb7b17915a18cb737836dc2909"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "bank_payments_api",
+    "version": "v2",
+    "proof": {
+     "kid": "agent-host",
+     "alg": "Ed25519",
+     "sig": "ff97867064a0d00103dd862098ded890ff26e1f5e814435670b7dffa6d6955447643d86329665d65efbf6d603b12cbb415860942d2087a95508c989e3bfbb70e"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "m-1",
+    "interpretation_ref": "a-1",
+    "actor": "did:web:agents.example:payments-assistant",
+    "t": 10,
+    "declared": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial"
+    },
+    "proof": {
+     "kid": "agent-host",
+     "alg": "Ed25519",
+     "sig": "a7f8698006e5c972d99a68e12eb37283639b8f8c6d05b8781e6524d23e4f9ccd1c74e0a4207c00be96f53785c4736f424ba463286cde75c5fbfc6024fb58c500"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "service:payments.bank.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial",
+     "released": [],
+     "reversible": false,
+     "t": 11,
+     "x-args": {
+      "amount": "84.10",
+      "currency": "EUR"
+     }
+    },
+    "proof": {
+     "kid": "bank-payments",
+     "alg": "Ed25519",
+     "sig": "b7dbe4a76465846b4a842707c6cabae9e9f2afb7809b70ac9bfc96ec0da90d9845026368dfc491d4b8c090e3c34c18cb231363256b06ab99a822d9b7210b8605"
+    }
+   }
+  ]
+ }
+}

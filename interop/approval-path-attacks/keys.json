@@ -1,0 +1,27 @@
+{
+ "alice-passkey": {
+  "kid": "alice-passkey",
+  "alg": "Ed25519",
+  "x": "e9689905505aa8bb764b503aec24615fe7ae46dd9120f5b6c6695465ce6654d9",
+  "roles": [
+   "issuer",
+   "approver"
+  ]
+ },
+ "agent-host": {
+  "kid": "agent-host",
+  "alg": "Ed25519",
+  "x": "3d38550dfd6bc07630eb625e8d16eba589e3311675cfc679e0f9d0810a3cfba5",
+  "roles": [
+   "host"
+  ]
+ },
+ "bank-payments": {
+  "kid": "bank-payments",
+  "alg": "Ed25519",
+  "x": "f8b182a9bb3ce1f65b47a6fcb05fcd3affee5278b05b2c3771f78e63bb0e953e",
+  "roles": [
+   "observer"
+  ]
+ }
+}

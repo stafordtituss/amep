@@ -1,0 +1,141 @@
+{
+ "name": "payment-split-under-threshold",
+ "attack": "AB12",
+ "source": "arXiv:2610.21063",
+ "question": "One large payment is split into two that each look small. The mandate's risk budget (100) is exceeded by the second, which carries no approval.",
+ "expect": {
+  "outcome": "violated",
+  "invariant": "I2"
+ },
+ "note": "AMEP budgets count effect cost units (here 60 per irreversible payment), not currency. A monetary threshold would need a profile; see README.md.",
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "did:web:bank.example:customers:alice",
+    "claims": {
+     "actions": [
+      "payments.send"
+     ],
+     "resources": [
+      "payee:landlord-ltd",
+      "payee:city-utility"
+     ],
+     "ceiling": "financial",
+     "exp": 100,
+     "budget": 100
+    },
+    "proof": {
+     "kid": "alice-passkey",
+     "alg": "Ed25519",
+     "sig": "b011506b08930a4292ee5311c439d19f6a9c1e37663988af8ecb707aa11c3f9d68a498a4dbecefcdb18112501fd0efec62ef1cfb7b17915a18cb737836dc2909"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "bank_payments_api",
+    "version": "v2",
+    "proof": {
+     "kid": "agent-host",
+     "alg": "Ed25519",
+     "sig": "ff97867064a0d00103dd862098ded890ff26e1f5e814435670b7dffa6d6955447643d86329665d65efbf6d603b12cbb415860942d2087a95508c989e3bfbb70e"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "m-1",
+    "interpretation_ref": "a-1",
+    "actor": "did:web:agents.example:payments-assistant",
+    "t": 10,
+    "declared": {
+     "action": "payments.send",
+     "resource": "payee:landlord-ltd",
+     "effect": "financial"
+    },
+    "proof": {
+     "kid": "agent-host",
+     "alg": "Ed25519",
+     "sig": "f1472752c7414fd5aae9e8e587c84b6136037b37084ec9edb8efaf20d4971f8c2ed5b05b0a738405d102ae290d073c8f7a504d851dafc7e2082bb92e27e9460b"
+    }
+   },
+   {
+    "id": "i-2",
+    "kind": "invocation",
+    "authority_ref": "m-1",
+    "interpretation_ref": "a-1",
+    "actor": "did:web:agents.example:payments-assistant",
+    "t": 20,
+    "declared": {
+     "action": "payments.send",
+     "resource": "payee:landlord-ltd",
+     "effect": "financial"
+    },
+    "proof": {
+     "kid": "agent-host",
+     "alg": "Ed25519",
+     "sig": "9e58417ce9e5bf6b581022f07cecbd9010e33a9f9558a4b2cee7d097778f719095861db6e826040c5e2abd6dfea9e7225071bead52a30a808f82a8f3d20db509"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "service:payments.bank.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "payments.send",
+     "resource": "payee:landlord-ltd",
+     "effect": "financial",
+     "released": [],
+     "reversible": false,
+     "t": 11,
+     "x-args": {
+      "amount": "600.00",
+      "currency": "EUR",
+      "memo": "rent part 1"
+     }
+    },
+    "proof": {
+     "kid": "bank-payments",
+     "alg": "Ed25519",
+     "sig": "65233237ec978013afc8a1d639324e6cd255261a83b04e84e238c50fa011e4977d719b36a1a3975fe4452cb0183f7cc90d1f2dd23857b2b0b5052f70a96c210a"
+    }
+   },
+   {
+    "id": "e-2",
+    "kind": "effect",
+    "invocation": "i-2",
+    "observed_by": "service:payments.bank.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "payments.send",
+     "resource": "payee:landlord-ltd",
+     "effect": "financial",
+     "released": [],
+     "reversible": false,
+     "t": 21,
+     "x-args": {
+      "amount": "600.00",
+      "currency": "EUR",
+      "memo": "rent part 2"
+     }
+    },
+    "proof": {
+     "kid": "bank-payments",
+     "alg": "Ed25519",
+     "sig": "ace7c3c2247fb2254e7811223335f0912d8122d231c14ad3422e65093855ed0c1d59e245d4d7b6c28172561b8d4c2ca4b0b3c686013954ce33ca19debe18ea0c"
+    }
+   }
+  ]
+ }
+}

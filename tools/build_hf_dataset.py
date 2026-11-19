@@ -84,7 +84,7 @@ for row in load_dataset("stafordtituss/amep-conformance", "core", split="train")
     assert (v.outcome, v.invariant) == (row["expected_outcome"], row["expected_invariant"]), row["name"]
 ```
 
-Two independently written verifiers (Python and JavaScript) agree on every row. Mutation analysis of the reference evaluator kills every non-equivalent mutant with this suite.
+Two reference verifiers (Python and JavaScript, written separately by the same author) agree on every row. Mutation analysis of the reference evaluator kills every non-equivalent mutant with this suite.
 
 ## Intended uses
 

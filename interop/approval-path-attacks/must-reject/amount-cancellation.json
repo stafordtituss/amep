@@ -1,0 +1,114 @@
+{
+ "name": "amount-cancellation",
+ "attack": "AB1",
+ "source": "arXiv:2610.21063",
+ "question": "Alice approved a net 50 EUR; the executed body carries +5,000 and -4,950.",
+ "expect": {
+  "outcome": "violated",
+  "invariant": "I8"
+ },
+ "note": "",
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "did:web:bank.example:customers:alice",
+    "claims": {
+     "actions": [
+      "payments.send"
+     ],
+     "resources": [
+      "payee:landlord-ltd",
+      "payee:city-utility"
+     ],
+     "ceiling": "financial",
+     "exp": 100
+    },
+    "proof": {
+     "kid": "alice-passkey",
+     "alg": "Ed25519",
+     "sig": "55215d1bb03e7fe86577e35d002866a003378089cfdeb9822172f3b575c09bbeb5263cbac8f12d7a48233a37a688ca94f9094eb27d2e056ab8501fda1e548909"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "bank_payments_api",
+    "version": "v2",
+    "proof": {
+     "kid": "agent-host",
+     "alg": "Ed25519",
+     "sig": "ff97867064a0d00103dd862098ded890ff26e1f5e814435670b7dffa6d6955447643d86329665d65efbf6d603b12cbb415860942d2087a95508c989e3bfbb70e"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "m-1",
+    "interpretation_ref": "a-1",
+    "actor": "did:web:agents.example:payments-assistant",
+    "t": 10,
+    "declared": {
+     "action": "payments.send",
+     "resource": "payee:landlord-ltd",
+     "effect": "financial"
+    },
+    "approval_ref": "ap-1",
+    "proof": {
+     "kid": "agent-host",
+     "alg": "Ed25519",
+     "sig": "c4391946203f1542a005b77fb8e78c7226e4dc1a2cac0ea8fba22125c5a06e39e00ab4e3c6f663798c84cd5031773f732d83f4461d53ef800ffe4dc01b9c350c"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "service:payments.bank.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "payments.send",
+     "resource": "payee:landlord-ltd",
+     "effect": "financial",
+     "released": [],
+     "reversible": false,
+     "t": 11,
+     "x-args": {
+      "amounts": [
+       "5000.00",
+       "-4950.00"
+      ],
+      "currency": "EUR"
+     }
+    },
+    "proof": {
+     "kid": "bank-payments",
+     "alg": "Ed25519",
+     "sig": "193c5ea13b605caa07f03102980201dd75c6170d18667130f88f28c82aea6c845e41f9201fe13408d054551c01f8dcc138a198f48e131c97ff384e5129af2c09"
+    }
+   }
+  ],
+  "approvals": [
+   {
+    "id": "ap-1",
+    "kind": "approval",
+    "effect_digest": "77db5259a5f2522371ab368d4123fc0f47904608c210a52525af79e90b1c6288",
+    "presence": "webauthn",
+    "expiry": 50,
+    "proof": {
+     "kid": "alice-passkey",
+     "alg": "Ed25519",
+     "sig": "4efce5149fc49c0d5f6be8109f9b717d753dc19a5b9e5e75718699f2c59bfe0681c96ae6af5ae85b0292baff81ba340e3c14f503ea4aee6bd755205a56801304"
+    }
+   }
+  ]
+ }
+}

@@ -39,7 +39,7 @@ ARIA identifies agents and their principals. These materials test the authority 
 
 ## Run the vectors
 
-The evidence format is AMEP (Agentic Mandate Evidence Protocol), an open specification with an IETF Internet-Draft ([draft-stafordtituss-agentic-mandate-evidence](https://datatracker.ietf.org/doc/draft-stafordtituss-agentic-mandate-evidence/)) and two independent verifiers, `amep-protocol` on PyPI and `@stafordtituss/amep` on npm. From this folder:
+The evidence format is AMEP (Agentic Mandate Evidence Protocol), an open specification with an IETF Internet-Draft ([draft-stafordtituss-agentic-mandate-evidence](https://datatracker.ietf.org/doc/draft-stafordtituss-agentic-mandate-evidence/)) and two reference verifiers by the same author, `amep-protocol` on PyPI and `@stafordtituss/amep` on npm. From this folder:
 
 ```
 npx --package @stafordtituss/amep@0.2.0-alpha.5 amep-protocol check-suite .
