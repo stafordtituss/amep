@@ -4,7 +4,7 @@ This file holds the notices required by the Community Specification License 1.0 
 
 ## Working Group
 
-The AMEP Working Group was founded, and is chaired, by **Staford Titus Selvaraj** (GitHub: `stafordtituss`), the original author of AMEP. Under section 1.2 of the Community Specification License, any derivative work based on these materials must include attribution to the AMEP Working Group.
+For the purposes of the Community Specification License, the "Working Group" is the AMEP project in this repository, maintained by its original author, **Staford Titus Selvaraj** (GitHub: `stafordtituss`). It is an open-source project, not a working group of a standards body such as the IETF or W3C. Under section 1.2 of the Community Specification License, any derivative work based on these materials must include attribution to the AMEP project.
 
 ## Code of Conduct
 

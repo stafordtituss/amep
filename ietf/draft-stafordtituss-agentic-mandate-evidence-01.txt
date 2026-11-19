@@ -1,0 +1,896 @@
+
+
+
+
+AUDIT BOF                                                 S. T. Selvaraj
+Internet-Draft                                               Independent
+Intended status: Informational                          19 November 2026
+Expires: 23 May 2027
+
+
+           Continuity Evaluation of Agent Delegation Records
+            draft-stafordtituss-agentic-mandate-evidence-01
+
+Abstract
+
+   The AUDIT architecture defines records that capture the user's
+   intent, delegation, authorization state, and the actions that agents
+   take across trust boundaries.  Records alone don't answer the
+   question an auditor, an operator, or a relying party asks next: did
+   the executed effect stay within the authority the user delegated?
+
+   This document defines a deterministic, three-valued evaluation over
+   such records.  The outcomes are preserved, violated, and unresolved,
+   and every non-preserved outcome names the invariant that was broken.
+   The document also defines the claim model that the evaluation needs,
+   the roles permitted to sign each record, a mapping onto the AUDIT
+   record types, and a set of interoperable test vectors.  It is derived
+   from the Agentic Mandate Evidence Protocol (AMEP).
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six months
+   and may be updated, replaced, or obsoleted by other documents at any
+   time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 23 May 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+
+
+
+
+Selvaraj                   Expires 23 May 2027                  [Page 1]
+
+Internet-Draft         Agent Continuity Evaluation         November 2026
+
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents (https://trustee.ietf.org/
+   license-info) in effect on the date of publication of this document.
+   Please review these documents carefully, as they describe your rights
+   and restrictions with respect to this document.  Code Components
+   extracted from this document must include Revised BSD License text as
+   described in Section 4.e of the Trust Legal Provisions and are
+   provided without warranty as described in the Revised BSD License.
+
+Table of Contents
+
+   1.  Introduction  . . . . . . . . . . . . . . . . . . . . . . . .   2
+     1.1.  Requirements Language . . . . . . . . . . . . . . . . . .   3
+     1.2.  Terminology . . . . . . . . . . . . . . . . . . . . . . .   3
+   2.  Relationship to the AUDIT Architecture  . . . . . . . . . . .   4
+   3.  Related Work  . . . . . . . . . . . . . . . . . . . . . . . .   5
+   4.  Claim Model . . . . . . . . . . . . . . . . . . . . . . . . .   6
+   5.  Signer Roles  . . . . . . . . . . . . . . . . . . . . . . . .   7
+   6.  Invariants  . . . . . . . . . . . . . . . . . . . . . . . . .   7
+   7.  Evaluation Procedure  . . . . . . . . . . . . . . . . . . . .   9
+   8.  Required Fields . . . . . . . . . . . . . . . . . . . . . . .  10
+   9.  Test Vectors  . . . . . . . . . . . . . . . . . . . . . . . .  11
+   10. Implementation Status . . . . . . . . . . . . . . . . . . . .  11
+   11. Security Considerations . . . . . . . . . . . . . . . . . . .  12
+   12. Privacy Considerations  . . . . . . . . . . . . . . . . . . .  12
+   13. IANA Considerations . . . . . . . . . . . . . . . . . . . . .  13
+   14. References  . . . . . . . . . . . . . . . . . . . . . . . . .  13
+     14.1.  Normative References . . . . . . . . . . . . . . . . . .  13
+     14.2.  Informative References . . . . . . . . . . . . . . . . .  13
+   Acknowledgments . . . . . . . . . . . . . . . . . . . . . . . . .  15
+   Author's Address  . . . . . . . . . . . . . . . . . . . . . . . .  15
+
+1.  Introduction
+
+   AI agents act through chains of delegation: a user to an agent, an
+   agent to sub-agents, and agents to tools, adapters, and services.
+   Each hop can widen what is done relative to what was asked.  Common
+   examples:
+
+   *  an approval for one command is reused for another;
+
+   *  a sub-agent receives broader scope than its parent held;
+
+   *  untrusted content steers a mutation;
+
+   *  an adapter maps a tool call to an effect that differs from the one
+      declared;
+
+
+
+
+Selvaraj                   Expires 23 May 2027                  [Page 2]
+
+Internet-Draft         Agent Continuity Evaluation         November 2026
+
+
+   *  a decision made after the fact, from an audit log, is presented as
+      if it had prevented the action.
+
+   [I-D.kuehlewind-audit-architecture] defines Interaction, Action,
+   Delegation, and Authorization Transition records, and the propagation
+   of audit context, so that these chains can be reconstructed.
+
+   This document is complementary.  Given a set of such records, it
+   specifies:
+
+   1.  a *claim model* that makes delegated authority machine-checkable
+       (actions, resources, deny lists, data classes, an effect ceiling,
+       validity, a delegation budget, and an optional risk budget);
+
+   2.  *signer roles*, so that a record counts as evidence only when it
+       is signed by a party entitled to make it;
+
+   3.  *invariants* that a chain of records must satisfy (I1 to I11);
+
+   4.  a deterministic *evaluation procedure* that returns preserved,
+       violated, or unresolved, together with the deciding invariant;
+
+   5.  *test vectors*, so that independent verifiers can demonstrate
+       that they agree.
+
+   The evaluation can run before an effect, when an enforcement point
+   decides on the predicted effect, or after the fact, when an auditor
+   evaluates recorded effects.  It never treats missing evidence as
+   success, and it never treats a post-execution decision as a block.
+
+1.1.  Requirements Language
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+   "OPTIONAL" in this document are to be interpreted as described in
+   BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in all
+   capitals, as shown here.
+
+1.2.  Terminology
+
+   This document uses the roles of [I-D.kuehlewind-audit-architecture]:
+   User, Agent, Tool/Service, Auditing Service, Audit Store,
+   Transparency Log, and Auditor.  It adds:
+
+   Mandate:  a signed claim set issued for a principal, stating what an
+      agent may do on the principal's behalf.
+
+   Intent:  an optional claim set derived from a single request (for
+
+
+
+Selvaraj                   Expires 23 May 2027                  [Page 3]
+
+Internet-Draft         Agent Continuity Evaluation         November 2026
+
+
+      example, a prompt), narrower than the mandate.
+
+   Invocation:  a declared call to a tool or service, made under a
+      mandate (possibly delegated).
+
+   Effect:  what was actually executed at the boundary where the action
+      took effect.
+
+   Observer:  the party that produced the effect record.
+
+   Verifier:  an entity that runs the evaluation in Section 7.
+
+2.  Relationship to the AUDIT Architecture
+
+    +================+=============================+==================+
+    | This document  | AUDIT record type           | What is          |
+    |                |                             | evaluated        |
+    +================+=============================+==================+
+    | Mandate,       | Interaction Record (prompt, | claim set C      |
+    | Intent         | signed grant)               | (Section 4)      |
+    +----------------+-----------------------------+------------------+
+    | Delegation     | Delegation Record           | attenuation, I1  |
+    +----------------+-----------------------------+------------------+
+    | Approval       | Interaction Record          | binding to the   |
+    |                | (approval, HITL escalation) | exact effect, I8 |
+    +----------------+-----------------------------+------------------+
+    | Invocation and | Action Record (declared)    | interpretation   |
+    | interpretation |                             | provenance (I3), |
+    |                |                             | influence (I4)   |
+    +----------------+-----------------------------+------------------+
+    | Effect         | Action Record (at the       | I2, I5, I9, I10, |
+    |                | effect boundary)            | I11              |
+    +----------------+-----------------------------+------------------+
+    | Grant,         | Authorization Transition    | liveness, I6     |
+    | revocation,    | Record                      |                  |
+    | status         |                             |                  |
+    +----------------+-----------------------------+------------------+
+    | Continuity     | (none)                      | the output of    |
+    | decision       |                             | this document,   |
+    |                |                             | with its phase   |
+    +----------------+-----------------------------+------------------+
+
+                                  Table 1
+
+
+
+
+
+
+
+
+Selvaraj                   Expires 23 May 2027                  [Page 4]
+
+Internet-Draft         Agent Continuity Evaluation         November 2026
+
+
+   Mandates and delegations commonly originate in OAuth 2.0 Token
+   Exchange chains [RFC8693].  Records MAY be carried as COSE_Sign1
+   objects [RFC9052], and MAY be registered with a transparency service
+   [I-D.ietf-scitt-architecture], which makes selective omission of
+   records detectable.
+
+   This document doesn't define new transport or storage.  It requires
+   only that records carry the fields listed in Section 8, and that
+   records can be linked using the AUDIT audit context: trace, parent,
+   actor, and on-behalf-of.
+
+3.  Related Work
+
+   Most related work grants or checks authority before an agent acts.
+   This document evaluates whether what was executed stayed within that
+   authority, and the two are complementary.
+
+   *  The Delegation Receipt Protocol
+      [I-D.nelson-agent-delegation-receipts] has the user sign an
+      Authorization Object (scope, time window, an instruction hash, and
+      a model-state commitment) that is anchored before the agent
+      receives control and checked before execution.  Such an object can
+      serve as the mandate whose claims this document evaluates.
+
+   *  Authenticated delegation for AI agents [SOUTH2025] proposes
+      scoped, verifiable delegation credentials that extend OpenID
+      Connect and OAuth 2.0.  Those credentials are another source of
+      mandates and delegations.  GNAP [RFC9635] negotiates delegated
+      authorization across multiple parties; its grants can likewise be
+      recorded as mandates.
+
+   *  Work on infrastructure for AI agents [CHAN2025] identifies
+      attribution and incident response as functions that require shared
+      infrastructure outside the agent.  The evaluation in Section 7
+      supplies one verifiable input to both.
+
+   *  The DIF threat model for delegated authority [DIF-DATM] argues
+      that delegated authority commonly fails at the moment of action
+      rather than at issuance, and asks for execution-time evaluation.
+      [DIF-DAE] compares existing authorization specifications
+      (including OAuth, UCAN, zCaps, KYA-OS, and AuthZEN) against a set
+      of criteria.  This document addresses the execution-time and
+      after-the-fact evaluation those documents call for, and does not
+      define a new credential format.
+
+
+
+
+
+
+
+Selvaraj                   Expires 23 May 2027                  [Page 5]
+
+Internet-Draft         Agent Continuity Evaluation         November 2026
+
+
+   *  The NCCoE concept paper on agent identity and authorization
+      [NCCOE-AGENTS] covers identification, authorization, auditing, and
+      non-repudiation for agents using existing standards.  The records
+      and outcomes defined here are one way to make the auditing and
+      non-repudiation goals checkable.
+
+   *  Prompt-injection benchmarks and defenses, such as AgentDojo
+      [AGENTDOJO] and CaMeL [CAMEL], detect or prevent untrusted content
+      from steering an agent.  When such steering produces an effect
+      outside the user's mandate, this document reports it as violated
+      (I2 or I4), independent of how the injection was detected.
+
+4.  Claim Model
+
+   A claim set is C = (A, R, A⁻, R⁻, D, E, V, P, K, B), where:
+
+   *  A and R are sets of canonical action and resource patterns that
+      are permitted;
+
+   *  A⁻ and R⁻ are sets of action and resource patterns that are denied
+      even when A or R would permit them;
+
+   *  D is a set of (data class, recipient class) pairs;
+
+   *  E is the effect ceiling, an element of the totally ordered set
+      read < write_local < write_shared < external_send < destructive <
+      financial;
+
+   *  V is the validity interval;
+
+   *  P is the purpose;
+
+   *  K is the delegation budget (remaining depth);
+
+   *  B is an OPTIONAL risk budget in points.
+
+   C1 ⊑ C2 (C1 is equal to or narrower than C2) holds if and only if:
+   every pattern in A1 and R1 is subsumed by some pattern in A2 or R2
+   respectively; every pattern in A2⁻ and R2⁻ is subsumed by some
+   pattern in A1⁻ or R1⁻ respectively (denies only grow); D1 ⊆ D2; E1 ≤
+   E2; V1 ⊆ V2; P1 = P2 or P2 is unrestricted; the depth rule holds (if
+   K2 is present, K2 > 0 and K1 < K2); and B1 ≤ B2 when B2 is present.
+
+   The meet C1 ⊓ C2 is taken component-wise, with denies unioned so that
+   no hop and no intent can lift a deny.
+
+
+
+
+
+
+Selvaraj                   Expires 23 May 2027                  [Page 6]
+
+Internet-Draft         Agent Continuity Evaluation         November 2026
+
+
+   Resource identifiers MUST be canonical.  File-system paths MUST be
+   absolute and normalized, with the home directory expanded and ".."
+   collapsed.  URLs MUST carry their resolved host class.  SaaS objects
+   MUST be identified as provider:type/id.  A verifier MUST NOT rely on
+   user-relative forms.
+
+   An effect is x = (a, r, d, e, t). x ⊨ C if and only if a matches A
+   and not A⁻, r matches R and not R⁻, e ≤ E, every released (data
+   class, recipient class) pair is in D, and t ∈ V.
+
+5.  Signer Roles
+
+   A valid signature shows only that a key signed a record.  Each key in
+   the verifier's key set carries roles, and a record counts as signed
+   only when its key holds a role permitted for the record's kind:
+
+    +========================================+========================+
+    | Record                                 | Permitted signer roles |
+    +========================================+========================+
+    | Mandate, revocation, revocation status | issuer                 |
+    +----------------------------------------+------------------------+
+    | Delegation, intent                     | issuer, host           |
+    +----------------------------------------+------------------------+
+    | Interpretation, invocation, decision   | host                   |
+    +----------------------------------------+------------------------+
+    | Effect                                 | observer               |
+    +----------------------------------------+------------------------+
+    | Approval                               | approver               |
+    +----------------------------------------+------------------------+
+    | Content finding                        | host, observer         |
+    +----------------------------------------+------------------------+
+
+                                  Table 2
+
+   Without roles, a compromised host key could mint its own mandate or
+   approve its own action.
+
+6.  Invariants
+
+   +=====+================================================+============+
+   | ID  | Invariant                                      | When       |
+   |     |                                                | broken     |
+   +=====+================================================+============+
+   | I1  | Attenuation: child ⊑ parent at every           | violated   |
+   |     | delegation edge                                |            |
+   +-----+------------------------------------------------+------------+
+   | I2  | Every effect matches the declared (or          | violated   |
+   |     | mediated) effect, satisfies the meet           |            |
+
+
+
+Selvaraj                   Expires 23 May 2027                  [Page 7]
+
+Internet-Draft         Agent Continuity Evaluation         November 2026
+
+
+   |     | of the chain (and of the intent), and          |            |
+   |     | stays within risk budgets unless a             |            |
+   |     | bound approval covers it                       |            |
+   +-----+------------------------------------------------+------------+
+   | I3  | The invocation was interpreted by an           | unresolved |
+   |     | approved, version-pinned mapping               |            |
+   +-----+------------------------------------------------+------------+
+   | I4  | Content withheld by a quarantine did           | violated   |
+   |     | not reach a later step; a mutation             | (executed) |
+   |     | influenced by content that is not              | or         |
+   |     | signed and trusted was confirmed by            | unresolved |
+   |     | the principal                                  |            |
+   +-----+------------------------------------------------+------------+
+   | I5  | Data classes released to a recipient           | violated   |
+   |     | are permitted                                  |            |
+   +-----+------------------------------------------------+------------+
+   | I6  | No ancestor was revoked, per signed            | violated   |
+   |     | revocation or status evidence, at or           |            |
+   |     | before the invocation                          |            |
+   +-----+------------------------------------------------+------------+
+   | I7  | All required records are present,              | unresolved |
+   |     | well-formed, signed by a permitted             |            |
+   |     | role, and fresh where required                 |            |
+   +-----+------------------------------------------------+------------+
+   | I8  | An approval matches the executed               | violated   |
+   |     | effect (without its time), is within           |            |
+   |     | its validity window, unconsumed, and           |            |
+   |     | used once                                      |            |
+   +-----+------------------------------------------------+------------+
+   | I9  | No agent effect targets guardrail              | violated   |
+   |     | configuration, keys, instruction               |            |
+   |     | files, or the audit store                      |            |
+   +-----+------------------------------------------------+------------+
+   | I10 | An effect at or above write_shared             | unresolved |
+   |     | names its actor and was observed by a          |            |
+   |     | party other than that actor                    |            |
+   +-----+------------------------------------------------+------------+
+   | I11 | Every recorded effect links to an              | violated   |
+   |     | authorized invocation, and none                |            |
+   |     | exists for an invocation a pre-                |            |
+   |     | execution decision denied                      |            |
+   +-----+------------------------------------------------+------------+
+
+                                  Table 3
+
+
+
+
+
+
+
+Selvaraj                   Expires 23 May 2027                  [Page 8]
+
+Internet-Draft         Agent Continuity Evaluation         November 2026
+
+
+7.  Evaluation Procedure
+
+   For each invocation, in recorded order, a verifier MUST apply the
+   following checks in order and return the first outcome that applies.
+   "Verified" means signed by a key holding a permitted role
+   (Section 5).
+
+   ID   Outcome     Condition
+   I4   violated    quarantined content in the influence set,
+                    not confirmed by the principal
+   I7   unresolved  no root mandate
+   I7   unresolved  cited intent missing, or a needed record
+                    not verified
+   I7   unresolved  lineage names an invocation that is not earlier
+   I3   unresolved  no approved interpretation, or a pin mismatch
+   I1   violated    a delegation edge where not (child ⊑ parent)
+   I6   violated    verified revocation or status shows an
+                    ancestor revoked
+   I7   unresolved  unverified revocation on the chain, or a
+                    revocable record without a fresh verified status
+   I9   violated    guardrail target
+   I4   violated    untrusted influence on a mutation, unconfirmed
+                    (unresolved instead if no effect exists)
+   I7   unresolved  no effect record
+        For every effect record of the invocation:
+   I7   unresolved    record not verified
+   I10  unresolved    e >= write_shared and the actor is absent,
+                      the effect is self-observed, or assurance L0
+   I2   violated      executed != declared (and != the mediated
+                      effect)
+   I9   violated      executed resource is a guardrail
+   I2   violated      x does not satisfy the meet of the chain and
+                      intent (I5 when the failure is a release)
+   I5   violated      data classes carried in through lineage reach
+                      a recipient class the claims do not permit
+   I7   unresolved  approval missing or not verified
+   I8   violated    approval unbound, outside its window,
+                    consumed, or reused
+   I7   violated    recorded budget spend != recomputed cost
+   I2   violated    risk budget exceeded without a bound approval
+   -    preserved   otherwise
+
+   After all invocations:
+
+
+
+
+
+
+
+
+Selvaraj                   Expires 23 May 2027                  [Page 9]
+
+Internet-Draft         Agent Continuity Evaluation         November 2026
+
+
+   ID   Outcome     Condition
+   I11  violated    pre-execution deny/hold decision, and an effect
+                    exists (enforcement contradicted)
+   -    preserved   pre-execution deny/hold decision, no effect,
+                    enforcement fail-closed or applied = confirmed
+   I11  violated    effect with no invocation
+
+   Lineage: an effect may record the data classes it read (accessed) and
+   the recipient class of what it sent; an invocation may name the
+   earlier invocations its input came from (derived_from).  The data
+   classes an invocation carries are those its own effects read plus
+   those carried by the invocations it derives from, transitively.  This
+   detects sensitive data leaving in a later step even when that step
+   declares no release.
+
+   A verifier evaluating a stream of packets MAY carry approval use and
+   risk-budget spending from one packet to the next, so that single use
+   and budgets hold across the stream.
+
+   Decisions carry a phase: pre_execution, post_execution, or
+   simulation.  Only pre-execution decisions can confirm or contradict a
+   block.  A post-execution decision is detection and MUST NOT be
+   presented as having prevented the action.
+
+   When B is present, the cost of x is base(e) × m(d) × rev(x).  The
+   base table is read 0, write_local 1, write_shared 3, external_send 5,
+   destructive 10, financial 20. m(d) is the largest data-class
+   multiplier among the released classes (1, 2, or 5). rev(x) is 1 if
+   the effect is a read, or reversible and not an external send, and 3
+   otherwise.  The cost is charged to every node in the chain.  The
+   tables are registries (Section 13).
+
+8.  Required Fields
+
+   The evaluation needs the following fields from each AUDIT record.
+   Field names are placeholders until the AUDIT data model is defined.
+
+   *  Mandate, Intent, and Delegation: id, parent, issuer, claims (C),
+      signature.
+
+   *  Invocation: id, authority reference, interpretation reference
+      (adapter and version), declared effect, actor, influence
+      references, approval reference, time.
+
+   *  Effect: id, invocation reference, executed effect x, observer,
+      assurance level (L0 self-reported to L3 provider-confirmed),
+      signature.
+
+
+
+
+Selvaraj                   Expires 23 May 2027                 [Page 10]
+
+Internet-Draft         Agent Continuity Evaluation         November 2026
+
+
+   *  Approval: id, effect digest (SHA-256 over the JCS [RFC8785] form
+      of x without its time), presence (webauthn, chat_user, host_ui, or
+      none), validity window, consumed flag, signature.
+
+   *  Revocation and revocation status: target, time (or as-of time and
+      revocation time), signature.
+
+   *  Continuity decision: invocation reference, mode, phase, outcome,
+      enforcement context (enforcement point, fail mode, what was
+      returned to the host, whether an effect record confirms it),
+      signature.
+
+   Records are canonicalized with JCS [RFC8785] and signed with Ed25519
+   [RFC8032].  Times are numbers of seconds since the epoch or RFC 3339
+   [RFC3339] strings.  A CDDL [RFC8610] definition and JSON Schemas are
+   published in [AMEP].
+
+9.  Test Vectors
+
+   [AMEP] publishes 95 vectors: 25 positive and 70 must-reject.  The
+   must-reject vectors cover all eleven invariants, signer roles,
+   revocation status, decision phase, deny lists, data lineage, state
+   across packets, risk-budget accounting, and a deny that an executed
+   effect contradicts.  Each vector is a packet of signed records, with
+   the expected outcome and invariant.  Two implementations written
+   separately by the author (Python, and JavaScript run under Node.js
+   and in a browser) agree on all 95.  Implementations by other parties
+   are invited.
+
+   A conforming verifier MUST return the expected outcome and invariant
+   for every vector.
+
+10.  Implementation Status
+
+   *Note to the RFC Editor:* please remove this section before
+   publication, per [RFC7942].
+
+   *  *AMEP reference verifiers.* Two implementations, both by the
+      author: Python, and JavaScript (run as a Node.js command-line tool
+      and as an offline browser page using WebCrypto).  Both evaluate
+      the procedure in Section 7 and agree on all 95 published vectors.
+      License: Apache 2.0.  Location: https://github.com/stafordtituss/
+      amep.  Maturity: prototype.
+
+   *  *Natsar control plane* (agent-authority enforcement for coding-
+      agent hosts and MCP).  It emits decision records before tool
+      execution from host hooks.  Maturity: pre-release.
+
+
+
+
+Selvaraj                   Expires 23 May 2027                 [Page 11]
+
+Internet-Draft         Agent Continuity Evaluation         November 2026
+
+
+   Implementation experience motivated several parts of this document:
+   canonical resource identifiers (absolute-path forms bypassed
+   relative-prefix rules); recording the enforcement context and phase
+   (hosts differ in whether they support "ask" and whether hook failures
+   block); and treating an effect that contradicts a deny as evidence of
+   bypass.
+
+11.  Security Considerations
+
+   *  *Adversarial models:* the guarantees MUST hold even if every model
+      in the chain is adversarial.  Semantic analysis MAY raise a
+      decision level, but MUST NOT mint authority or lower a decision.
+
+   *  *Self-reporting:* records produced by the actor alone are
+      insufficient for high-impact effects (I10).
+
+   *  *Key compromise:* signer roles (Section 5) limit what one stolen
+      key can forge.
+
+   *  *Evidence omission:* a missing record, status or signature yields
+      unresolved.  Omission of whole invocations is detected only
+      against an independent effect log (I11).
+
+   *  *Canonicalization:* non-canonical resource forms enable bypasses.
+      Canonicalization is therefore normative.
+
+   *  *Approval replay and time-of-check/time-of-use:* approvals bind
+      the exact effect and are single use (I8).
+
+   *  *Fail-open enforcement:* an enforcement point that errors MUST
+      return a deny decision, not a transport error.  Hosts commonly
+      treat transport errors as non-blocking, and some treat an
+      unsupported "ask" as a hook failure and run the action.  A
+      verifier SHOULD treat an effect that contradicts a pre-execution
+      deny as evidence of bypass.
+
+   *  *Guardrail tampering:* agent writes to hook configuration, keys,
+      instruction files, or the audit store are violations (I9).
+
+12.  Privacy Considerations
+
+   Effect records can contain personal data.  Verifiers need only
+   canonical actions, resource identifiers, data-class labels, and
+   digests.  Payloads SHOULD be detached and hashed, following the AUDIT
+   selective-disclosure work.
+
+
+
+
+
+
+Selvaraj                   Expires 23 May 2027                 [Page 12]
+
+Internet-Draft         Agent Continuity Evaluation         November 2026
+
+
+13.  IANA Considerations
+
+   This document proposes registries for effect classes, data classes,
+   recipient classes, signer roles, and the risk-cost tables, with the
+   registration policy Specification Required.  The registries are to be
+   defined in a later revision.
+
+14.  References
+
+14.1.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119,
+              DOI 10.17487/RFC2119, March 1997,
+              <https://www.rfc-editor.org/rfc/rfc2119>.
+
+   [RFC3339]  Klyne, G. and C. Newman, "Date and Time on the Internet:
+              Timestamps", RFC 3339, DOI 10.17487/RFC3339, July 2002,
+              <https://www.rfc-editor.org/rfc/rfc3339>.
+
+   [RFC8032]  Josefsson, S. and I. Liusvaara, "Edwards-Curve Digital
+              Signature Algorithm (EdDSA)", RFC 8032,
+              DOI 10.17487/RFC8032, January 2017,
+              <https://www.rfc-editor.org/rfc/rfc8032>.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
+              2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
+              May 2017, <https://www.rfc-editor.org/rfc/rfc8174>.
+
+   [RFC8785]  Rundgren, A., Jordan, B., and S. Erdtman, "JSON
+              Canonicalization Scheme (JCS)", RFC 8785,
+              DOI 10.17487/RFC8785, June 2020,
+              <https://www.rfc-editor.org/rfc/rfc8785>.
+
+14.2.  Informative References
+
+   [AGENTDOJO]
+              Debenedetti, E., Zhang, J., Balunović, M., Beurer-Kellner,
+              L., Fischer, M., and F. Tramèr, "AgentDojo: A Dynamic
+              Environment to Evaluate Prompt Injection Attacks and
+              Defenses for LLM Agents", NeurIPS Datasets and Benchmarks
+              Track 2024, 2024, <https://arxiv.org/abs/2406.13352>.
+
+   [AMEP]     Selvaraj, S. T., "Agentic Mandate Evidence Protocol (AMEP)
+              v0.2", 2026, <https://github.com/stafordtituss/amep>.
+
+
+
+
+
+
+Selvaraj                   Expires 23 May 2027                 [Page 13]
+
+Internet-Draft         Agent Continuity Evaluation         November 2026
+
+
+   [CAMEL]    Debenedetti, E., Shumailov, I., Fan, T., Hayes, J.,
+              Carlini, N., Fabian, D., Kern, C., Shi, C., Terzis, A.,
+              and F. Tramèr, "Defeating Prompt Injections by Design",
+              2025, <https://arxiv.org/abs/2503.18813>.
+
+   [CHAN2025] Chan, A., Wei, K., Huang, S., Rajkumar, N., Perrier, E.,
+              Lazar, S., Hadfield, G. K., and M. Anderljung,
+              "Infrastructure for AI Agents", Transactions on Machine
+              Learning Research 2025, 2025,
+              <https://arxiv.org/abs/2501.10114>.
+
+   [DIF-DAE]  Decentralized Identity Foundation, Trusted AI Agents
+              Working Group, "Delegated Authority Evaluations", 2026,
+              <https://identity.foundation/delegated-authority-
+              evaluations/>.
+
+   [DIF-DATM] Decentralized Identity Foundation, Trusted AI Agents
+              Working Group, "Threat Model for Delegated Authority in
+              AI-Mediated Systems", 2026, <https://identity.foundation/
+              delegated-authority-threat-model/>.
+
+   [I-D.ietf-scitt-architecture]
+              Birkholz, H., Delignat-Lavaud, A., Fournet, C., Deshpande,
+              Y., and S. Lasker, "An Architecture for Trustworthy and
+              Transparent Digital Supply Chains", Work in Progress,
+              Internet-Draft, draft-ietf-scitt-architecture-22, 10
+              October 2025, <https://datatracker.ietf.org/doc/html/
+              draft-ietf-scitt-architecture-22>.
+
+   [I-D.kuehlewind-audit-architecture]
+              Kühlewind, M. and H. Birkholz, "An Architecture for
+              Auditing Agent Delegation and Interactions", Work in
+              Progress, Internet-Draft, draft-kuehlewind-audit-
+              architecture-01, 7 September 2026,
+              <https://datatracker.ietf.org/doc/html/draft-kuehlewind-
+              audit-architecture-01>.
+
+   [I-D.nelson-agent-delegation-receipts]
+              Nelson, R., "Agent Delegation Receipts", Work in Progress,
+              Internet-Draft, draft-nelson-agent-delegation-receipts-15,
+              21 October 2026, <https://datatracker.ietf.org/doc/html/
+              draft-nelson-agent-delegation-receipts-15>.
+
+
+
+
+
+
+
+
+
+Selvaraj                   Expires 23 May 2027                 [Page 14]
+
+Internet-Draft         Agent Continuity Evaluation         November 2026
+
+
+   [NCCOE-AGENTS]
+              NIST National Cybersecurity Center of Excellence,
+              "Accelerating the Adoption of Software and Artificial
+              Intelligence Agent Identity and Authorization (Concept
+              Paper)", 2026, <https://www.nccoe.nist.gov/projects/
+              software-and-ai-agent-identity-and-authorization>.
+
+   [RFC7942]  Sheffer, Y. and A. Farrel, "Improving Awareness of Running
+              Code: The Implementation Status Section", BCP 205,
+              RFC 7942, DOI 10.17487/RFC7942, July 2016,
+              <https://www.rfc-editor.org/rfc/rfc7942>.
+
+   [RFC8610]  Birkholz, H., Vigano, C., and C. Bormann, "Concise Data
+              Definition Language (CDDL): A Notational Convention to
+              Express Concise Binary Object Representation (CBOR) and
+              JSON Data Structures", RFC 8610, DOI 10.17487/RFC8610,
+              June 2019, <https://www.rfc-editor.org/rfc/rfc8610>.
+
+   [RFC8693]  Jones, M., Nadalin, A., Campbell, B., Ed., Bradley, J.,
+              and C. Mortimore, "OAuth 2.0 Token Exchange", RFC 8693,
+              DOI 10.17487/RFC8693, January 2020,
+              <https://www.rfc-editor.org/rfc/rfc8693>.
+
+   [RFC9052]  Schaad, J., "CBOR Object Signing and Encryption (COSE):
+              Structures and Process", STD 96, RFC 9052,
+              DOI 10.17487/RFC9052, August 2022,
+              <https://www.rfc-editor.org/rfc/rfc9052>.
+
+   [RFC9635]  Richer, J., Ed. and F. Imbault, "Grant Negotiation and
+              Authorization Protocol (GNAP)", RFC 9635,
+              DOI 10.17487/RFC9635, October 2024,
+              <https://www.rfc-editor.org/rfc/rfc9635>.
+
+   [SOUTH2025]
+              South, T., Marro, S., Hardjono, T., Mahari, R., Whitney,
+              C. D., Greenwood, D., Chan, A., and A. Pentland,
+              "Authenticated Delegation and Authorized AI Agents", 2025,
+              <https://arxiv.org/abs/2501.09674>.
+
+Acknowledgments
+
+   This document is derived from the Agentic Mandate Evidence Protocol
+   (AMEP), designed and written by the author.
+
+Author's Address
+
+   Staford Titus Selvaraj
+   Independent
+
+
+
+Selvaraj                   Expires 23 May 2027                 [Page 15]
+
+Internet-Draft         Agent Continuity Evaluation         November 2026
+
+
+   Email: stafordtituss@gmail.com
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Selvaraj                   Expires 23 May 2027                 [Page 16]

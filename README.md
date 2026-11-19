@@ -43,7 +43,7 @@ See `packages/python/README.md` and `packages/js/README.md`. Published at [amep-
 | `schemas/` | JSON Schemas (one per object) and CDDL |
 | `vectors/` | The conformance suite: positive and must-reject packets (also on Hugging Face: [stafordtituss/amep-conformance](https://huggingface.co/datasets/stafordtituss/amep-conformance)) |
 | `packages/python/` | The `amep-protocol` Python package: verifier, SDK, CLI |
-| `packages/js/` | The `@stafordtituss/amep` npm package: the same, in JavaScript (independent implementation) |
+| `packages/js/` | The `@stafordtituss/amep` npm package: the same, in JavaScript (written separately from the Python package, by the same author) |
 | `packages/mcp/` | The `amep-mcp` MCP server: the verifier and both conformance suites as MCP tools |
 | `packages/agents/` | The `amep-agents` package: evidence for every tool call in OpenAI Agents SDK and LangGraph/LangChain agents |
 | `verifier/python/` | Conformance-vector generator (uses the Python package) |
@@ -72,9 +72,21 @@ The IETF Internet-Draft is in `ietf/`: Markdown source, with XML, text and HTML 
 
 Not an identity provider, a policy engine or a prompt-injection detector. AMEP binds to OAuth and OpenID AuthZEN for decisions, SCITT for transparency, MCP and A2A for carriage, and OpenTelemetry for tracing.
 
+## Related work
+
+AMEP evaluates evidence *after* authority has been granted and exercised. Related work, mostly on granting and checking authority *before* an action:
+
+- **Delegation Receipt Protocol** ([draft-nelson-agent-delegation-receipts](https://datatracker.ietf.org/doc/draft-nelson-agent-delegation-receipts/), R. Nelson). A user-signed Authorization Object, anchored before the agent runs and checked before execution. A DRP receipt is a natural mandate input for AMEP.
+- **Authenticated Delegation and Authorized AI Agents** ([arXiv:2501.09674](https://arxiv.org/abs/2501.09674), South et al., 2025). Scoped, verifiable delegation credentials for agents, extending OpenID Connect and OAuth 2.0.
+- **Infrastructure for AI Agents** ([arXiv:2501.10114](https://arxiv.org/abs/2501.10114), Chan et al., TMLR 2025) and **IDs for AI Systems** ([arXiv:2406.12137](https://arxiv.org/abs/2406.12137), Chan et al., 2024). Attribution and response infrastructure; AMEP's evidence is one form of it.
+- **DIF Threat Model for Delegated Authority in AI-Mediated Systems** ([identity.foundation](https://identity.foundation/delegated-authority-threat-model/)) and **DIF Delegated Authority Evaluations** ([identity.foundation](https://identity.foundation/delegated-authority-evaluations/)), Trusted AI Agents Working Group. The threat model argues that delegated authority fails at the moment of action; the evaluations compare OAuth, UCAN, zCaps, KYA-OS, AuthZEN and others.
+- **NIST NCCoE, Accelerating the Adoption of Software and AI Agent Identity and Authorization** ([concept paper, 2026](https://www.nccoe.nist.gov/projects/software-and-ai-agent-identity-and-authorization)). Identification, authorization, auditing and non-repudiation for agents using existing standards.
+- **GNAP** ([RFC 9635](https://www.rfc-editor.org/rfc/rfc9635)). Delegated authorization negotiation across multiple parties.
+- **AgentDojo** ([arXiv:2406.13352](https://arxiv.org/abs/2406.13352)) and **CaMeL** ([arXiv:2503.18813](https://arxiv.org/abs/2503.18813)), Debenedetti, Tramèr et al. Prompt-injection evaluation and data-flow-based defenses for agents. A successful injection is an effect outside the user's mandate, which AMEP reports as `violated`.
+
 ## Licenses, attribution and trademarks
 
-- Specification text: Community Specification License 1.0 (`LICENSE-SPEC.md`), with `Scope.md` and `Notices.md`. Derivative works must credit the AMEP Working Group, founded and chaired by Staford Titus Selvaraj.
+- Specification text: Community Specification License 1.0 (`LICENSE-SPEC.md`), with `Scope.md` and `Notices.md`. Derivative works must credit the AMEP project and its original author, Staford Titus Selvaraj. (The license calls the project its "Working Group"; AMEP is an open-source project, not a standards-body working group.)
 - Code, schemas and vectors: Apache License 2.0 (`LICENSE-CODE`). Redistributions must keep `NOTICE`.
 - "AMEP" and "AMEP Conformant" are trademarks of Staford Titus Selvaraj; see `TRADEMARKS.md`. Forks are welcome under a different name.
 - To cite AMEP, see `CITATION.cff`.
