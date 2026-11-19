@@ -1,0 +1,91 @@
+{
+ "name": "effect after a mandate's RFC 3339 expiry",
+ "expect": {
+  "outcome": "violated",
+  "invariant": "I2"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "fs.*",
+      "process.exec"
+     ],
+     "resources": [
+      "repo:app/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": "1970-01-01T00:00:10Z",
+     "depth": 2
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "514017c8e29d65bed818a5e75a3b436961145e047c51d418302570c1eb583e35c6aa54019f32323791a78364475c1c4a9a6a93269046b976e17d227df068ff05"
+    }
+   }
+  ],
+  "delegations": [],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "host_shell",
+    "version": "r9",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "185d02d49c8440af31134eec4b820a71cfa92a89dd007f0b912acbcb9bf860641ff6e3ff58e7a08754e6bf9c27d2269d166521b86e39293ad09957a61fe75a09"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "m-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "write_local"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "d8ff8aba8577711889bc372ce6b3f9bc96438ffa1bb650edf84d2e9b03c2c1f18d0e2d1dd015f5c0e0ac38ec49f27ac7c3add74f46e2905f5b32b830ca2a7f05"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "hook:host",
+    "assurance": "L1",
+    "executed": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "write_local",
+     "released": [],
+     "t": 11
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "sig": "50525648c531e0be5cede8daa74a0d7c9199e767ab20e02ba5ce77bc0ffdcd02561f7987f36df79f2ce22f80b94b62a98fdda0301fff13d008a4d1f20154e505"
+    }
+   }
+  ]
+ }
+}

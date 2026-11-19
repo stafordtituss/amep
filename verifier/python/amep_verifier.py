@@ -398,6 +398,20 @@ def vectors():
         revocable(p, I), p.update(statuses=[I.sign({"kind": "status", "target": "m-1", "as_of": 10})])))
     add("approval used at its expiry instant", ("preserved", "-"), lambda p, I, H, O, X: with_approval(p, I, H, "ap-11", expiry=11))
     add("approval valid from the instant of the action", ("preserved", "-"), lambda p, I, H, O, X: with_approval(p, I, H, "ap-12", nbf=10))
+
+    # Suite v0.2.2: an agent acting directly under a mandate whose validity uses RFC 3339 times (spec 5.2 allows
+    # either form). Found by the AgentDojo experiment (experiments/agentdojo): with no delegation in the chain, both
+    # reference verifiers compared the effect time with the unconverted string, so Python returned unresolved/I7 for
+    # every such packet and JavaScript never detected an effect after expiry.
+    def direct(p, I, H, O, **kw):
+        mand(p, I, **kw)
+        p.update(delegations=[], invocations=[H.sign({**p["invocations"][0], "authority_ref": "m-1"})])
+    add("action under a mandate with RFC 3339 validity", ("preserved", "-"), lambda p, I, H, O, X:
+        direct(p, I, H, O, exp="1970-01-01T00:01:40Z", nbf="1970-01-01T00:00:01Z"))
+    add("effect after a mandate's RFC 3339 expiry", ("violated", "I2"), lambda p, I, H, O, X:
+        direct(p, I, H, O, exp="1970-01-01T00:00:10Z"))
+    add("effect before a mandate's RFC 3339 nbf", ("violated", "I2"), lambda p, I, H, O, X:
+        direct(p, I, H, O, exp="1970-01-01T00:01:40Z", nbf="1970-01-01T00:00:20Z"))
     return keys, V
 
 

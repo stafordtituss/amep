@@ -4,6 +4,8 @@ Specification drafts, conformance-suite versions and package versions are listed
 
 ## Unreleased
 
+- **Fix (both reference verifiers):** an agent acting directly under a mandate (no delegation) whose `exp` or `nbf` is an RFC 3339 time. The effect time was compared with the unconverted string. Python returned `unresolved`/I7 for every such packet; JavaScript never detected an effect after expiry or before `nbf`. **Conformance suite v0.2.2** adds 3 vectors for this path (114 vectors: 33 positive, 81 must-reject). Found by the AgentDojo experiment.
+- **AgentDojo experiment** (`experiments/agentdojo`): AMEP evidence over all 949 user-task × injection-task pairs of AgentDojo v1.2.2, with mandates of three granularities.
 - **Conformance suite v0.2.1** (no normative change): 16 vectors found by mutation analysis of the reference evaluator, covering the action-widening and effect-ceiling rules, `write_shared` as high impact, intent references to non-intent objects, approval `nbf`, verdict precedence within a packet, and the inclusive edge of every time, budget and approval-window bound. 111 vectors (32 positive, 79 must-reject).
 - **Mutation analysis tool** (`paper/eval/mutation.py`) with a `--check` mode for CI, and verification benchmarks (`paper/eval/bench.py`, `bench.mjs`).
 - **`amep-mcp`**: the verifier as an MCP server (`packages/mcp`), with both conformance suites bundled.

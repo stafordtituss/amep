@@ -113,8 +113,8 @@ function effectOk(x, c) {
   if ((c.deny_resources || []).some(p => patMatch(x.resource, p))) return [false, "resource denied"];
   if (CEILING.indexOf(x.effect) > CEILING.indexOf(c.ceiling)) return [false, "effect above ceiling"];
   for (const d of x.released || []) if (!(c.data || []).includes(d)) return [false, `released ${d} not allowed`];
-  if (toTime(x.t) > c.exp) return [false, "after validity"];
-  if ("nbf" in c && toTime(x.t) < c.nbf) return [false, "before validity"];
+  if (toTime(x.t) > toTime(c.exp)) return [false, "after validity"];
+  if ("nbf" in c && toTime(x.t) < toTime(c.nbf)) return [false, "before validity"];
   return [true, ""];
 }
 const cost = x => {

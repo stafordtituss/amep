@@ -185,8 +185,8 @@ def effect_ok(x: dict, c: dict) -> tuple[bool, str]:
     if CEILING.index(x["effect"]) > CEILING.index(c["ceiling"]): return False, "effect above ceiling"
     for d in x.get("released", []):
         if d not in c.get("data", []): return False, f"released {d} not allowed"
-    if to_time(x["t"]) > c["exp"]: return False, "after validity"
-    if "nbf" in c and to_time(x["t"]) < c["nbf"]: return False, "before validity"
+    if to_time(x["t"]) > to_time(c["exp"]): return False, "after validity"
+    if "nbf" in c and to_time(x["t"]) < to_time(c["nbf"]): return False, "before validity"
     return True, ""
 
 
