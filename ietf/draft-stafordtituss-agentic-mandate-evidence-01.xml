@@ -338,7 +338,7 @@ I11  violated    effect with no invocation
 </section>
 <section anchor="test-vectors"><name>Test Vectors</name>
 
-<t><xref target="AMEP"/> publishes 95 vectors: 25 positive and 70 must-reject. The must-reject vectors cover all eleven invariants, signer roles, revocation status, decision phase, deny lists, data lineage, state across packets, risk-budget accounting, and a deny that an executed effect contradicts. Each vector is a packet of signed records, with the expected outcome and invariant. Two implementations written separately by the author (Python, and JavaScript run under Node.js and in a browser) agree on all 95. Implementations by other parties are invited.</t>
+<t><xref target="AMEP"/> publishes 114 vectors: 33 positive and 81 must-reject. The must-reject vectors cover all eleven invariants, signer roles, revocation status, decision phase, deny lists, data lineage, state across packets, risk-budget accounting, and a deny that an executed effect contradicts. Each vector is a packet of signed records, with the expected outcome and invariant. Two implementations written separately by the author (Python, and JavaScript run under Node.js and in a browser) agree on all 114. Implementations by other parties are invited.</t>
 
 <t>A conforming verifier <bcp14>MUST</bcp14> return the expected outcome and invariant for every vector.</t>
 
@@ -348,7 +348,7 @@ I11  violated    effect with no invocation
 <t><strong>Note to the RFC Editor:</strong> please remove this section before publication, per <xref target="RFC7942"/>.</t>
 
 <t><list style="symbols">
-  <t><strong>AMEP reference verifiers.</strong> Two implementations, both by the author: Python, and JavaScript (run as a Node.js command-line tool and as an offline browser page using WebCrypto). Both evaluate the procedure in <xref target="evaluation"/> and agree on all 95 published vectors. License: Apache 2.0. Location: https://github.com/stafordtituss/amep. Maturity: prototype.</t>
+  <t><strong>AMEP reference verifiers.</strong> Two implementations, both by the author: Python, and JavaScript (run as a Node.js command-line tool and as an offline browser page using WebCrypto). Both evaluate the procedure in <xref target="evaluation"/> and agree on all 114 published vectors. License: Apache 2.0. Location: https://github.com/stafordtituss/amep. Maturity: prototype.</t>
   <t><strong>Natsar control plane</strong> (agent-authority enforcement for coding-agent hosts and MCP). It emits decision records before tool execution from host hooks. Maturity: pre-release.</t>
 </list></t>
 
@@ -832,7 +832,7 @@ I11  violated    effect with no invocation
   </back>
 
 <!-- ##markdown-source:
-H4sIAMJl/moAA818S3Mbx5bmHr8im140qAAgPiRZoux7BwIpixZFckTajtsT
+H4sIAK9m/moAA818S3Mbx5bmHr8im140qAAgPiRZoux7BwIpixZFckTajtsT
 E3YBSABlFqpw60GKpnQjZjPT07uJWcx2FrPo/9C77v4l95f0952TmVUFQLYj
 7mYUIQmoR+bJk+fxnUei3+93yrhM7JHZGWVpGadVXN6bk9soqaIyzlKTzcxw
 btPSHNvEzvXaezvJ8mmx04nG49ze4l19ZOsIO51JVNp5lt8fmTidZZ1pNkmj
@@ -999,35 +999,35 @@ Bbqn1r7n0x09s46WoP5tCCV12p4AHDdEaCTUJIpupBbUCj1KI4mpGraE+ors
 L/11exmd940UZCjuSSZKwNH6jkrGWxMxcv9kevD06f4L98ze4QF7Yq9jr+v6
 u04CewoehZsyjcM9F8u4ymAsWKd9PTL8OSMdhZ/YblWyOaOgvxodH5/5rtv9
 PX/OLw57++3Vxbm5miwsf7hHTEw1TuJi4btNef7UdbNfU3C/1zNTPFWot8IL
-hXnx1B+pOjIHT+kqFbJwni/35FQYtIgVRrWvjQv+RU3wCy63iaCZ+sBZr1WD
-2lJhatSEnLxsHMZzkZZ2WIcT3g7q9FqABoCUlbXQO6RFXpdpSzeMSA0X/GFY
-XZJ6L4eFuJc+Ne5OJoa6rv2wki6WkNPTdj23enDsDmA79LIqhKQXL9mUY2G9
-sSCgGwc01Sib7uU9/ndRyLfRbXQ1ydnsysNpeirjHMox+LlwsxHq5NkdrMiu
-nm2THAl248XTgTldm33sk7muu1HkBxTH2oszFNXJeJhnvpbvbOQxf33Z2m0n
-TlrZqVWzFiHmSpNCnUePzrPSerWmZpzIKZ2jR4/gOYk9MPGS6WvpQypCg5UU
-IESOfc6WRQzRGv4imMh/3zx6RIlvuLJwQHCACbZsT0/aGts7cmQ+syNdbokc
-pPM74k479+V8lBys0R5E6dedzeSy2yzswNy6FrYf7HiU36/KDJjqFef3Dbr+
-PK5LXW92aep579amN8xBOMx+Fk/YgXYEBwcxt9pmexYgwe/6DYgBMEkpP2ND
-CJ+VGTsKBsLk86gsojz0LwPypDwN2tVO7BpstOJYwesMP9zhb9p0lel3o8td
-6be3SzrQYCF8/ciXn8jfGtcLIJPy7iLLboo2ubZfx1FrokhpBkqkdCwzGD8J
-mgsKMMAK1aTYOHVx1Ggiy7f1j3R9T0ifrSLaRwGhWhFET8O5ev6wwiz+IH00
-xe5Ltz5/AmCbvyR39JxHV9mlp9UpGN4ZyhlXNu/y/MJOVNzsaGnH3SZvfBas
-0BjJteXIkVHXPdg8EN+wkt6gtk4mz9zCtNEi/NIRlIlYS9XK6eKU4JFWQh18
-UhzJmWEreUCYDmtdH4sElepLZs6WOJTcQPxipushB5h8GcmPMwDrJ/dFrIFw
-HrFZu3FqX0AiFB34LER80gdQCypkM5FmsPo1lfSrGlaCVSTfC2U4muZth1bV
-5OdG1MgW1Yy/PeWFfxHPF32Yn/pcVMGD13u7OtNb6VHwjQucqdXO0aj6wEOy
-a1DAEmcrStxItckhkobZudPT8GMV/owMh41CltH/lIYrLGR5ozHmXqOeOkuJ
-yLxx0OZukSVrqZK6yVPbW0Lbc9pqEfX1wWzO1e+71Y9qbKY2CoSyE3eL3qly
-2VSiZ6dj0P71EVzom6vtCD86qdMN6+AExkt7mQmCAZD1xwMe+2+V7oWPZgo5
-57Zxwk3tMvuJ6qRJ9/S5W9xrpvAyMKCp4zLqtkPmem4izzPfl+Y8sdPFZgax
-DEepqPzyzsC8EUMReulFzdefkl4k8lcMQsBP0mqoL0QEH86sYEedYaFFaFoU
-DSSqtJkgafabuXPKYcjP25nNhOnnrA45+k2jlrRcSZ+z8FMci+RNpPYspP4N
-1XbuqOZVtfn/9IUmFC5zuI3JptE7aUYlIVtV0naByEKO/xLjDsz34YcLmHJQ
-hVlvVG78aEXT2fSaWZwkGtvEtZtp3ApVuIzukywCAY79Y7YHlQQCWlziMSbW
-AOocR52hCOfq+tO4YNqZu8xjY4rqhufDtVWbhy8k17J+zi6cGGrkZQQpOizu
-f3Kj/QMcawlluxFRhMwzwwDJFmkKqIHS3YTuoGgGxHhvrprHOEJCyB8cCATW
-vyzgDw400rcIZpxnkJ/6GSNeIE+Gk5s0u0vsdC5HLzoPRxoW2unXO/L7vjsb
-vPlbfmhI0n51+5EPL1oIdtD5Dy5asr40WQAA
+sNv7T/yZqiMQRV+pmIUTPd+XY2FQI5YY1cA2LvgXNcMvwNwmAmfqE2e9VhFq
+S4mpURRyArNxGs+FWtpiHY54O6zTayEaIFKW1kLzkFZ5Xaot3bAiNV7wp2F1
+Seq+HBjiZvrcuDuaGAq79sNK2lhCUk/79dzqwbE7oO3QzKoYkm68ZFeOhfnG
+ggBvHNJUq2y6l/f434Uh30a30dUkZ7crT6fpsYxzaMfg58LNRqyTZ3cwI7t6
+uE2SJNgNbO7AnK5NP/bpXNffKBIEkmPtxhmK8mQ8zjNfy3g2Mpm/vm7ttxM3
+rfzUulmLEHOlaaHOo0fnWWm9YlM3TuScztGjR/CdRB+YeMkEtnQiFaHFSkoQ
+Isk+a8syhugNfxNMNKBvHj2izDecWTgiOMAEW/anJ42N7S05Mp/Zki73RI7S
++S1x5537ckJKjtZoF6J07M5mctntFnZgbl0T2w92PMrvV2UGVPWK8/sWXX8i
+1yWvN/s09cR3e9cbFiGcZz+LJ2xCO4KPg6Bb7bQ9C6jgd/0MxACwpJRfsiGK
+z8qMTQUD4fJ5VBZRHlqYgXpSHgjtajN2jTdaoaxAdkYg7vw3zbpK9bvR5a60
+3NslfWiwEb6E5CtQZHAN7QWTSYV3kWU3RZtc269DqTVZpDgDKFI8lhnMn8TN
+BSUYeIV6UmwcvDhq9JHl21pIur4tpM9uEW2lgFStiKOn4Wg9f1thFn+QVppi
+96Vbnz8EsM1lkjt61KOr7NID65QM7w/lmCv7d3mEYScqbna0uuNukzc+EVZo
+mOQ6c+TUqGsgbJ6Jb9hJb1Jbh5NnbmHaaxF+7AjaRLileuWUcUr8SDOhPj4p
+juTYsJVUIGyHta6VReJK9SYzZ0wcUG6AfjHU9ZADTL6M5PcZAPeT+yLWWDiP
+2K/dOLgvOBGaDogWgj5pBagFFbKZSD9Y/ZpK+lWNLMEqku+FMpxO88ZDC2vy
+iyNqZYtqxp+f8sK/iOeLPuxPfTSq4NnrvV2d6a20KfjeBc7U6uhoFH7gI9k4
+KHiJsxUlbqTa5xBJz+zc6Wn4vQp/TIbDRiHR6H9Nw9UWsrzRG3OvgU+dqERw
+3jhrc7fIkrVsSd3nqR0uofM5bXWJ+hJhNufq993qRzU8UxsFQtmMu0XvVLls
+KgG00zFo//oILvrN1XaE353U6YZ1fALjpe3MxMHAyPr7AY/9t0r3wgc0hRx1
+2zjkpoaZLUV13qR7+twt7jWzeBkY0NRxGXXbOXM9OpHnmW9Nc67Y6WIziViG
+01RUfnlnYN6IoQjt9KLm609JOxL5KwYhICjpNtQXIsIPZ1awo86w0CI0LYrG
+ElXazJE0W87cUeUw5OftzGbO9HNWhxz9plFOWq6k1Vn4KY5FUidSfhZS/4aC
+O3dUU6va/3/6QnMKlzncxmTT6J00A5OQsCppu0BkISeAiXIH5vvw2wXMOqjC
+rPcqN363oulses1EThKNbeI6zjR0hSpcRvdJFoEAx/4xO4RKAgGtL/EkE8sA
+dZqjTlKEo3X9aVww88xd5skxhXXD8+Haqs3DF5JuWT9qFw4NNVIzAhUdGve/
+utH+DY61nLLdiClC8pmBgCSMNAvUwOluQndWNANkvDdXzZMcISfkzw4EAusf
+F/BnBxoZXIQzzjPIr/2METGQJ8PJTZrdJXY6l9MXnYcjjQzt9Osd+YnfnQ3e
+/C2/NSSZv7oDyQcYLQg76PwH4J437jdZAAA=
 
 -->
 

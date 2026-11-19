@@ -327,7 +327,7 @@ Records are canonicalized with JCS {{RFC8785}} and signed with Ed25519 {{RFC8032
 
 # Test Vectors
 
-{{AMEP}} publishes 95 vectors: 25 positive and 70 must-reject. The must-reject vectors cover all eleven invariants, signer roles, revocation status, decision phase, deny lists, data lineage, state across packets, risk-budget accounting, and a deny that an executed effect contradicts. Each vector is a packet of signed records, with the expected outcome and invariant. Two implementations written separately by the author (Python, and JavaScript run under Node.js and in a browser) agree on all 95. Implementations by other parties are invited.
+{{AMEP}} publishes 114 vectors: 33 positive and 81 must-reject. The must-reject vectors cover all eleven invariants, signer roles, revocation status, decision phase, deny lists, data lineage, state across packets, risk-budget accounting, and a deny that an executed effect contradicts. Each vector is a packet of signed records, with the expected outcome and invariant. Two implementations written separately by the author (Python, and JavaScript run under Node.js and in a browser) agree on all 114. Implementations by other parties are invited.
 
 A conforming verifier MUST return the expected outcome and invariant for every vector.
 
@@ -335,7 +335,7 @@ A conforming verifier MUST return the expected outcome and invariant for every v
 
 **Note to the RFC Editor:** please remove this section before publication, per {{RFC7942}}.
 
-- **AMEP reference verifiers.** Two implementations, both by the author: Python, and JavaScript (run as a Node.js command-line tool and as an offline browser page using WebCrypto). Both evaluate the procedure in {{evaluation}} and agree on all 95 published vectors. License: Apache 2.0. Location: https://github.com/stafordtituss/amep. Maturity: prototype.
+- **AMEP reference verifiers.** Two implementations, both by the author: Python, and JavaScript (run as a Node.js command-line tool and as an offline browser page using WebCrypto). Both evaluate the procedure in {{evaluation}} and agree on all 114 published vectors. License: Apache 2.0. Location: https://github.com/stafordtituss/amep. Maturity: prototype.
 - **Natsar control plane** (agent-authority enforcement for coding-agent hosts and MCP). It emits decision records before tool execution from host hooks. Maturity: pre-release.
 
 Implementation experience motivated several parts of this document: canonical resource identifiers (absolute-path forms bypassed relative-prefix rules); recording the enforcement context and phase (hosts differ in whether they support "ask" and whether hook failures block); and treating an effect that contradicts a deny as evidence of bypass.

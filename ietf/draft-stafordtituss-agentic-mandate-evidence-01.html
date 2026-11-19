@@ -1814,7 +1814,7 @@ I11  violated    effect with no invocation
       <h2 id="name-test-vectors">
 <a href="#section-9" class="section-number selfRef">9. </a><a href="#name-test-vectors" class="section-name selfRef">Test Vectors</a>
       </h2>
-<p id="section-9-1"><span>[<a href="#AMEP" class="cite xref">AMEP</a>]</span> publishes 95 vectors: 25 positive and 70 must-reject. The must-reject vectors cover all eleven invariants, signer roles, revocation status, decision phase, deny lists, data lineage, state across packets, risk-budget accounting, and a deny that an executed effect contradicts. Each vector is a packet of signed records, with the expected outcome and invariant. Two implementations written separately by the author (Python, and JavaScript run under Node.js and in a browser) agree on all 95. Implementations by other parties are invited.<a href="#section-9-1" class="pilcrow">¶</a></p>
+<p id="section-9-1"><span>[<a href="#AMEP" class="cite xref">AMEP</a>]</span> publishes 114 vectors: 33 positive and 81 must-reject. The must-reject vectors cover all eleven invariants, signer roles, revocation status, decision phase, deny lists, data lineage, state across packets, risk-budget accounting, and a deny that an executed effect contradicts. Each vector is a packet of signed records, with the expected outcome and invariant. Two implementations written separately by the author (Python, and JavaScript run under Node.js and in a browser) agree on all 114. Implementations by other parties are invited.<a href="#section-9-1" class="pilcrow">¶</a></p>
 <p id="section-9-2">A conforming verifier <span class="bcp14">MUST</span> return the expected outcome and invariant for every vector.<a href="#section-9-2" class="pilcrow">¶</a></p>
 </section>
 </div>
@@ -1826,7 +1826,7 @@ I11  violated    effect with no invocation
 <p id="section-10-1"><strong>Note to the RFC Editor:</strong> please remove this section before publication, per <span>[<a href="#RFC7942" class="cite xref">RFC7942</a>]</span>.<a href="#section-10-1" class="pilcrow">¶</a></p>
 <ul class="normal">
 <li class="normal" id="section-10-2.1">
-          <p id="section-10-2.1.1"><strong>AMEP reference verifiers.</strong> Two implementations, both by the author: Python, and JavaScript (run as a Node.js command-line tool and as an offline browser page using WebCrypto). Both evaluate the procedure in <a href="#evaluation" class="auto internal xref">Section 7</a> and agree on all 95 published vectors. License: Apache 2.0. Location: https://github.com/stafordtituss/amep. Maturity: prototype.<a href="#section-10-2.1.1" class="pilcrow">¶</a></p>
+          <p id="section-10-2.1.1"><strong>AMEP reference verifiers.</strong> Two implementations, both by the author: Python, and JavaScript (run as a Node.js command-line tool and as an offline browser page using WebCrypto). Both evaluate the procedure in <a href="#evaluation" class="auto internal xref">Section 7</a> and agree on all 114 published vectors. License: Apache 2.0. Location: https://github.com/stafordtituss/amep. Maturity: prototype.<a href="#section-10-2.1.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-10-2.2">
           <p id="section-10-2.2.1"><strong>Natsar control plane</strong> (agent-authority enforcement for coding-agent hosts and MCP). It emits decision records before tool execution from host hooks. Maturity: pre-release.<a href="#section-10-2.2.1" class="pilcrow">¶</a></p>

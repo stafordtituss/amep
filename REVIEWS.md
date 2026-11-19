@@ -1,6 +1,6 @@
 # Reviewing AMEP
 
-AMEP asks one question: **after an agent acts, can a third party verify from portable evidence whether the action stayed within the authority it was delegated?** It answers preserved, violated or unresolved, and publishes 95 conformance vectors so that anyone can check a verifier.
+AMEP asks one question: **after an agent acts, can a third party verify from portable evidence whether the action stayed within the authority it was delegated?** It answers preserved, violated or unresolved, and publishes conformance vectors (positive and must-reject) so that anyone can check a verifier.
 
 Outside scrutiny is the most useful thing AMEP can get, and critical findings are as welcome as positive ones. Every review, implementation and citation by others is logged below, as written and with the reviewer's stated relationship to the author.
 
