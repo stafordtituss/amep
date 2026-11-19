@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and open-ended discussion
+    url: https://github.com/stafordtituss/amep/discussions
+    about: Ask questions or discuss ideas before writing a review or proposal.
+  - name: How to review AMEP
+    url: https://github.com/stafordtituss/amep/blob/main/REVIEWS.md
+    about: The ways to review, implement, test or cite AMEP, and the public log of reviews so far.

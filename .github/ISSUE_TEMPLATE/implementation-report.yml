@@ -1,0 +1,64 @@
+name: Implementation or conformance report
+description: Report an AMEP implementation, an integration, or a run of the conformance vectors against your own system.
+title: "[Implementation] "
+labels: ["implementation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Implementations and conformance runs by others are the most useful contribution to AMEP. Please publish your results in **your own** repository or site and link them here, so they stay under your control. Disagreements with the reference verifiers are especially welcome: they find ambiguities in the specification.
+  - type: input
+    id: who
+    attributes:
+      label: Name and affiliation (person or organization)
+    validations:
+      required: true
+  - type: dropdown
+    id: relationship
+    attributes:
+      label: Relationship to the AMEP author
+      options:
+        - None (no prior collaboration, employment or financial relationship)
+        - Prior collaborator or co-author
+        - Current or former colleague or employer
+        - Other (please describe below)
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What you built or ran
+      options:
+        - A new verifier or producer, written without the reference code
+        - An integration that emits or consumes AMEP evidence
+        - A conformance run of vectors/ against an existing system
+        - A mapping between AMEP and another specification
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Public link to your code or results
+      placeholder: "https://github.com/your-org/your-repo"
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: Results
+      description: Vectors passed and failed, the AMEP version or commit you tested, and any case where your result differs from the expected outcome or invariant.
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: What was unclear or missing
+    validations:
+      required: false
+  - type: checkboxes
+    id: listing
+    attributes:
+      label: Listing
+      options:
+        - label: You may list this implementation or report, with the name above, in README.md and REVIEWS.md.

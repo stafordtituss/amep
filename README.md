@@ -91,10 +91,20 @@ AMEP evaluates evidence *after* authority has been granted and exercised. Relate
 - "AMEP" and "AMEP Conformant" are trademarks of Staford Titus Selvaraj; see `TRADEMARKS.md`. Forks are welcome under a different name.
 - To cite AMEP, see `CITATION.cff`.
 
+## Review AMEP
+
+AMEP needs outside scrutiny more than anything else. Three ways to help, all public:
+
+1. **Run it against your own system.** Run the vectors against your implementation or system, publish the results (failures included) in your own repository, and open an [implementation report](https://github.com/stafordtituss/amep/issues/new?template=implementation-report.yml).
+2. **Cite it where relevant.** If your Internet-Draft, paper or specification overlaps with AMEP, an informative reference, or a note on where the approaches differ, is welcome.
+3. **Review it in public.** Open an [independent technical review](https://github.com/stafordtituss/amep/issues/new?template=independent-review.yml), or comment on an IETF, W3C, DIF or OpenID Foundation list and link the message.
+
+Every review, implementation and citation by others is logged, as written and including critical ones, in [`REVIEWS.md`](REVIEWS.md).
+
 ## Contributing
 
 Questions, vectors, implementations in other languages and research results are all welcome; see [`CONTRIBUTING.md`](CONTRIBUTING.md). Open problems suitable for papers and theses are in [`RESEARCH.md`](RESEARCH.md), and changes are listed in [`CHANGELOG.md`](CHANGELOG.md).
 
 Open an issue, then an `AMEP-Proposal-N` document. Every normative change needs at least one positive and one must-reject vector.
 
-**Implementations.** Python (`amep-protocol`), JavaScript (`@stafordtituss/amep`) and the browser verifier, all by the specification's author. Implementations by others are especially welcome; open an issue and yours will be listed here.
+**Implementations.** Python (`amep-protocol`), JavaScript (`@stafordtituss/amep`) and the browser verifier, all by the specification's author. Implementations by others are especially welcome; open an [implementation report](https://github.com/stafordtituss/amep/issues/new?template=implementation-report.yml) and yours will be listed here and in [`REVIEWS.md`](REVIEWS.md).

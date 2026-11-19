@@ -1,0 +1,68 @@
+name: Independent technical review
+description: Review the AMEP specification, Internet-Draft, vectors or verifiers. Critical reviews are as welcome as positive ones.
+title: "[Review] "
+labels: ["review"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reviewing AMEP. Reviews are kept public and are never edited by the maintainer. Each one is listed in [REVIEWS.md](https://github.com/stafordtituss/amep/blob/main/REVIEWS.md) as written, including critical ones.
+
+        The question AMEP tries to answer: **after an agent acts, can a third party verify from portable evidence whether the action stayed within the authority it was delegated?** Answers of preserved, violated or unresolved are defined in the specification.
+  - type: input
+    id: reviewer
+    attributes:
+      label: Name and affiliation
+      description: As you would like it to appear in REVIEWS.md. Leave blank to review anonymously (anonymous reviews are not listed).
+      placeholder: "Jane Doe, Example University"
+    validations:
+      required: false
+  - type: dropdown
+    id: relationship
+    attributes:
+      label: Your relationship to the AMEP author
+      description: Asked of every reviewer so that readers can weigh reviews fairly.
+      options:
+        - None (no prior collaboration, employment or financial relationship)
+        - Prior collaborator or co-author
+        - Current or former colleague or employer
+        - Other (please describe below)
+    validations:
+      required: true
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: What you reviewed
+      options:
+        - label: Specification (spec/amep-v0.2.md)
+        - label: IETF Internet-Draft (ietf/)
+        - label: Conformance vectors (vectors/)
+        - label: A reference verifier (Python, JavaScript or browser)
+        - label: I ran the vectors against my own system or implementation
+  - type: textarea
+    id: method
+    attributes:
+      label: What you did
+      description: For example, the sections you read, or the commands, versions and system you ran.
+    validations:
+      required: true
+  - type: textarea
+    id: findings
+    attributes:
+      label: Findings
+      description: Problems, ambiguities, things that are wrong or missing, and anything that worked. Quote spec text where you can.
+    validations:
+      required: true
+  - type: textarea
+    id: assessment
+    attributes:
+      label: Overall assessment
+      description: Does AMEP address a real gap between agent identity, delegated authority and executed effect? Is the preserved / violated / unresolved model technically distinct from existing work? Would you see it being useful in practice, and where?
+    validations:
+      required: false
+  - type: checkboxes
+    id: listing
+    attributes:
+      label: Listing
+      options:
+        - label: You may list this review, with my name and affiliation, in REVIEWS.md.
