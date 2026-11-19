@@ -12,7 +12,7 @@ from . import sdk
 from .core import (Malformed, Result, approval_digest, canon, digest, evaluate, is_guardrail, to_time,
                    verdict, verify_sig)
 
-__version__ = "0.2.0a5"
+__version__ = "0.2.0a6"
 SPEC_VERSION = "0.2.0-draft.4"
 
 __all__ = ["Malformed", "Result", "approval_digest", "canon", "digest", "evaluate", "is_guardrail", "sdk",

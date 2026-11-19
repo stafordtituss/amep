@@ -4,7 +4,6 @@ Specification drafts, conformance-suite versions and package versions are listed
 
 ## Unreleased
 
-- **Fix (both reference verifiers):** an agent acting directly under a mandate (no delegation) whose `exp` or `nbf` is an RFC 3339 time. The effect time was compared with the unconverted string. Python returned `unresolved`/I7 for every such packet; JavaScript never detected an effect after expiry or before `nbf`. **Conformance suite v0.2.2** adds 3 vectors for this path (114 vectors: 33 positive, 81 must-reject). Found by the AgentDojo experiment.
 - **AgentDojo experiment** (`experiments/agentdojo`): AMEP evidence over all 949 user-task × injection-task pairs of AgentDojo v1.2.2, with mandates of three granularities.
 - **Conformance suite v0.2.1** (no normative change): 16 vectors found by mutation analysis of the reference evaluator, covering the action-widening and effect-ceiling rules, `write_shared` as high impact, intent references to non-intent objects, approval `nbf`, verdict precedence within a packet, and the inclusive edge of every time, budget and approval-window bound. 111 vectors (32 positive, 79 must-reject).
 - **Mutation analysis tool** (`paper/eval/mutation.py`) with a `--check` mode for CI, and verification benchmarks (`paper/eval/bench.py`, `bench.mjs`).
@@ -13,6 +12,10 @@ Specification drafts, conformance-suite versions and package versions are listed
 - **Delegation-continuity test materials** for the W3C Agent Identity Registry Protocol Community Group (`interop/w3c-agent-identity/delegation-continuity/`): 20 vectors and an offline browser verifier.
 - **AMEP-Proposal-1: EvaluationRecord** (`proposals/`).
 - `RESEARCH.md`, `CONTRIBUTING.md` and this changelog.
+
+## Packages 0.2.0a6 / 0.2.0-alpha.6 (2026-11-19)
+
+- **Fix (both reference verifiers):** an agent acting directly under a mandate (no delegation) whose `exp` or `nbf` is an RFC 3339 time. The effect time was compared with the unconverted string. Python returned `unresolved`/I7 for every such packet; JavaScript never detected an effect after expiry or before `nbf`. **Conformance suite v0.2.2** adds 3 vectors for this path (114 vectors: 33 positive, 81 must-reject). Found by the AgentDojo experiment.
 
 ## v0.2.0-draft.4-r2 (2026-11-17)
 
