@@ -1,0 +1,21 @@
+{
+  "name": "amep-aria-ap-bridge-demo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ARIA AP identity and receipts alongside AMEP evidence of delegated authority: one exchange, both checks.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "demo": "node demo.mjs"
+  },
+  "dependencies": {
+    "@noble/curves": "2.4.0",
+    "@noble/post-quantum": "0.5.4",
+    "@stafordtituss/amep": "0.2.0-alpha.6",
+    "@trustlayer-foundation/aria-ap": "1.0.1",
+    "@trustlayer-foundation/aria-sdk": "1.0.1"
+  }
+}
