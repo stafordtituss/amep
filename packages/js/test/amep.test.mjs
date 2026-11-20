@@ -6,7 +6,7 @@ import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
-import { verifyPacket, Key, keyset, sdk } from "../src/index.mjs";
+import { verifyPacket, Key, keyset, sdk, canon, parseStrict, evaluate, verdict, sigOk } from "../src/index.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const VECTORS = join(here, "..", "..", "..", "vectors");
@@ -78,4 +78,18 @@ test("CLI verify exit codes and keygen file mode", () => {
   const r = spawnSync(process.execPath, [BIN, "keygen", "--kid", "issuer-1", "--roles", "issuer", "--out", join(dir, "issuer-1")]);
   assert.equal(r.status, 0);
   assert.equal(statSync(join(dir, "issuer-1.key.pem")).mode & 0o777, 0o600);
+});
+
+test("I-JSON number rules (spec 12.1)", () => {
+  assert.equal(canon({ n: 2 ** 53 - 1 }), '{"n":9007199254740991}');
+  assert.throws(() => canon({ n: 2 ** 53 }));
+  assert.throws(() => parseStrict('{"amount": 1200.0000000000000001}'));
+  assert.throws(() => parseStrict('{"amount": 1e400}'));
+  assert.deepEqual(parseStrict('{"a": 1200.00, "b": 0.1, "c": 1.5e3}'), { a: 1200, b: 0.1, c: 1500 });
+  const { packet, keys } = build();
+  packet.invocations[0]["x-ticket"] = 9007199254740993;
+  const v = verdict(evaluate(packet, keys, sigOk));
+  assert.equal(v.outcome, "unresolved");
+  assert.equal(v.invariant, "I7");
+  assert.match(v.reason, /I-JSON range/);
 });

@@ -45,7 +45,7 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_core_suite_conforms(self):
         r = await self.call("check_suite", suite="core")
-        self.assertEqual((r["vectors"], r["agree"], r["failures"]), (111, 111, []))
+        self.assertEqual((r["vectors"], r["agree"], r["failures"]), (118, 118, []))
 
     async def test_delegation_suite_conforms(self):
         r = await self.call("check_suite", suite="delegation")

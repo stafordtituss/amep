@@ -2,8 +2,9 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
-## Unreleased
+## Packages 0.2.0a7 / 0.2.0-alpha.7 and amep-mcp 0.1.0a2 (2026-11-20)
 
+- **Fix (both reference verifiers), spec Section 12.1 and conformance suite v0.2.3:** numbers whose magnitude exceeds 2^53 − 1 are now malformed. Python kept such integers exact while JavaScript rounded them, so the two verifiers canonicalized 2^53 + 1 differently and returned different verdicts on the same signed packet; in JavaScript one approval digest also covered two different identifiers. Both verifiers now return `unresolved`/I7 for any packet containing such a number, `canon` refuses to sign one, and the command-line tools parse with `parse_strict` / `parseStrict`, which reject non-integer literals a double cannot represent exactly (for example `1200.0000000000000001`). The suite adds 4 vectors (118 vectors: 34 positive, 84 must-reject), and the JCS vector's large float changes from `1e21` to `1e15`. Found while writing the cryptographic note in `paper/eprint/`.
 - **AgentDojo experiment** (`experiments/agentdojo`): AMEP evidence over all 949 user-task × injection-task pairs of AgentDojo v1.2.2, with mandates of three granularities.
 - **Conformance suite v0.2.1** (no normative change): 16 vectors found by mutation analysis of the reference evaluator, covering the action-widening and effect-ceiling rules, `write_shared` as high impact, intent references to non-intent objects, approval `nbf`, verdict precedence within a packet, and the inclusive edge of every time, budget and approval-window bound. 111 vectors (32 positive, 79 must-reject).
 - **Mutation analysis tool** (`paper/eval/mutation.py`) with a `--check` mode for CI, and verification benchmarks (`paper/eval/bench.py`, `bench.mjs`).

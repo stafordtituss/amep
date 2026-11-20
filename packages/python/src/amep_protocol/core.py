@@ -10,6 +10,7 @@ import re
 import sys
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
@@ -59,7 +60,15 @@ def to_time(v) -> float:
 
 
 # ---------------- RFC 8785 canonical form (spec 12.1) ----------------
-def _jcs_number(v) -> str:
+# I-JSON (RFC 7493): numbers beyond +/-(2^53 - 1) are not interoperable. Python keeps such integers exact while
+# ECMAScript rounds them to a double, so two verifiers would canonicalize the same packet differently. Spec 12.1
+# makes them malformed everywhere: canon() refuses to serialize them and evaluate() returns unresolved (I7).
+MAX_SAFE_INT = 2 ** 53 - 1
+
+
+def _jcs_number(v, strict: bool = True) -> str:
+    if strict and abs(v) > MAX_SAFE_INT:
+        raise Malformed(f"number {v!r} is outside the I-JSON range (|n| > 2^53-1)")
     if isinstance(v, int):
         return str(v)
     if v != v or v in (float("inf"), float("-inf")):
@@ -85,23 +94,55 @@ def _jcs_number(v) -> str:
     return sign + out
 
 
-def _jcs(v) -> str:
+def _jcs(v, strict: bool = True) -> str:
     if v is None or isinstance(v, bool):
         return json.dumps(v)
     if isinstance(v, (int, float)):
-        return _jcs_number(v)
+        return _jcs_number(v, strict)
     if isinstance(v, str):
         return json.dumps(v, ensure_ascii=False)
     if isinstance(v, list):
-        return "[" + ",".join(_jcs(x) for x in v) + "]"
+        return "[" + ",".join(_jcs(x, strict) for x in v) + "]"
     if isinstance(v, dict):
         keys = sorted(v, key=lambda s: s.encode("utf-16-be"))  # UTF-16 code-unit order
-        return "{" + ",".join(json.dumps(k, ensure_ascii=False) + ":" + _jcs(v[k]) for k in keys) + "}"
+        return "{" + ",".join(json.dumps(k, ensure_ascii=False) + ":" + _jcs(v[k], strict) for k in keys) + "}"
     raise Malformed(f"not JSON: {type(v).__name__}")
 
 
-def canon(obj) -> bytes:
-    return _jcs(obj).encode("utf-8")
+def canon(obj, strict: bool = True) -> bytes:
+    """RFC 8785 form. strict=False skips the I-JSON range check; only test-vector generators should use it."""
+    return _jcs(obj, strict).encode("utf-8")
+
+
+def unsafe_number(v, path: str = "$"):
+    """Path of the first number outside the I-JSON range (|n| > 2^53-1), or None."""
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return path if abs(v) > MAX_SAFE_INT else None
+    if isinstance(v, list):
+        return next((p for i, x in enumerate(v) if (p := unsafe_number(x, f"{path}[{i}]"))), None)
+    if isinstance(v, dict):
+        return next((p for k, x in v.items() if (p := unsafe_number(x, f"{path}.{k}"))), None)
+    return None
+
+
+def _strict_float(s: str) -> float:
+    f = float(s)
+    if f != f or f in (float("inf"), float("-inf")) or Decimal(repr(f)) != Decimal(s):
+        raise Malformed(f"number literal {s} is not exactly representable as an IEEE 754 double")
+    return f
+
+
+def _reject_constant(s: str):
+    raise Malformed(f"{s} is not JSON")
+
+
+def parse_strict(text: str):
+    """Parse JSON text for evaluation (spec 12.1). A non-integer number literal must equal, as a decimal, the
+    double it denotes, so two distinct literals can never share one canonical form or approval digest.
+    Integers are kept exact and checked against the I-JSON range by evaluate()."""
+    return json.loads(text, parse_float=_strict_float, parse_constant=_reject_constant)
 
 
 def digest(obj) -> str:
@@ -217,6 +258,10 @@ def _check(cond, outcome, invariant, reason):
 
 def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = None) -> list[Result]:
     """state (spec 10.6): carries approval use and risk-budget spending across packets. Read on entry, updated on exit."""
+    bad = unsafe_number(packet)
+    if bad:   # spec 12.1: such a packet cannot be canonicalized the same way by every verifier
+        ids = [i.get("id", "?") if isinstance(i, dict) else "?" for i in packet.get("invocations", [])] or ["-"]
+        return [Result(i, "unresolved", "I7", f"number outside the I-JSON range at {bad}") for i in ids]
     objs = {o["id"]: o for kind in ("mandates", "delegations", "intents", "interpretations", "invocations",
                                     "effects", "approvals", "findings")
             for o in packet.get(kind, []) if isinstance(o, dict) and "id" in o}

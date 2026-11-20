@@ -10,12 +10,12 @@
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { evaluate, verdict, approvalDigest } from "../src/core.mjs";
+import { evaluate, verdict, approvalDigest, parseStrict } from "../src/core.mjs";
 import { sigOk, Key, ROLES } from "../src/node.mjs";
 import { VERSION, SPEC_VERSION } from "../src/index.mjs";
 
 const EXIT = { preserved: 0, violated: 1, unresolved: 2 };
-const load = p => JSON.parse(readFileSync(p === "-" ? 0 : p, "utf8"));
+const load = p => parseStrict(readFileSync(p === "-" ? 0 : p, "utf8"));   // spec 12.1: strict number literals
 const roleList = s => (s || "").split(",").filter(Boolean);
 
 function run(argv) {

@@ -101,3 +101,28 @@ class CliTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NumberRuleTest(unittest.TestCase):
+    """Spec 12.1: numbers outside the I-JSON range are malformed; strict parsing rejects inexact literals."""
+
+    def test_canon_range(self):
+        from amep_protocol import Malformed, canon
+        self.assertEqual(canon({"n": 2 ** 53 - 1}), b'{"n":9007199254740991}')
+        with self.assertRaises(Malformed):
+            canon({"n": 2 ** 53})
+
+    def test_parse_strict(self):
+        from amep_protocol import Malformed, parse_strict
+        with self.assertRaises(Malformed):
+            parse_strict('{"amount": 1200.0000000000000001}')
+        with self.assertRaises(Malformed):
+            parse_strict('{"amount": 1e400}')
+        self.assertEqual(parse_strict('{"a": 1200.00, "b": 0.1, "c": 1.5e3}'), {"a": 1200.0, "b": 0.1, "c": 1500.0})
+
+    def test_unsafe_integer_is_unresolved(self):
+        packet, keys = build()
+        packet["invocations"][0]["x-ticket"] = 9007199254740993
+        v = verdict(evaluate(packet, keys))
+        self.assertEqual((v.outcome, v.invariant), ("unresolved", "I7"))
+        self.assertIn("I-JSON range", v.reason)

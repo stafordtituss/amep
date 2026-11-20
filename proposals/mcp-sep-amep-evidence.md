@@ -11,7 +11,7 @@
 
 This SEP proposes an optional extension, `io.github.stafordtituss/amep-evidence`, that lets MCP clients, gateways and servers exchange signed evidence about tool calls. A client or gateway attaches stable references to each `tools/call`: an invocation identifier and the mandate the call is made under. A server that supports the extension returns, in the result's `_meta`, a signed receipt describing what it actually did: the action, the resource, its effect class and the data released. The receipt is signed by a key the server publishes, so an auditor can later check, offline and without trusting the client, whether each executed effect stayed within the authority the user delegated.
 
-The evidence format is the Agentic Mandate Evidence Protocol (AMEP), an open specification with an IETF Internet-Draft (draft-stafordtituss-agentic-mandate-evidence-00), 114 conformance vectors, and two reference verifiers published as packages for Python and JavaScript (written separately, by the same author). The extension adds no new methods and changes no core behavior. It uses only capability negotiation and `_meta`. Peers that don't advertise it behave exactly as today.
+The evidence format is the Agentic Mandate Evidence Protocol (AMEP), an open specification with an IETF Internet-Draft (draft-stafordtituss-agentic-mandate-evidence-00), 118 conformance vectors, and two reference verifiers published as packages for Python and JavaScript (written separately, by the same author). The extension adds no new methods and changes no core behavior. It uses only capability negotiation and `_meta`. Peers that don't advertise it behave exactly as today.
 
 ## Motivation
 

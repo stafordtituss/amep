@@ -98,15 +98,51 @@ function toTime(v) {
 
 // ---- RFC 8785 canonical form (spec 12.1). JSON.stringify of a number is ECMAScript Number::toString, and the
 // default sort compares UTF-16 code units, so this is JCS as written. ----
+// I-JSON (RFC 7493): numbers beyond +/-(2^53 - 1) are not interoperable. ECMAScript rounds them to a double while
+// Python keeps integers exact, so two verifiers would canonicalize the same packet differently. Spec 12.1 makes
+// them malformed everywhere: canon() refuses to serialize them and evaluate() returns unresolved (I7).
 function canon(v) {
   if (v === null || typeof v !== "object") {
     if (typeof v === "number" && !Number.isFinite(v)) throw new Malformed("NaN and Infinity are not allowed");
+    if (typeof v === "number" && Math.abs(v) > Number.MAX_SAFE_INTEGER)
+      throw new Malformed(`number ${v} is outside the I-JSON range (|n| > 2^53-1)`);
     return JSON.stringify(v);
   }
   if (Array.isArray(v)) return "[" + v.map(canon).join(",") + "]";
   return "{" + Object.keys(v).sort().map(k => JSON.stringify(k) + ":" + canon(v[k])).join(",") + "}";
 }
 const stripProof = o => Object.fromEntries(Object.entries(o).filter(([k]) => k !== "proof"));
+
+// Path of the first number outside the I-JSON range, or null.
+function unsafeNumber(v, path = "$") {
+  if (typeof v === "number") return Math.abs(v) > Number.MAX_SAFE_INTEGER ? path : null;
+  if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) { const p = unsafeNumber(v[i], `${path}[${i}]`); if (p) return p; } return null; }
+  if (v && typeof v === "object") { for (const [k, x] of Object.entries(v)) { const p = unsafeNumber(x, `${path}.${k}`); if (p) return p; } }
+  return null;
+}
+
+// A decimal literal as sign + significant digits + exponent, so "1200.00" and "1.2e3" compare equal.
+function normDec(s) {
+  const m = /^(-?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m) return null;
+  let digits = (m[2] + (m[3] || "")).replace(/^0+/, ""), exp = Number(m[4] || 0) - (m[3] || "").length;
+  if (!digits) return "0";
+  while (digits.endsWith("0")) { digits = digits.slice(0, -1); exp++; }
+  return (m[1] ? "-" : "") + digits + "e" + exp;
+}
+
+// Parse JSON text for evaluation (spec 12.1). A non-integer number literal must equal, as a decimal, the double it
+// denotes, so two distinct literals can never share one canonical form or approval digest. Integers are checked
+// against the I-JSON range by evaluate(). Uses the reviver's source text (ES2025 JSON.parse source text access);
+// on engines without it, only the range rule applies.
+function parseStrict(text) {
+  return JSON.parse(text, function (key, value, context) {
+    const src = context && typeof context.source === "string" ? context.source : null;
+    if (typeof value === "number" && src && /[.eE]/.test(src) && normDec(src) !== normDec(String(value)))
+      throw new Malformed(`number literal ${src} is not exactly representable as an IEEE 754 double`);
+    return value;
+  });
+}
 
 // ---- SHA-256 over UTF-8 (pure JS, so evaluation stays synchronous in the browser) ----
 const K = Uint32Array.from([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
@@ -178,8 +214,8 @@ function effectOk(x, c) {
   if ((c.deny_resources || []).some(p => patMatch(x.resource, p))) return [false, "resource denied"];
   if (CEILING.indexOf(x.effect) > CEILING.indexOf(c.ceiling)) return [false, "effect above ceiling"];
   for (const d of x.released || []) if (!(c.data || []).includes(d)) return [false, `released ${d} not allowed`];
-  if (toTime(x.t) > c.exp) return [false, "after validity"];
-  if ("nbf" in c && toTime(x.t) < c.nbf) return [false, "before validity"];
+  if (toTime(x.t) > toTime(c.exp)) return [false, "after validity"];
+  if ("nbf" in c && toTime(x.t) < toTime(c.nbf)) return [false, "before validity"];
   return [true, ""];
 }
 const cost = x => {
@@ -192,6 +228,11 @@ const cost = x => {
 // state (spec 10.6): { approvals_used: {id: [invocation, digest]}, spent: {node: points} }, read on entry and
 // updated on exit, so approval single use and risk budgets hold across a stream of packets.
 function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
+  const bad = unsafeNumber(pk);
+  if (bad) {   // spec 12.1: such a packet cannot be canonicalized the same way by every verifier
+    const ids = (pk.invocations || []).map(i => (i && typeof i === "object" && i.id) || "?");
+    return (ids.length ? ids : ["-"]).map(id => ({ id, outcome: "unresolved", invariant: "I7", reason: `number outside the I-JSON range at ${bad}` }));
+  }
   // signature valid AND the signing key holds a role allowed for this object kind (spec 12.5)
   const verify = o => {
     if (!o || typeof o !== "object" || !o.proof || o.proof.alg !== "Ed25519") return false;

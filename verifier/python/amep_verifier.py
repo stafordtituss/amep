@@ -41,7 +41,8 @@ class Signer:
 
     def sign(self, body: dict) -> dict:
         body = {k: v for k, v in body.items() if k != "proof"}
-        return {**body, "proof": {"kid": self.kid, "alg": "Ed25519", "sig": self.key.sign(canon(body)).hex()}}
+        # strict=False so the suite can contain numbers outside the I-JSON range that verifiers must reject
+        return {**body, "proof": {"kid": self.kid, "alg": "Ed25519", "sig": self.key.sign(canon(body, strict=False)).hex()}}
 
 
 
@@ -258,7 +259,7 @@ def vectors():
     add("malformed timestamp", ("unresolved", "I7"), lambda p, I, H, O, X: p.update(invocations=[H.sign({**p["invocations"][0], "t": "2026-01-01 00:00:10"})]))
     # 8. RFC 8785: UTF-16 key order and ECMAScript number form
     add("JCS canonical form (unicode keys, floats)", ("preserved", "-"), lambda p, I, H, O, X: p.update(invocations=[H.sign({**p["invocations"][0],
-        "x-note": "café ☕", "x-é": 1, "x-z": 0.1, "x-｡": "halfwidth", "x-\U0001F600": "astral", "x-big": 1e21, "x-small": 1.5e-7, "x-whole": 100.0, "x-neg": -2.5})]))
+        "x-note": "café ☕", "x-é": 1, "x-z": 0.1, "x-｡": "halfwidth", "x-\U0001F600": "astral", "x-big": 1e15, "x-small": 1.5e-7, "x-whole": 100.0, "x-neg": -2.5})]))
 
     # ---- draft.3: decision phase, quarantine, deny lists, scenario vectors A1/A3/A6 ----
     # phase (spec 5.13): only pre-execution decisions can confirm a block or be contradicted
@@ -412,6 +413,22 @@ def vectors():
         direct(p, I, H, O, exp="1970-01-01T00:00:10Z"))
     add("effect before a mandate's RFC 3339 nbf", ("violated", "I2"), lambda p, I, H, O, X:
         direct(p, I, H, O, exp="1970-01-01T00:01:40Z", nbf="1970-01-01T00:00:20Z"))
+
+    # Suite v0.2.3: numbers outside the I-JSON range (spec 12.1). Python keeps 2^53 + 1 exact while ECMAScript
+    # rounds it to 2^53, so before this rule the two reference verifiers canonicalized the same signed packet
+    # differently and returned different verdicts. Both must now treat any |n| > 2^53 - 1 as malformed.
+    def ticket(p, H, n):
+        p["invocations"] = [H.sign({**p["invocations"][0], "x-ticket": n})]
+    add("extension number at the largest I-JSON integer", ("preserved", "-"), lambda p, I, H, O, X:
+        ticket(p, H, 2 ** 53 - 1))
+    add("extension number at 2^53, outside I-JSON", ("unresolved", "I7"), lambda p, I, H, O, X:
+        ticket(p, H, 2 ** 53))
+    add("extension number 2^53 + 1, which ECMAScript cannot represent", ("unresolved", "I7"), lambda p, I, H, O, X:
+        ticket(p, H, 2 ** 53 + 1))
+    # JSON does not distinguish integers from floats: a verifier cannot tell 1e21 from 1000000000000000000000,
+    # which Python keeps exact, so the range applies to every number (until v0.2.3, the JCS vector used 1e21).
+    add("extension float 1e21, outside the safe range", ("unresolved", "I7"), lambda p, I, H, O, X:
+        ticket(p, H, 1e21))
     return keys, V
 
 

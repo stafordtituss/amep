@@ -1,0 +1,171 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+\newtheorem{claim}{Claim}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+\newcommand{\pres}{\textsf{preserved}}
+\newcommand{\viol}{\textsf{violated}}
+\newcommand{\unres}{\textsf{unresolved}}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\Canon}{\mathsf{JCS}}
+\newcommand{\Hash}{\mathsf{H}}
+\newcommand{\Sig}{\mathsf{Sig}}
+\newcommand{\Vf}{\mathsf{Vf}}
+
+\title{Binding Approvals and Receipts to Executed Effects:\\ Signed Evidence of AI Agent Authority and the Limits of Canonical-JSON Binding}
+\author{Staford Titus Selvaraj\\ Charlemagne Labs\\ \texttt{ss14958@nyu.edu}\\ ORCID 0009-0004-8227-7595}
+\date{November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+AI agents now act for people through tools: they send email, change records and initiate payments. Afterwards, the question of whether an action stayed within what the person authorized is usually answered from logs written by the agent's own runtime. We study the cryptographic core of an alternative: portable, signed evidence that a third party can verify offline. The evidence consists of role-bound Ed25519 signatures over RFC~8785 canonical JSON, approvals bound to a SHA-256 digest of the exact executed effect, and receipts signed by the system that executed the effect rather than by the agent. We state the security goals (evidence unforgeability, approval binding with single use, detection of substitution and of deleted or altered records, and fail-closed evaluation) and argue each from the unforgeability of the signature scheme, the collision resistance of the hash, and the injectivity of the canonical encoding. We then show that the last assumption holds only modulo the JSON number model, and that this has concrete consequences: distinct decimal literals that parse to the same IEEE~754 double share one canonical form and one approval digest, and integers above $2^{53}$ are canonicalized differently by a Python and a JavaScript verifier of the same specification, so the two disagree on the same signed packet and, in JavaScript, one approval validates two different identifiers. We give the resulting design rules (values whose exact identity matters must be strings; verifiers must reject numbers outside the I-JSON safe range rather than leave avoidance to producers), which the specification and both verifiers now apply, and report on the open specification, its 118-vector conformance suite and two reference verifiers.
+\end{abstract}
+
+\section{Introduction}
+
+Identity and authorization mechanisms answer \emph{who} is calling and whether a call should be admitted. They do not let a third party determine, after the fact, whether what was actually executed stayed within what a person authorized. An agent hijacked by a prompt injection is a legitimate caller with a valid token; an agent platform that misreports its own actions controls the only log; and a human approval shown as ``pay the landlord 1{,}200'' is worth little if nothing binds it to the bytes that were executed.
+
+AMEP (the Agentic Mandate Evidence Protocol) is an open specification, published as an IETF Internet-Draft~\cite{amepid}, for portable evidence of each link from a person's mandate, through delegations and the agent's declared invocation, to an independently observed executed effect~\cite{amep}. A deterministic verifier evaluates the evidence to \pres{}, \viol{} or \unres{}, and missing or unverifiable evidence never yields \pres{}. Most of the specification concerns authorization semantics (a claim algebra with a decidable order and meet, eleven invariants). This note isolates the cryptographic layer underneath it: what the signatures, digests and canonical encoding must guarantee for the evaluation to mean anything, why they do, and where they do not.
+
+\paragraph{Contributions.}
+\begin{itemize}
+\item A precise statement of the security goals for agent-authority evidence, and arguments for each under standard assumptions (Section~\ref{sec:security}).
+\item An analysis of digest binding over canonical JSON showing that it is binding only modulo the JSON number model, with two concrete consequences demonstrated on the reference implementations: collapse of distinct decimal literals, and a cross-implementation divergence for integers above $2^{53}$ (Section~\ref{sec:canon}).
+\item Design rules that close these gaps, and a discussion of what signed evidence cannot show regardless of the cryptography (Section~\ref{sec:limits}).
+\end{itemize}
+
+\section{Model}\label{sec:model}
+
+\paragraph{Parties and keys.} A \emph{principal} authorizes an \emph{agent}, which runs on a \emph{host} and calls \emph{executing systems} (tool servers, payment systems). A \emph{verifier} later receives the evidence and a key set. Each key in the key set carries an Ed25519 public key and a set of \emph{roles}: \textsf{issuer} (the principal or its identity provider), \textsf{approver}, \textsf{host} and \textsf{observer}.
+
+\paragraph{Objects.} Evidence is a packet of JSON objects, each with a \code{kind} and a \code{proof}. The specification fixes which roles may sign which kind:
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Kind & Permitted signer roles \\
+\midrule
+mandate, revocation, status & issuer \\
+delegation, intent & issuer, host \\
+interpretation, invocation, decision & host \\
+effect receipt & observer \\
+approval & approver \\
+\bottomrule
+\end{tabular}
+\end{center}
+A \emph{mandate} states the principal's authority as patterns over actions and resources, an effect-class ceiling and a validity window; a \emph{delegation} narrows its parent; an \emph{invocation} records what the agent declared it would do, citing its authority; an \emph{effect receipt}, signed by the executing system, records the executed effect body $x$ for an invocation; an \emph{approval} binds a human's consent to an effect.
+
+\paragraph{Signatures.} For an object $o$, let $\overline{o}$ denote $o$ without its \code{proof} member. The proof is $\sigma = \Sig_{sk}(\Canon(\overline{o}))$, where $\Canon$ is the RFC~8785 JSON Canonicalization Scheme~\cite{rfc8785}: members sorted by UTF-16 code units, no insignificant whitespace, strings in a fixed escaping, and numbers serialized as ECMAScript's \code{Number.prototype.toString} would serialize the IEEE~754 double they denote. Verification of $o$ against key set $K$ succeeds iff the key named in the proof exists in $K$, has a role permitted for $o$'s kind, and $\Vf_{pk}(\Canon(\overline{o}), \sigma) = 1$.
+
+\paragraph{Approval digest.} An approval carries $d = \Hash(\Canon(x \setminus \{t\}))$, with $\Hash$ = SHA-256 and $x \setminus \{t\}$ the executed-effect body without its time member, so that an approval can be issued before execution. Time is bound separately by the approval's validity window, which must contain both the invocation and the execution time.
+
+\paragraph{Evaluation (cryptographic part).} For each invocation, the verifier checks the signatures and signer roles of every object the decision rests on; requires at least one effect receipt for the invocation, signed by an observer, and for high-impact effects an observer other than the acting agent; compares each executed body with the declared action and resource; checks it against the effective authority (the meet of the chain and any cited intent); and, if an approval is cited, requires that its digest equal the digest of every executed body, that it be unconsumed, within its window, and used by no other invocation or body. Receipts that reference no authorized invocation are reported as \viol{} (invariant I11). Any failure to verify a signature yields \unres{} (I7), never \pres{}.
+
+\section{Security goals and arguments}\label{sec:security}
+
+We assume (A1) Ed25519 is existentially unforgeable under chosen-message attack (EUF-CMA); (A2) SHA-256 is collision resistant; (A3) $\Canon$ is injective on the set of JSON values considered (Section~\ref{sec:canon} examines this); (A4) the adversary does not hold the private keys of the honest principal, approver or observer, and the key set given to the verifier is authentic. The adversary may control the agent, the host and the storage of evidence, and may obtain signatures from honest parties on objects of its choice through their normal operation (the principal signs mandates and approvals it intends; the observer signs receipts of what it executed).
+
+\begin{claim}[Evidence unforgeability]\label{c:unforge}
+No efficient adversary can produce a packet that the verifier evaluates to \pres{} for an executed effect $x$ unless the honest observer signed a receipt of $x$ for that invocation, and an honest issuer signed a mandate (and, where cited, an intent) whose effective authority admits $x$.
+\end{claim}
+\emph{Argument.} \pres{} requires a verified receipt for the invocation, signed by a key with the observer role (role check), and a verified chain rooted in a mandate signed by a key with the issuer role. By (A4) these keys are honest. If the receipt or mandate was never signed by its honest key, the adversary has produced a valid signature on $\Canon(\overline{o})$ for a new message; by (A3), distinct objects give distinct messages, so this is an existential forgery, contradicting (A1). The role check prevents a valid signature by a key the adversary legitimately holds (for instance the host's) from standing in for the observer's or issuer's. Attenuation across delegations is checked in the claim algebra; a delegation that widens its parent yields \viol{} (I1), independent of who signed it.
+
+\begin{claim}[Approval binding]\label{c:bind}
+If the verifier accepts an approval for an invocation with executed bodies $x_1,\dots,x_k$, then the approver signed an approval whose digest equals $\Hash(\Canon(x_i\setminus\{t\}))$ for every $i$; hence, under (A2) and (A3), every executed body equals the approved body as a JSON value, up to its time member.
+\end{claim}
+\emph{Argument.} The approval's signature binds its \code{effect\_digest} by (A1). The verifier recomputes the digest from each executed body and requires equality. Two bodies $x \ne x'$ (as JSON values, ignoring $t$) with equal digests would give either $\Canon(x)=\Canon(x')$, contradicting (A3), or a SHA-256 collision, contradicting (A2). Consequently post-approval substitution of an amount, recipient or hidden field in the executed body is detected as \viol{} (I8). Single use and the validity window are checked against the packet (and, across packets, against verifier state carried from earlier packets; signing that state is open work), so a genuine approval cannot be replayed for a second invocation or body, or outside its window.
+
+\begin{claim}[Substitution and record tampering]\label{c:tamper}
+If the host's signed invocation declares an action or resource different from what the honest observer executed, the verifier returns \viol{} (I2). If an invocation is deleted from stored evidence while the observer's receipt for it remains, the verifier returns \viol{} (I11). If a stored host-signed object is altered, the verifier returns \unres{} (I7) rather than \pres{}.
+\end{claim}
+\emph{Argument.} The receipt is signed by the observer, so by Claim~\ref{c:unforge} it reflects what was executed; the comparison of declared with executed is then a deterministic check. A receipt whose invocation is absent fails the orphan check. Alteration of a host-signed object changes $\Canon(\overline{o})$ (by A3), so its signature no longer verifies, and unverifiable evidence evaluates to \unres{}. Note the asymmetry: deletion of a receipt cannot be detected from the remaining evidence, which is why \pres{} requires a receipt rather than the absence of contrary evidence.
+
+\begin{claim}[Fail-closed evaluation]\label{c:failclosed}
+For every packet and every invocation, if any object the verdict depends on is missing, malformed or fails verification, the verdict for that invocation is \unres{} or \viol{}, never \pres{}.
+\end{claim}
+\emph{Argument.} By construction of the evaluation procedure: each check that cannot be completed raises \unres{} (I7), and exceptions from malformed input are mapped to \unres{}. This property is tested rather than proved: mutation analysis of the reference evaluator includes operators that make evaluation fail open, and the conformance suite kills all of them~\cite{amep}.
+
+These arguments are informal reductions, not machine-checked proofs; a mechanized treatment of the claim algebra and evaluation is open work.
+
+\section{Canonical JSON is binding only modulo the number model}\label{sec:canon}
+
+Assumption (A3) is where the guarantees above are weakest. RFC~8785 canonicalizes numbers by their IEEE~754 double value. It is therefore injective on JSON values \emph{after} numbers have been mapped to doubles, but not on the decimal literals a human or a downstream system may see.
+
+\paragraph{Experiment.} We canonicalized and digested the same inputs with both reference implementations of the specification (Python and JavaScript, written separately by the same author). Table~\ref{tab:num} summarizes the results.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}lllp{3.0cm}@{}}
+\toprule
+Value of \code{amount} & Python $\Canon$ & JavaScript $\Canon$ & Consequence \\
+\midrule
+\code{1200} & \code{1200} & \code{1200} & \\
+\code{1200.0000000000000001} & \code{1200} & \code{1200} & same digest as the row above \\
+\code{9007199254740992} & \code{9007199254740992} & \code{9007199254740992} & \\
+\code{9007199254740993} & \code{9007199254740993} & \code{9007199254740992} & the implementations disagree \\
+\code{"1200"}, \code{"1200.0000000000000001"} & distinct & distinct & strings bind exactly \\
+\bottomrule
+\end{tabular}
+\caption{Canonical forms produced by the two reference verifiers for the same JSON text.}
+\label{tab:num}
+\end{table}
+
+\paragraph{Consequence 1: literal collapse.} Two distinct decimal literals that round to the same double share one canonical form and therefore one approval digest. An approval shown as one literal validates execution of the other. For values interpreted as doubles this is harmless; for values that a downstream system parses as arbitrary-precision decimals (common for monetary amounts), it is a gap between what was approved and what was executed.
+
+\paragraph{Consequence 2: cross-implementation divergence.} Python's JSON parser keeps integers exact, so the Python verifier canonicalizes $2^{53}+1$ as written; ECMAScript parses it to the nearest double, $2^{53}$. A packet signed by a Python producer over an object containing $2^{53}+1$ therefore verifies in the Python verifier and fails signature verification in the JavaScript verifier: the two return \pres{} and \unres{} on the same evidence. Worse, within the JavaScript verifier an approval for an identifier $2^{53}$ also validates an executed body naming $2^{53}+1$, because both canonicalize to the same bytes. Large integers are exactly where identifiers (accounts, orders, tickets) tend to live.
+
+The specification already advised producers to avoid integers above $2^{53}$. The experiment shows why a producer-side \emph{should} is insufficient: the verifiers are the parties whose agreement matters, and they silently disagree when a producer ignores the advice. We have since applied the rules below to the specification and to both reference verifiers (conformance suite v0.2.3); with them, both return \unres{} on the packets of Table~\ref{tab:num} that previously diverged.
+
+\paragraph{Design rules.} We draw three rules, which apply to any design that signs or digests canonical JSON:
+\begin{enumerate}
+\item \textbf{Exactly-bound values are strings.} Amounts, identifiers and any value whose exact textual identity matters must be carried as JSON strings (the payment vectors in the AMEP suite already do so, e.g.\ \code{"amount": "1200.00"}).
+\item \textbf{Verifiers reject numbers outside the safe range.} A verifier must treat any packet containing a number whose magnitude exceeds $2^{53}-1$, the safe-integer range of I-JSON~\cite{rfc7493}, as malformed, yielding \unres{}, so that all conforming verifiers agree. The range must apply to every number, not only to integer literals, because after parsing a verifier cannot tell \code{1e21} from \code{1000000000000000000000}. A verifier that parses text should also reject a non-integer literal whose decimal value differs from the double it denotes.
+\item \textbf{Conformance vectors exercise the boundary.} The suite should include vectors at $2^{53}-1$ (accepted), $2^{53}$ and $2^{53}+1$ (rejected), and a large float such as $10^{21}$ (rejected), so that a verifier that silently rounds is detected. Suite v0.2.3 adds exactly these four.
+\end{enumerate}
+A related fault surfaced in practice: when evaluating evidence produced from an external benchmark, both reference verifiers compared RFC~3339 time strings in mandates without delegation unconverted with numeric effect times, one raising an error and the other comparing a number with a string. Both are the same lesson: the canonical and semantic forms of a value must be fixed before it is compared, and the conformance suite must cover each encoding a producer may legitimately use.
+
+\section{What signed evidence cannot show}\label{sec:limits}
+
+The guarantees concern what was signed and what was executed. They do not reach what a human \emph{saw}. If an approver's device signed a digest of a body containing hidden text, or a body rendered misleadingly (label spoofing, non-injective rendering, a compromised signing ceremony), the evidence shows a genuine approval of that body. These are trusted-display problems, addressed by trusted rendering at approval time~\cite{kodathala2026approve}; evidence can only record that the approved body was executed exactly. Likewise, a flood of genuine approvals is genuinely signed; only a rate rule, not cryptography, can make ``too many'' a violation. Effects that stay within the recorded authority but act on the same object with different content (for example, an email to the authorized recipient carrying extra data) require approvals bound to the exact effect or data-release rules, not resource scope.
+
+Two further limits are structural. Deletion of a receipt is undetectable from the remaining evidence, so absence of a receipt yields \unres{}; and the guarantees rest on the observer being independent of the agent, which the verifier enforces only through roles and the requirement that a high-impact effect's observer differ from the acting agent.
+
+\section{Implementation and validation}
+
+The specification, two reference verifiers (Python and JavaScript) and a conformance suite of 118 signed vectors are open source~\cite{amep}. Both verifiers agree on all 118 vectors, on a 20-vector delegation suite, and on 16 vectors for a published catalogue of approval-path attacks~\cite{kodathala2026approve}; because both verifiers share an author, their agreement cannot rule out a shared misreading, and the divergence of Section~\ref{sec:canon} shows that agreement on the suite does not imply agreement on all inputs. Mutation analysis of the reference evaluator found that an earlier 95-vector suite detected 53 of 70 seeded faults; vectors derived from the survivors raised detection to 69 of 70, the remaining mutant being equivalent. In an MCP prototype in which tool servers sign receipts of executed effects, producing and checking the evidence adds about 0.12\,ms per call and verification about 0.32\,ms per call. Over the oracle traces of the AgentDojo benchmark~\cite{agentdojo}, evidence checked against task-scoped authority flags 566 of 571 successful action-taking prompt-injection attacks as \viol{}, and evidence checked against tool-wide permission flags none, with no false positives on 97 honest traces.
+
+\section{Related work}
+
+Receipts signed by the receiving service rather than the agent appear in Notarized Agents~\cite{figuera2026notarized}, which records what a service did but leaves authorization and delegation checking open; our verifier checks such receipts against delegated authority. Transparency logs (Certificate Transparency, SCITT~\cite{scitt}) provide append-only, witnessed storage and are complementary: they can make receipt deletion detectable, which signed evidence alone cannot. Capability tokens such as macaroons~\cite{macaroons}, Biscuit and UCAN attenuate authority before use; our claim algebra checks attenuation after the fact over signed records. Zero-knowledge authorization~\cite{llambi2026zk} proves that a request satisfied a policy without revealing attributes, and names runtime execution binding as open; signed receipts bound to approval digests provide that binding on the evidence side. Work on agent payment mandates~\cite{aviv2026mandate} shows that a valid mandate signature can coexist with a transaction the user did not intend, which is the gap between what was signed and what was meant that Section~\ref{sec:limits} delimits.
+
+\section{Conclusion}
+
+Signed, role-bound evidence with receipts from the executing system turns ``was the agent allowed to do that?'' into a question a third party can answer offline, under standard assumptions. The weakest of those assumptions is the injectivity of canonical JSON, which holds only modulo the number model; specifications that bind approvals or signatures to canonical JSON should carry exactly-bound values as strings and require verifiers, not only producers, to reject numbers outside I-JSON.
+
+\section*{Acknowledgment}
+The text of this paper was drafted with the assistance of Claude (Anthropic), an AI system, from the author's research, results and direction. The author reviewed and revised the content and takes full responsibility for it.
+
+\begin{thebibliography}{99}
+\bibitem{amep} S.~T. Selvaraj, ``AMEP: Agentic Mandate Evidence Protocol,'' specification, conformance suite and verifiers, 2026, doi:10.5281/zenodo.24317758, \url{https://github.com/stafordtituss/amep}.
+\bibitem{amepid} S.~T. Selvaraj, ``Agentic Mandate Evidence Protocol (AMEP),'' IETF Internet-Draft draft-stafordtituss-agentic-mandate-evidence-00, Nov. 2026.
+\bibitem{rfc8785} A.~Rundgren, B.~Jordan, and S.~Erdtman, ``JSON Canonicalization Scheme (JCS),'' RFC 8785, IETF, 2020.
+\bibitem{rfc7493} T.~Bray, ``The I-JSON Message Format,'' RFC 7493, IETF, 2015.
+\bibitem{kodathala2026approve} S.~V. Kodathala, P.~Pollishetty, and J.~Cargill, ``Approve what, exactly? Effect binding and trusted rendering for agent step-up authorization,'' arXiv:2610.21063, 2026.
+\bibitem{figuera2026notarized} J.~Figuera, ``Notarized agents: Receiver-attested confidential receipts for AI agent actions,'' arXiv:2606.04193, 2026.
+\bibitem{llambi2026zk} M.~Llamb{\'i}-Morillas and D.~Fern{\'a}ndez-Fern{\'a}ndez, ``Cryptographically verifiable authorization for autonomous AI agents: A falsifiable hypothesis and proof of concept,'' arXiv:2607.21325, 2026.
+\bibitem{aviv2026mandate} A.~Aviv, P.~A. Gandhi, R.~Bitton, and A.~Shabtai, ``Beyond the mandate: A systematic security analysis of the Agent Payments Protocol (AP2),'' arXiv:2608.23858, 2026.
+\bibitem{scitt} H.~Birkholz, A.~Delignat-Lavaud, C.~Fournet, Y.~Deshpande, and S.~Lasker, ``An architecture for trustworthy and transparent digital supply chains,'' IETF Internet-Draft draft-ietf-scitt-architecture.
+\bibitem{macaroons} A.~Birgisson, J.~G. Politz, {\'U}.~Erlingsson, A.~Taly, M.~Vrable, and M.~Lentczner, ``Macaroons: Cookies with contextual caveats for decentralized authorization in the cloud,'' in \emph{Proc. NDSS}, 2014.
+\bibitem{agentdojo} E.~Debenedetti, J.~Zhang, M.~Balunovi{\'c}, L.~Beurer-Kellner, M.~Fischer, and F.~Tram{\`e}r, ``AgentDojo: A dynamic environment to evaluate prompt injection attacks and defenses for LLM agents,'' in \emph{NeurIPS Datasets and Benchmarks}, 2024.
+\end{thebibliography}
+
+\end{document}

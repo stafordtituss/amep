@@ -17,14 +17,14 @@ import os
 import sys
 
 from . import SPEC_VERSION, __version__, sdk
-from .core import approval_digest, evaluate, verdict
+from .core import approval_digest, evaluate, parse_strict, verdict
 
 EXIT = {"preserved": 0, "violated": 1, "unresolved": 2}
 
 
 def _load(path):
     with (sys.stdin if path == "-" else open(path, encoding="utf-8")) as f:
-        return json.load(f)
+        return parse_strict(f.read())   # spec 12.1: rejects number literals a double cannot represent exactly
 
 
 def cmd_verify(a):

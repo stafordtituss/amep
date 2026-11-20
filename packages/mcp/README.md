@@ -18,7 +18,7 @@ Evaluation runs locally with the reference verifier from [`amep-protocol`](https
 |---|---|
 | `verify_packet` | Evaluates a packet against a key set. Returns the verdict, a result per invocation, and the verifier state to pass along with the next packet in a stream. |
 | `explain_invariant` | Explains I1 to I11, the outcome when each is broken, and which conformance vectors exercise it. |
-| `list_vectors` | Lists the bundled conformance vectors: the 114-vector AMEP suite (`core`), and the 20-vector W3C delegation-continuity suite (`delegation`). |
+| `list_vectors` | Lists the bundled conformance vectors: the 118-vector AMEP suite (`core`), and the 20-vector W3C delegation-continuity suite (`delegation`). |
 | `get_vector` | Returns one vector, with its packet and test keys, ready for `verify_packet`. |
 | `check_suite` | Runs a bundled suite through the verifier and reports agreement, vector by vector. |
 

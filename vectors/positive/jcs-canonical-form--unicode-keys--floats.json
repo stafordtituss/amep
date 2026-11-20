@@ -89,14 +89,14 @@
     "x-z": 0.1,
     "x-｡": "halfwidth",
     "x-😀": "astral",
-    "x-big": 1e+21,
+    "x-big": 1000000000000000.0,
     "x-small": 1.5e-07,
     "x-whole": 100.0,
     "x-neg": -2.5,
     "proof": {
      "kid": "host-1",
      "alg": "Ed25519",
-     "sig": "b9a59bee48e20481975c76a53db23d12035e881d2708ceabf96dee26b2f8643099b9c6d6818b70f8995b3f714d8e0efae739b31f45616909ec355ed924b39b0d"
+     "sig": "97949b13f50cbac98db88d5b7b5408a063c75f0602720325c89b875d5795148857075189b018e723eee8d83bac2c7a0acda1938b0c566c9c45c7655d4b29d606"
     }
    }
   ],
