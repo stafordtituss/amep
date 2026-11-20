@@ -68,15 +68,22 @@ function normDec(s) {
 
 // Parse JSON text for evaluation (spec 12.1). A non-integer number literal must equal, as a decimal, the double it
 // denotes, so two distinct literals can never share one canonical form or approval digest. Integers are checked
-// against the I-JSON range by evaluate(). Uses the reviver's source text (ES2025 JSON.parse source text access);
-// on engines without it, only the range rule applies.
+// against the I-JSON range by evaluate(). The literals are read from the text itself (after JSON.parse has
+// accepted it, so it is valid JSON), which works on every engine, without JSON.parse source-text access.
+const NUMBER = /-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
 export function parseStrict(text) {
-  return JSON.parse(text, function (key, value, context) {
-    const src = context && typeof context.source === "string" ? context.source : null;
-    if (typeof value === "number" && src && /[.eE]/.test(src) && normDec(src) !== normDec(String(value)))
-      throw new Malformed(`number literal ${src} is not exactly representable as an IEEE 754 double`);
-    return value;
-  });
+  const value = JSON.parse(text);
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') { for (i++; i < text.length && text[i] !== '"'; i++) if (text[i] === "\\") i++; continue; }
+    if (c !== "-" && (c < "0" || c > "9")) continue;
+    NUMBER.lastIndex = i;
+    const lit = NUMBER.exec(text)[0];
+    i += lit.length - 1;
+    if (/[.eE]/.test(lit) && normDec(lit) !== normDec(String(Number(lit))))
+      throw new Malformed(`number literal ${lit} is not exactly representable as an IEEE 754 double`);
+  }
+  return value;
 }
 
 // ---- SHA-256 over UTF-8 (pure JS, so evaluation stays synchronous in the browser) ----
