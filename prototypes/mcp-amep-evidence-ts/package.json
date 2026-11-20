@@ -1,0 +1,31 @@
+{
+  "name": "amep-evidence-mcp-experimental",
+  "version": "0.1.0-experimental.1",
+  "private": true,
+  "description": "EXPERIMENTAL: the io.github.stafordtituss/amep-evidence MCP extension (signed effect receipts) on the official MCP TypeScript SDK v2",
+  "type": "module",
+  "exports": {
+    ".": "./src/extension.mjs",
+    "./gateway": "./src/gateway.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/",
+    "server": "node src/tickets-server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
+    "@modelcontextprotocol/server": "2.4.0",
+    "@stafordtituss/amep": "0.2.0-alpha.7",
+    "zod": "4.6.7"
+  },
+  "license": "Apache-2.0",
+  "author": "Staford Titus Selvaraj",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stafordtituss/amep.git",
+    "directory": "prototypes/mcp-amep-evidence-ts"
+  }
+}
