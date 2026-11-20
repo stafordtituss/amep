@@ -1,0 +1,15 @@
+{
+ "calls": 500,
+ "baseline": {
+  "median_ms": 0.119,
+  "p95_ms": 0.2
+ },
+ "amep": {
+  "median_ms": 0.239,
+  "p95_ms": 0.31
+ },
+ "overhead_median_ms": 0.12,
+ "verify_ms_per_call": 0.318,
+ "evidence_bytes_per_call": 938,
+ "machine": "Darwin arm64, Python 3.11.8"
+}

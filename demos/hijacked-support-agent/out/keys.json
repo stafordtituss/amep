@@ -1,0 +1,26 @@
+{
+ "alice-issuer": {
+  "kid": "alice-issuer",
+  "alg": "Ed25519",
+  "x": "fcdfacfce0cd3f82a0da401354b2703dadb9819f1886934ee4ae5bb4c423591c",
+  "roles": [
+   "issuer"
+  ]
+ },
+ "acme-agent-host": {
+  "kid": "acme-agent-host",
+  "alg": "Ed25519",
+  "x": "372ee2927e3492bc9ad66bcec745b01ed7e9321287e6eb1c1a61d6935dbdfa64",
+  "roles": [
+   "host"
+  ]
+ },
+ "helpdesk-observer": {
+  "kid": "helpdesk-observer",
+  "alg": "Ed25519",
+  "x": "516b770b22e52869cc7cd81cb785dc16d876c039b891e5bdbb62ee1e2c567a56",
+  "roles": [
+   "observer"
+  ]
+ }
+}

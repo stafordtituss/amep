@@ -108,3 +108,55 @@ Questions, vectors, implementations in other languages and research results are 
 Open an issue, then an `AMEP-Proposal-N` document. Every normative change needs at least one positive and one must-reject vector.
 
 **Implementations.** Python (`amep-protocol`), JavaScript (`@stafordtituss/amep`) and the browser verifier, all by the specification's author. Implementations by others are especially welcome; open an [implementation report](https://github.com/stafordtituss/amep/issues/new?template=implementation-report.yml) and yours will be listed here and in [`REVIEWS.md`](REVIEWS.md).
+
+## Citation
+
+If you use AMEP, its conformance suite or its results in your work, please cite it. GitHub's **Cite this repository** button (from [`CITATION.cff`](CITATION.cff)) gives the same entries.
+
+The specification, conformance suite and verifiers (Zenodo; this DOI always resolves to the latest version):
+
+```bibtex
+@software{selvaraj2026amep,
+  author    = {Selvaraj, Staford Titus},
+  title     = {{AMEP}: Agentic Mandate Evidence Protocol},
+  year      = {2026},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.24317758},
+  url       = {https://github.com/stafordtituss/amep}
+}
+```
+
+The IETF Internet-Draft:
+
+```bibtex
+@techreport{selvaraj2026amepdraft,
+  author      = {Selvaraj, Staford Titus},
+  title       = {Agentic Mandate Evidence Protocol ({AMEP})},
+  type        = {Internet-Draft},
+  number      = {draft-stafordtituss-agentic-mandate-evidence-00},
+  institution = {Internet Engineering Task Force},
+  year        = {2026},
+  month       = nov,
+  url         = {https://datatracker.ietf.org/doc/draft-stafordtituss-agentic-mandate-evidence/}
+}
+```
+
+The paper (preprint):
+
+```bibtex
+@misc{selvaraj2026ameppaper,
+  author = {Selvaraj, Staford Titus},
+  title  = {{AMEP}: Verifiable Evidence That Agent Actions Stayed Within Delegated Authority},
+  year   = {2026},
+  note   = {Preprint},
+  doi    = {10.20944/preprints202611.1865.v1}
+}
+```
+
+## Contact
+
+- **Questions, bugs and proposals:** [open an issue](https://github.com/stafordtituss/amep/issues/new/choose). Public discussion helps everyone who reads the repository later.
+- **Reviews and implementation reports:** use the [review](https://github.com/stafordtituss/amep/issues/new?template=independent-review.yml) and [implementation report](https://github.com/stafordtituss/amep/issues/new?template=implementation-report.yml) forms.
+- **Standards discussion:** the IETF agent2agent and audit lists, and the W3C Agent Identity Community Group.
+- **Security issues in the verifiers:** open a [private security advisory](https://github.com/stafordtituss/amep/security/advisories/new) rather than a public issue.
+- **Collaboration:** Staford Titus Selvaraj, Charlemagne Labs · [ORCID 0009-0004-8227-7595](https://orcid.org/0009-0004-8227-7595)

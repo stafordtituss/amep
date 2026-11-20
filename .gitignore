@@ -29,3 +29,6 @@ node_modules/
 
 # Private drafts shared with collaborators before publication
 drafts/
+
+# Anonymous workshop submission source (keep private until review ends)
+paper/laut27/

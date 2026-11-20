@@ -11,7 +11,7 @@
 
 This SEP proposes an optional extension, `io.github.stafordtituss/amep-evidence`, that lets MCP clients, gateways and servers exchange signed evidence about tool calls. A client or gateway attaches stable references to each `tools/call`: an invocation identifier and the mandate the call is made under. A server that supports the extension returns, in the result's `_meta`, a signed receipt describing what it actually did: the action, the resource, its effect class and the data released. The receipt is signed by a key the server publishes, so an auditor can later check, offline and without trusting the client, whether each executed effect stayed within the authority the user delegated.
 
-The evidence format is the Agentic Mandate Evidence Protocol (AMEP), an open specification with an IETF Internet-Draft (draft-stafordtituss-agentic-mandate-evidence-00), 95 conformance vectors, and two independent verifiers published as packages for Python and JavaScript. The extension adds no new methods and changes no core behavior. It uses only capability negotiation and `_meta`. Peers that don't advertise it behave exactly as today.
+The evidence format is the Agentic Mandate Evidence Protocol (AMEP), an open specification with an IETF Internet-Draft (draft-stafordtituss-agentic-mandate-evidence-00), 114 conformance vectors, and two reference verifiers published as packages for Python and JavaScript (written separately, by the same author). The extension adds no new methods and changes no core behavior. It uses only capability negotiation and `_meta`. Peers that don't advertise it behave exactly as today.
 
 ## Motivation
 
@@ -151,7 +151,7 @@ No backward-compatibility concerns. The extension is opt-in on both sides, adds 
 
 ## Reference Implementation
 
-- **Evidence format and verifiers (available):** the AMEP specification, conformance suite and two independent verifiers: https://github.com/stafordtituss/amep, published as `amep-protocol` on PyPI and `@stafordtituss/amep` on npm. Both include a producer SDK that creates and signs effect receipts.
+- **Evidence format and verifiers (available):** the AMEP specification, conformance suite and two reference verifiers by the same author: https://github.com/stafordtituss/amep, published as `amep-protocol` on PyPI and `@stafordtituss/amep` on npm. Both include a producer SDK that creates and signs effect receipts.
 - **MCP prototype (available):** https://github.com/stafordtituss/amep/tree/main/prototypes/mcp-amep-evidence, built on the official MCP Python SDK (`mcp` 2.3.0) through its extension interface (`Extension.intercept_tool_call` on the server, `ClientExtension` on the client). A reference server advertises the extension and signs receipts for what each tool actually executed. A reference gateway verifies them and evaluates the evidence. Eight integration tests run real MCP sessions, in-process and over stdio, covering: an honest server (`preserved`), a server whose receipt shows it changed a different resource than requested (`violated`), no opt-in (no receipt), a tampered receipt (rejected), a tool with no effect (no receipt), a server without the extension (unchanged behavior), and the stdio transport. Setup instructions are in its README.
 - **Next step:** per the extension process, publish the extension as Experimental in an `experimental-ext-` repository associated with the sponsoring group, and port the server half into an SDK branch if the group prefers.
 

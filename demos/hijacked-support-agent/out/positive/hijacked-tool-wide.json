@@ -1,0 +1,203 @@
+{
+ "name": "hijacked-tool-wide",
+ "question": "The same attack, but the only authority on record is the tool-wide permission (any ticket, any recipient): how most agents are deployed.",
+ "expect": {
+  "outcome": "preserved",
+  "invariant": "-"
+ },
+ "packet": {
+  "amep_version": "0.2",
+  "mandates": [
+   {
+    "id": "m-alice-support",
+    "kind": "mandate",
+    "principal": "user:alice@acme.example",
+    "subject_agent": "agent:acme-support-assistant",
+    "claims": {
+     "actions": [
+      "saas.*",
+      "mail.*"
+     ],
+     "resources": [
+      "tickets:issue/*",
+      "mail:recipient/*"
+     ],
+     "ceiling": "external_send",
+     "exp": 1795144919
+    },
+    "proof": {
+     "kid": "alice-issuer",
+     "alg": "Ed25519",
+     "sig": "f379d80167994d28dac3cf492f2ff5498e7f7a581e24802fe21ea66d8a11ceefa0ec918ab101aa726ce568f1ab857684d9d9f86a1492e63a16703e7efa8cfd0b"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "interp-helpdesk",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "mcp:helpdesk",
+    "version": "v1",
+    "proof": {
+     "kid": "acme-agent-host",
+     "alg": "Ed25519",
+     "sig": "e109483788485f5857ec0a2bcecf5822c5be140c387b7c569d1b591cd5a8c8055494a41a546767b0bf15bcca85bfa3855b5540f420031f5952705f157351b208"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "m-alice-support",
+    "interpretation_ref": "interp-helpdesk",
+    "t": 1795141319,
+    "actor": "agent:acme-support-assistant",
+    "declared": {
+     "action": "saas.read",
+     "resource": "tickets:issue/4821",
+     "effect": "read"
+    },
+    "proof": {
+     "kid": "acme-agent-host",
+     "alg": "Ed25519",
+     "sig": "8fe82a6d1d18af302864b6d953549e24dd04a42432cac40dae2e3ad82533578f38b8d921728f3824fc2f898c1dce845dc518b75d11b8c540a0f38b9a8507ec0e"
+    }
+   },
+   {
+    "id": "i-2",
+    "kind": "invocation",
+    "authority_ref": "m-alice-support",
+    "interpretation_ref": "interp-helpdesk",
+    "t": 1795141319,
+    "actor": "agent:acme-support-assistant",
+    "declared": {
+     "action": "saas.update",
+     "resource": "tickets:issue/4821",
+     "effect": "write_shared"
+    },
+    "proof": {
+     "kid": "acme-agent-host",
+     "alg": "Ed25519",
+     "sig": "1b66d1bb7a7a74fca33401db69dc68699e3dbdc7724fef9861505854ba8ed67768a2543a95b4bc626382bc1d1aee4c50e453e7c46e8ae6eafcb52c6f6f157d01"
+    }
+   },
+   {
+    "id": "i-3",
+    "kind": "invocation",
+    "authority_ref": "m-alice-support",
+    "interpretation_ref": "interp-helpdesk",
+    "t": 1795141319,
+    "actor": "agent:acme-support-assistant",
+    "declared": {
+     "action": "mail.send",
+     "resource": "mail:recipient/dana@customer.example",
+     "effect": "external_send"
+    },
+    "proof": {
+     "kid": "acme-agent-host",
+     "alg": "Ed25519",
+     "sig": "d0be7f4a24544b38bc31ae4e11c4b19518b80bcf129f21ae63f5112f97f1a8b8313d0757929ec38ee61fa4942ff148b5e943ad4ebb4630b7f815d3d422ff5e02"
+    }
+   },
+   {
+    "id": "i-4",
+    "kind": "invocation",
+    "authority_ref": "m-alice-support",
+    "interpretation_ref": "interp-helpdesk",
+    "t": 1795141319,
+    "actor": "agent:acme-support-assistant",
+    "declared": {
+     "action": "mail.send",
+     "resource": "mail:recipient/records@ticket-audit.example",
+     "effect": "external_send"
+    },
+    "proof": {
+     "kid": "acme-agent-host",
+     "alg": "Ed25519",
+     "sig": "b5f8bf9b180506ef43e6363d8a3ee632a8f24cfd6908dadbb04b00ba12fd266bc3f46d0ffe20f1c8dbb8aeede9fc46d1ba6173d48989c9feee5ac98d099c1d06"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "server:helpdesk.acme.example:e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "server:helpdesk.acme.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "saas.read",
+     "resource": "tickets:issue/4821",
+     "effect": "read",
+     "released": [],
+     "t": 1795141319
+    },
+    "proof": {
+     "kid": "helpdesk-observer",
+     "alg": "Ed25519",
+     "sig": "676351de7c8fe5b935e1f977f025c32ae3b17c429939fd8be752b43dfe5249247210feb75b3ebc30eafd9c1bb69a55910678be9bee4aba8a0061088148f6f008"
+    }
+   },
+   {
+    "id": "server:helpdesk.acme.example:e-2",
+    "kind": "effect",
+    "invocation": "i-2",
+    "observed_by": "server:helpdesk.acme.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "saas.update",
+     "resource": "tickets:issue/4821",
+     "effect": "write_shared",
+     "released": [],
+     "reversible": true,
+     "t": 1795141319
+    },
+    "proof": {
+     "kid": "helpdesk-observer",
+     "alg": "Ed25519",
+     "sig": "83b18eeba16f4e0a434464a7800e8380a99cd0f4c642b5006e9c9b5da64ce77160806b58ba5c6b78550a607e09f6ff8f61480c2be366010f3963d95d06aa7003"
+    }
+   },
+   {
+    "id": "server:helpdesk.acme.example:e-3",
+    "kind": "effect",
+    "invocation": "i-3",
+    "observed_by": "server:helpdesk.acme.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "mail.send",
+     "resource": "mail:recipient/dana@customer.example",
+     "effect": "external_send",
+     "released": [],
+     "t": 1795141319
+    },
+    "proof": {
+     "kid": "helpdesk-observer",
+     "alg": "Ed25519",
+     "sig": "2f07e9e0f63d9774fd4a486402a9d65f64703b26c2143aa44372aa4b904d14998b35b8445d12f5e049d0550e2d03f4ce86436b6cbfc202a3d3f093b708411601"
+    }
+   },
+   {
+    "id": "server:helpdesk.acme.example:e-4",
+    "kind": "effect",
+    "invocation": "i-4",
+    "observed_by": "server:helpdesk.acme.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "mail.send",
+     "resource": "mail:recipient/records@ticket-audit.example",
+     "effect": "external_send",
+     "released": [],
+     "t": 1795141319
+    },
+    "proof": {
+     "kid": "helpdesk-observer",
+     "alg": "Ed25519",
+     "sig": "f8a408701859aee65464115f17eab0c444981404e057a99ad3fa4fe7f40f49e90a6219293c7a9d7c86b7ac985d9b2c1a36ebc00e6e9704ee6616ee52baba9206"
+    }
+   }
+  ]
+ }
+}
