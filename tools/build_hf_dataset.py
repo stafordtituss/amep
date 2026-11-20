@@ -9,7 +9,7 @@ import os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 OUT = os.path.join(ROOT, "dist", "hf-dataset")
 SUITES = {
-    "core": ("vectors", "0.2.1"),
+    "core": ("vectors", "0.2.3"),
     "delegation": ("interop/w3c-agent-identity/delegation-continuity", "0.1"),
 }
 
@@ -56,7 +56,7 @@ A verifier evaluates the packet and returns one of three outcomes:
 
 | Config | Rows | Contents |
 |---|---|---|
-| `core` | {core_n} | The AMEP conformance suite v{core_v}: {core_pos} positive and {core_neg} must-reject vectors, covering attenuation, declared-vs-executed drift, revocation, signer roles, approval replay, data release, guardrail tampering, self-reported effects and orphan effects |
+| `core` | {core_n} | The AMEP conformance suite v{core_v}: {core_pos} positive and {core_neg} must-reject vectors, covering attenuation, declared-vs-executed drift, revocation, signer roles, approval replay, data release, guardrail tampering, self-reported effects, orphan effects and numbers outside the I-JSON safe range |
 | `delegation` | {del_n} | Delegation continuity across agent hops, built for the W3C Agent Identity Registry Protocol Community Group's hiring scenario (DID-identified agents) |
 
 ## Fields
