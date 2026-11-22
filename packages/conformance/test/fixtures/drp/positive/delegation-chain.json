@@ -1,0 +1,92 @@
+{
+  "id": "delegation-chain",
+  "description": "Valid 2-level delegation chain: child receipt is a strict subset of parent scope.",
+  "receipt": {
+    "delegationId": "auth-1781977527026-pytic",
+    "issuedAt": "2026-06-20T17:45:27.026Z",
+    "scopeSchema": {
+      "version": "1.0",
+      "allowedActions": [
+        {
+          "operation": "read",
+          "resource": "email"
+        }
+      ],
+      "deniedActions": [
+        {
+          "operation": "delete",
+          "resource": "*"
+        }
+      ]
+    },
+    "boundaries": "Do not send emails. Do not delete anything.",
+    "timeWindow": {
+      "start": "2026-06-20T17:45:27.026Z",
+      "end": "2100-01-01T00:00:00.000Z"
+    },
+    "operatorInstructions": "Read email only. Do not modify records.",
+    "instructionsHash": "c7770cec36944bd53f6baf7dc9b7f5aa281a292300376e7b42bdfaf6f15c31e5",
+    "signerPublicKey": {
+      "kty": "EC",
+      "crv": "P-256",
+      "x": "YOCYzuRIo-jNl6zFBC-jF6p0LTbTN59-OBUYe4EJtxA",
+      "y": "CO4pmWi_NNbht-q87YpOsZH7G2WLjnlkd6Z5D_RhdVM"
+    },
+    "parentReceiptId": "72c4c94b6170eb9ce9816fd6663d0975d720f0cab092cbc53410529be80d6c94",
+    "signature": "9d9e08cc4df3514bbc2955c04c487294c5596e993cf49f1f4e9f40c447ecbf13ac1a0c97d51540e68b46a591cb5225a1e60bd40b67b431e2b87ebd57e74bdb33",
+    "orchestratorSignature": "2cf5a544c70cd6be94bf13d3df51acd144676eacec5931e8ece728478fbafb764dfd7d8275aa1b2bf2618f63ea225aceb88da12d3afedafe74c8a578744eb3ba"
+  },
+  "receiptId": "72af90834945481ff6aff3fae68236ab701e4f4c2eaa6a1f03df454b3a9cf0bc",
+  "parentReceipt": {
+    "delegationId": "auth-1781977527011-wbhsb",
+    "issuedAt": "2026-06-20T17:45:27.011Z",
+    "scope": "Manage email and calendar",
+    "boundaries": "Do not send emails. Do not delete anything.",
+    "timeWindow": {
+      "start": "2026-06-20T17:45:27.011Z",
+      "end": "2100-01-02T00:00:00.001Z"
+    },
+    "operatorInstructions": "Read email only. Do not modify records.",
+    "instructionsHash": "c7770cec36944bd53f6baf7dc9b7f5aa281a292300376e7b42bdfaf6f15c31e5",
+    "signerPublicKey": {
+      "kty": "EC",
+      "crv": "P-256",
+      "x": "YOCYzuRIo-jNl6zFBC-jF6p0LTbTN59-OBUYe4EJtxA",
+      "y": "CO4pmWi_NNbht-q87YpOsZH7G2WLjnlkd6Z5D_RhdVM"
+    },
+    "signature": "055566ae26ca6c40d23feec0905dbd23616d6be2ca479aab7399b4a40ead4140e705ccb4bee2e112568d71baf73be02c67ae7f10105efd8ab4dc74ef38018feb"
+  },
+  "parentReceiptId": "72c4c94b6170eb9ce9816fd6663d0975d720f0cab092cbc53410529be80d6c94",
+  "parentScopeSchema": {
+    "version": "1.0",
+    "allowedActions": [
+      {
+        "operation": "read",
+        "resource": "email"
+      },
+      {
+        "operation": "read",
+        "resource": "calendar"
+      },
+      {
+        "operation": "write",
+        "resource": "calendar"
+      }
+    ],
+    "deniedActions": [
+      {
+        "operation": "delete",
+        "resource": "*"
+      }
+    ]
+  },
+  "action": {
+    "operation": "read",
+    "resource": "email"
+  },
+  "operatorInstructions": "Read email only. Do not modify records.",
+  "verifierOptions": {},
+  "expected": {
+    "outcome": "PERMIT"
+  }
+}

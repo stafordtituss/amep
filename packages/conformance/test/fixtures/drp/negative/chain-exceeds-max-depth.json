@@ -1,0 +1,220 @@
+{
+  "id": "chain-exceeds-max-depth",
+  "description": "Delegation chain depth 4 exceeds MAX_CHAIN_DEPTH=3 -- denied with PARENT_SCOPE_VIOLATION.",
+  "receipt": {
+    "delegationId": "auth-1781977995528-xt7l1",
+    "issuedAt": "2026-06-20T17:53:15.528Z",
+    "scopeSchema": {
+      "version": "1.0",
+      "allowedActions": [
+        {
+          "operation": "read",
+          "resource": "a"
+        }
+      ],
+      "deniedActions": []
+    },
+    "boundaries": "none",
+    "timeWindow": {
+      "start": "2026-06-20T17:53:15.525Z",
+      "end": "2100-01-01T00:00:00.000Z"
+    },
+    "operatorInstructions": "Read email only. Do not modify records.",
+    "instructionsHash": "c7770cec36944bd53f6baf7dc9b7f5aa281a292300376e7b42bdfaf6f15c31e5",
+    "signerPublicKey": {
+      "kty": "EC",
+      "crv": "P-256",
+      "x": "fz16sKfZ0cJPvDhpMqeQgaY9mFeqje0GIgG0qglsOEg",
+      "y": "plEsP-HKoZltbCe80aKRDD28JsMfugD2DEe0QnEloX8"
+    },
+    "parentReceiptId": "6d9eb45fbc52c5ea2f8da7a20f46ab800ca75a7b05415beb27e2a3e1cbc11ee4",
+    "signature": "714f03d5dfe247d3ad58163153aa94d19499689ca5246d23101d513f8c34117950537d870234fcde28a9ff60d75c3c8836952ff76ecfb340bd5392fba3482e38",
+    "orchestratorSignature": "3bf6d5c9bfbfd22a888ea61f4b97d240205d4ca0e14689cee1a7e044dba3f812aedc9afd54bfea86fe2efd9e2014ca4a6fb2d2019b1e2bee7187d3ae12e9a914"
+  },
+  "receiptId": "da0a0c3b4c6913e0a015b4c6ce19001df4af0fac679ced73b276ba6e3a7d4185",
+  "chainReceipts": [
+    {
+      "receipt": {
+        "delegationId": "auth-1781977995527-lqj3e",
+        "issuedAt": "2026-06-20T17:53:15.527Z",
+        "scopeSchema": {
+          "version": "1.0",
+          "allowedActions": [
+            {
+              "operation": "read",
+              "resource": "a"
+            },
+            {
+              "operation": "read",
+              "resource": "b"
+            }
+          ],
+          "deniedActions": []
+        },
+        "boundaries": "none",
+        "timeWindow": {
+          "start": "2026-06-20T17:53:15.525Z",
+          "end": "2100-01-01T00:00:00.000Z"
+        },
+        "operatorInstructions": "Read email only. Do not modify records.",
+        "instructionsHash": "c7770cec36944bd53f6baf7dc9b7f5aa281a292300376e7b42bdfaf6f15c31e5",
+        "signerPublicKey": {
+          "kty": "EC",
+          "crv": "P-256",
+          "x": "fz16sKfZ0cJPvDhpMqeQgaY9mFeqje0GIgG0qglsOEg",
+          "y": "plEsP-HKoZltbCe80aKRDD28JsMfugD2DEe0QnEloX8"
+        },
+        "parentReceiptId": "eb32832bc11ba6ce90b0c15eee1c163e73ce9294062342c8114ab61b6edae4d7",
+        "signature": "0b43c535c915a7ef6bd90b5c293e66f5921748ed256c9b8482f1f65390d7780f5c6137b05f6064742417fcb2f7c61cde1e14613f44968888d0faa7578d2320a4",
+        "orchestratorSignature": "0ca2b2717de7040404dc7af0f6f2ed6425b599475d951914f964e01a55e4ae5315d310c1122b3ea5b6ba42345619078cde6102a4203732ff008fbb67d82bb95d"
+      },
+      "receiptId": "6d9eb45fbc52c5ea2f8da7a20f46ab800ca75a7b05415beb27e2a3e1cbc11ee4"
+    },
+    {
+      "receipt": {
+        "delegationId": "auth-1781977995527-ezghq",
+        "issuedAt": "2026-06-20T17:53:15.527Z",
+        "scopeSchema": {
+          "version": "1.0",
+          "allowedActions": [
+            {
+              "operation": "read",
+              "resource": "a"
+            },
+            {
+              "operation": "read",
+              "resource": "b"
+            },
+            {
+              "operation": "read",
+              "resource": "c"
+            }
+          ],
+          "deniedActions": []
+        },
+        "boundaries": "none",
+        "timeWindow": {
+          "start": "2026-06-20T17:53:15.525Z",
+          "end": "2100-01-01T00:00:00.000Z"
+        },
+        "operatorInstructions": "Read email only. Do not modify records.",
+        "instructionsHash": "c7770cec36944bd53f6baf7dc9b7f5aa281a292300376e7b42bdfaf6f15c31e5",
+        "signerPublicKey": {
+          "kty": "EC",
+          "crv": "P-256",
+          "x": "fz16sKfZ0cJPvDhpMqeQgaY9mFeqje0GIgG0qglsOEg",
+          "y": "plEsP-HKoZltbCe80aKRDD28JsMfugD2DEe0QnEloX8"
+        },
+        "parentReceiptId": "c7ac5b0c1394cee67e20b227676fb5867cf25e4291950efcd8dbabb86f9b9665",
+        "signature": "8447366ce88b7aa8cef0a1f11dfb2533ee889d95603dca1ae4a428bc9ae7c6a13f0045e9d23e4bd7fe6cd79899af2f959eeb851ca77684f3bf6fb16f3e486736",
+        "orchestratorSignature": "e2c1a6ff2b3b0c97a6e1f938a5a7da9ac6b97b1e7f404e589d4486645c8e8eab59ffc98a2d3783caf7e54831c5077cd2598b412857fc3d18f2f1cc3bbf03a38c"
+      },
+      "receiptId": "eb32832bc11ba6ce90b0c15eee1c163e73ce9294062342c8114ab61b6edae4d7"
+    },
+    {
+      "receipt": {
+        "delegationId": "auth-1781977995526-ak55m",
+        "issuedAt": "2026-06-20T17:53:15.526Z",
+        "scopeSchema": {
+          "version": "1.0",
+          "allowedActions": [
+            {
+              "operation": "read",
+              "resource": "a"
+            },
+            {
+              "operation": "read",
+              "resource": "b"
+            },
+            {
+              "operation": "read",
+              "resource": "c"
+            },
+            {
+              "operation": "read",
+              "resource": "d"
+            }
+          ],
+          "deniedActions": []
+        },
+        "boundaries": "none",
+        "timeWindow": {
+          "start": "2026-06-20T17:53:15.525Z",
+          "end": "2100-01-01T00:00:00.000Z"
+        },
+        "operatorInstructions": "Read email only. Do not modify records.",
+        "instructionsHash": "c7770cec36944bd53f6baf7dc9b7f5aa281a292300376e7b42bdfaf6f15c31e5",
+        "signerPublicKey": {
+          "kty": "EC",
+          "crv": "P-256",
+          "x": "fz16sKfZ0cJPvDhpMqeQgaY9mFeqje0GIgG0qglsOEg",
+          "y": "plEsP-HKoZltbCe80aKRDD28JsMfugD2DEe0QnEloX8"
+        },
+        "parentReceiptId": "0bcefb17401efca077e0e678856053597f04732b0b9c0fc094ca51aca4ea1ef9",
+        "signature": "619d8dddf1735b629bb8f3be47a4722529ec204c2e1edaa1f023c6f1c27d5be034541f9694a9a06a8a36f6345237dab28e2108cc83d0c6991ce8c1aa0b782509",
+        "orchestratorSignature": "ecf2cafac4d8ae20a5013f83094537a4a80146ae1d9b46807452f20642ce7fc6d0a383348a5b1a11d7d104c6447509fa4a73493c19b45507d9b7aa69a7f0b8b7"
+      },
+      "receiptId": "c7ac5b0c1394cee67e20b227676fb5867cf25e4291950efcd8dbabb86f9b9665"
+    },
+    {
+      "receipt": {
+        "delegationId": "auth-1781977995524-veney",
+        "issuedAt": "2026-06-20T17:53:15.524Z",
+        "scope": "root scope for deep chain test",
+        "boundaries": "none",
+        "timeWindow": {
+          "start": "2026-06-20T17:53:15.524Z",
+          "end": "2100-01-02T00:00:00.000Z"
+        },
+        "operatorInstructions": "Read email only. Do not modify records.",
+        "instructionsHash": "c7770cec36944bd53f6baf7dc9b7f5aa281a292300376e7b42bdfaf6f15c31e5",
+        "signerPublicKey": {
+          "kty": "EC",
+          "crv": "P-256",
+          "x": "fz16sKfZ0cJPvDhpMqeQgaY9mFeqje0GIgG0qglsOEg",
+          "y": "plEsP-HKoZltbCe80aKRDD28JsMfugD2DEe0QnEloX8"
+        },
+        "signature": "1c89a60ddb0a52c51c09a4075a8331873f48380ba0ff148b09f23208234c3d74c46c548fd669708fb2c57df3aa4481696f5efd80ba01f0066bd00db5d09806e5"
+      },
+      "receiptId": "0bcefb17401efca077e0e678856053597f04732b0b9c0fc094ca51aca4ea1ef9",
+      "scopeSchema": {
+        "version": "1.0",
+        "allowedActions": [
+          {
+            "operation": "read",
+            "resource": "a"
+          },
+          {
+            "operation": "read",
+            "resource": "b"
+          },
+          {
+            "operation": "read",
+            "resource": "c"
+          },
+          {
+            "operation": "read",
+            "resource": "d"
+          },
+          {
+            "operation": "read",
+            "resource": "e"
+          }
+        ],
+        "deniedActions": []
+      }
+    }
+  ],
+  "action": {
+    "operation": "read",
+    "resource": "a"
+  },
+  "operatorInstructions": "Read email only. Do not modify records.",
+  "verifierOptions": {
+    "maxChainDepth": 3
+  },
+  "expected": {
+    "outcome": "DENY",
+    "denialCode": "CHAIN_DEPTH_EXCEEDED"
+  }
+}

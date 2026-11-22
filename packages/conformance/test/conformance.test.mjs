@@ -334,3 +334,62 @@ describe("import-book: Provared", () => {
     assert.ok(!out.mapping.limits.some(l => "per_effect" in l && l.per_effect === "100"));
   });
 });
+
+// ---- Delegation Receipt Protocol vectors ----
+import { analyseVector, checkLegacyReceipt, claimsOf } from "../src/profiles/drp.mjs";
+import { compare as drpCompare, amepIfExecuted } from "../../../interop/drp/compare.mjs";
+import { readdirSync } from "node:fs";
+
+describe("profile: Delegation Receipt Protocol", () => {
+  const FIX = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "drp");
+  const vectors = ["positive", "negative"].flatMap(d => readdirSync(join(FIX, d)).filter(f => f.endsWith(".json"))
+    .map(f => JSON.parse(readFileSync(join(FIX, d, f), "utf8"))));
+  const byId = id => vectors.find(v => v.id === id);
+
+  test("DRP's own receipt checks agree with the vectors: only the invalid-signature vector fails them", () => {
+    assert.equal(vectors.length, 14);
+    const failing = vectors.filter(v => { const a = analyseVector(v); return [...a.checks.receipt.problems, ...a.checks.chain.flatMap(c => c.problems)].length; });
+    assert.deepEqual(failing.map(v => v.id), ["invalid-signature"]);
+  });
+
+  test("a changed receipt fails the signature and the receipt id", () => {
+    const v = byId("action-not-in-scope"), r = structuredClone(v.receipt);
+    assert.deepEqual(checkLegacyReceipt(r, v.receiptId).problems, []);
+    r.timeWindow.end = "2099-01-01T00:00:00.000Z";
+    const p = checkLegacyReceipt(r, v.receiptId).problems.join(" | ");
+    assert.match(p, /signature does not check/); assert.match(p, /receipt id/);
+  });
+
+  test("scope schemas: a product stays plain claims; other pairs become grants; what can't be exact is a gap", () => {
+    const s = (allowed, denied = []) => ({ allowedActions: allowed.map(([operation, resource]) => ({ operation, resource })),
+      deniedActions: denied.map(([operation, resource]) => ({ operation, resource })) });
+    assert.deepEqual(claimsOf(s([["read", "a"], ["read", "b"]])).claims, { actions: ["drp.read"], resources: ["drp:a", "drp:b"], ceiling: "read" });
+    assert.deepEqual(claimsOf(s([["read", "docs"], ["write", "reports"]])).claims.grants,
+      [{ actions: ["drp.read"], resources: ["drp:docs"] }, { actions: ["drp.write"], resources: ["drp:reports"] }]);
+    assert.deepEqual(claimsOf(s([["read", "a"]], [["delete", "*"]])).claims.deny_actions, ["drp.delete"]);
+    assert.match(claimsOf(s([["read", "a"]], [["send", "email"]])).gap, /denied pair/);
+    assert.match(claimsOf(s([["teleport", "a"]])).gap, /no AMEP effect class/);
+  });
+
+  test("AMEP beside DRP: agreement where both decide on signed or supplied scope; the rest is labelled", () => {
+    const rel = Object.fromEntries(drpCompare().map(r => [r.id, r.amep.na ? "n/a" : `${r.amep.result.outcome} ${r.amep.result.invariant}`]));
+    assert.deepEqual(rel, {
+      "positive/authority-state-no-drift": "preserved -", "positive/delegation-chain": "preserved -", "positive/minimal-valid": "n/a",
+      "positive/narrowed-sub-receipt": "preserved -", "positive/one-time-use-first-presentation": "preserved -",
+      "negative/action-not-in-scope": "violated I2", "negative/chain-exceeds-max-depth": "n/a", "negative/expired": "n/a",
+      "negative/invalid-signature": "n/a", "negative/one-time-use-already-consumed": "preserved -", // DRP: receipt already used
+      "negative/one-time-use-no-store": "preserved -",                                                // DRP: no consumption store
+      "negative/parent-scope-violation": "violated I1", "negative/replay-same-session": "n/a", "negative/tampered-action-hash": "n/a",
+    });
+  });
+
+  test("grants don't widen: an action outside every allowed pair, though inside their product, is violated", () => {
+    // narrowed-sub-receipt allows read documents, read reports, write reports. The product of those operations and
+    // resources would also allow write documents; the grants do not.
+    const v = structuredClone(byId("narrowed-sub-receipt"));
+    v.action = { operation: "write", resource: "documents" };
+    const out = amepIfExecuted(v, analyseVector(v));
+    assert.equal(out.grants, true);
+    assert.deepEqual([out.result.outcome, out.result.invariant, out.result.blame], ["violated", "I2", "agent"]);
+  });
+});

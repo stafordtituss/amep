@@ -2,6 +2,18 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## Comparison with the Delegation Receipt Protocol's vectors (unreleased, 2026-11-22)
+
+- **DRP profile** (`packages/conformance/src/profiles/drp.mjs`) and **`interop/drp/`:** AMEP beside the 14 published vectors of DRP's reference SDK (draft-nelson-agent-delegation-receipts). Each receipt is checked by DRP's own rule first (signature, receipt id, orchestrator binding); only `invalid-signature` fails, as intended. AMEP then answers the matching question, had the action run as proposed, with the scope the DRP verifier was given adopted as authority and labelled as such. Of the 8 vectors that can be compared, AMEP agrees on 6. The remaining 2 are DRP's single-use receipts, which AMEP doesn't have. The 6 that can't be compared state authority only in natural language, or decide by the verifier's chain-depth limit.
+- **Findings, in the README:**
+  - the root authority in every comparable vector is supplied by the verifier, not signed by the user;
+  - the vectors use the pre-11 signing rule that draft -15 deprecates, and there are no vectors for its JWS or COSE profiles;
+  - their signatures are raw P1363, not the DER the draft describes for that rule;
+  - sub-receipts use `orchestratorSignature`, which -15 deprecates.
+- DRP's scopes allow (operation, resource) pairs, which is what led to grants (above). The profile expresses them exactly, and a test shows an action inside the product of the pairs, but outside every pair, is `violated`.
+- **`interop/COVERAGE.md`** has a DRP column.
+- The vectors are vendored, unchanged and with their licence, as test fixtures (MIT).
+
 ## Grants: authority as a union of products (unreleased, 2026-11-22)
 
 - **Spec 5.3:** a claim set may carry `grants`, a list of `{actions, resources}`, instead of `actions` and `resources`. Each grant permits its actions on its resources, and the authority is their union. One product (`actions` × `resources`) can't express "read the documents, write the reports" without also permitting "write the documents"; grants can. Plain claims count as one grant, so the two forms mix along a chain:

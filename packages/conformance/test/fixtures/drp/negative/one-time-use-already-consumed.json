@@ -1,0 +1,48 @@
+{
+  "id": "one-time-use-already-consumed",
+  "description": "oneTimeUse receipt presented for the second time -- denied because already consumed.",
+  "receipt": {
+    "delegationId": "auth-1781977995520-myswm",
+    "issuedAt": "2026-06-20T17:53:15.520Z",
+    "scope": "Read calendar events",
+    "boundaries": "Do not send emails",
+    "timeWindow": {
+      "start": "2026-06-20T17:53:15.520Z",
+      "end": "2100-01-01T00:00:00.029Z"
+    },
+    "operatorInstructions": "Stay within scope",
+    "instructionsHash": "2cf53c29f07d1164f47190209e12719d0b74c6ac52c1a2afd679972a1dc2bff7",
+    "signerPublicKey": {
+      "kty": "EC",
+      "crv": "P-256",
+      "x": "fz16sKfZ0cJPvDhpMqeQgaY9mFeqje0GIgG0qglsOEg",
+      "y": "plEsP-HKoZltbCe80aKRDD28JsMfugD2DEe0QnEloX8"
+    },
+    "oneTimeUse": true,
+    "signature": "9a6ee7978da0b1ee44c0f11a3c85778ef90f1158b95bdc87a7fe4b6b3785661dca6cff61c5711fcea9f29ba87a6afce86e6c0890c13ec06abbb2623f7f56465a"
+  },
+  "receiptId": "adf8a5fc44d797fe5f4f927a42f2a7d0008b9a2b7b2d45566793a2ed5e2eb2ab",
+  "action": {
+    "operation": "read",
+    "resource": "calendar"
+  },
+  "operatorInstructions": "Stay within scope",
+  "testBehavior": "second_presentation",
+  "verifierOptions": {
+    "scopeSchema": {
+      "version": "1.0",
+      "allowedActions": [
+        {
+          "operation": "read",
+          "resource": "calendar"
+        }
+      ],
+      "deniedActions": []
+    },
+    "consumptionStore": "durable"
+  },
+  "expected": {
+    "outcome": "DENY",
+    "denialCode": "RECEIPT_ALREADY_CONSUMED"
+  }
+}
