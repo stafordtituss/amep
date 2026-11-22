@@ -125,3 +125,30 @@ test("verdict statement: names the packet, verdict and blame; envelope round-tri
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /verified: violated I2/);
 });
+
+test("SVR statement: preserved gets AMEP_VERDICT_PRESERVED, others none; signs and verifies; spec version matches", async (t) => {
+  if (!existsSync(join(VECTORS, "keys.json"))) return t.skip("conformance vectors not present");
+  const { readdirSync } = await import("node:fs");
+  const { SPEC_VERSION } = await import("../src/index.mjs");
+  const keys = JSON.parse(readFileSync(join(VECTORS, "keys.json"), "utf8"));
+  const cases = [["positive", readdirSync(join(VECTORS, "positive")).sort()[0], [verdicts.SVR_PRESERVED]],
+    ["must-reject", "payment-over-the-per-call-limit-without-approval.json", []],
+    ["must-reject", "missing-effect-receipt.json", []]];
+  for (const [sub, name, props] of cases) {
+    const bytes = Buffer.from(JSON.stringify(JSON.parse(readFileSync(join(VECTORS, sub, name), "utf8")).packet), "utf8");
+    const res = evaluate(JSON.parse(bytes.toString()), keys, sigOk);
+    const s = verdicts.svrStatement(bytes, keys, res, "https://example.com/v", "2026-11-22T00:00:00Z");
+    assert.equal(s.predicateType, "https://in-toto.io/attestation/svr/v0.2");
+    assert.deepEqual(s.predicate.properties, props, name);
+    assert.equal(s.predicate.verifier.policies[0].digest.sha256, createHash("sha256").update(canon(keys), "utf8").digest("hex"));
+    assert.equal(s.predicate.verifier.policies[1].name, `amep-${SPEC_VERSION}`);
+    assert.deepEqual(s.subject, verdicts.statement(bytes, keys, res).subject);
+  }
+  const bytes = Buffer.from("{}", "utf8");
+  const s = verdicts.svrStatement(bytes, keys, evaluate({}, keys, sigOk), "https://example.com/v");
+  assert.match(s.predicate.timeCreated, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/);
+  const k = Key.generate("verifier-1", ["observer"]);
+  const env = verdicts.signEnvelope(s, k.keyObject, k.kid), pub = { [k.kid]: k.publicEntry().x };
+  assert.throws(() => verdicts.verifyEnvelope(env, pub)); // by default only AMEP verdict statements are accepted
+  assert.equal(verdicts.verifyEnvelope(env, pub, [verdicts.PREDICATE_TYPE, verdicts.SVR_TYPE]).predicateType, verdicts.SVR_TYPE);
+});

@@ -10,6 +10,7 @@ in-toto and Sigstore tooling can store and check AMEP verdicts.
 from __future__ import annotations
 
 import base64
+import datetime
 import hashlib
 
 from cryptography.exceptions import InvalidSignature
@@ -20,6 +21,9 @@ from .core import canon, ed25519_strict_ok, parse_strict, verdict
 PREDICATE_TYPE = "https://github.com/stafordtituss/amep/verdict/v0.3"
 STATEMENT_TYPE = "https://in-toto.io/Statement/v1"
 PAYLOAD_TYPE = "application/vnd.in-toto+json"
+SVR_TYPE = "https://in-toto.io/attestation/svr/v0.2"
+SVR_PRESERVED = "AMEP_VERDICT_PRESERVED"
+RULES_URI = "https://github.com/stafordtituss/amep/blob/main/spec/amep-v0.2.md"
 
 
 def _result(r) -> dict:
@@ -49,6 +53,28 @@ def statement(packet_bytes: bytes, keys: dict, results: list, verifier: dict | N
             "predicateType": PREDICATE_TYPE, "predicate": rec}
 
 
+def svr_statement(packet_bytes: bytes, keys: dict, results: list, verifier_id: str, time_created: str | None = None) -> dict:
+    """The same verdict as an in-toto Simple Verification Result (SVR v0.2), for policy engines that consume SVRs.
+
+    An SVR lists the properties that passed. The only AMEP property is AMEP_VERDICT_PRESERVED, present when the packet
+    verdict is preserved; a violated or unresolved packet gets an SVR with no properties, and the AMEP verdict record
+    (statement()) carries the outcome, blame and gaps. The policies are the key set and the AMEP evaluation rules.
+    Unlike the verdict record, an SVR is not deterministic: it names its verifier and the time of verification."""
+    if time_created is None:
+        time_created = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    from . import SPEC_VERSION
+    passed = verdict(results).outcome == "preserved"
+    return {"_type": STATEMENT_TYPE,
+            "subject": [{"name": "amep-packet", "digest": {"sha256": hashlib.sha256(packet_bytes).hexdigest()}}],
+            "predicateType": SVR_TYPE,
+            "predicate": {
+                "verifier": {"id": verifier_id, "policies": [
+                    {"name": "amep-keyset", "digest": {"sha256": hashlib.sha256(canon(keys)).hexdigest()}},
+                    {"name": f"amep-{SPEC_VERSION}", "uri": RULES_URI}]},
+                "timeCreated": time_created,
+                "properties": [SVR_PRESERVED] if passed else []}}
+
+
 def _pae(payload_type: str, payload: bytes) -> bytes:
     """DSSE pre-authentication encoding: "DSSEv1" SP len(type) SP type SP len(body) SP body."""
     t = payload_type.encode("utf-8")
@@ -63,8 +89,9 @@ def sign_envelope(stmt: dict, signer, keyid: str) -> dict:
             "signatures": [{"keyid": keyid, "sig": base64.b64encode(sig).decode()}]}
 
 
-def verify_envelope(env: dict, public_keys: dict) -> dict:
+def verify_envelope(env: dict, public_keys: dict, predicate_types: tuple = (PREDICATE_TYPE,)) -> dict:
     """Check a DSSE envelope against {keyid: public key hex}; returns the statement. Raises ValueError otherwise.
+    Only AMEP verdict statements are accepted unless `predicate_types` says otherwise, e.g. (PREDICATE_TYPE, SVR_TYPE).
     The same exact Ed25519 acceptance rule as for AMEP objects applies (spec 12.2)."""
     if env.get("payloadType") != PAYLOAD_TYPE:
         raise ValueError("not an in-toto payload")
@@ -82,7 +109,7 @@ def verify_envelope(env: dict, public_keys: dict) -> dict:
         except InvalidSignature:
             continue
         stmt = parse_strict(payload.decode("utf-8"))
-        if stmt.get("_type") != STATEMENT_TYPE or stmt.get("predicateType") != PREDICATE_TYPE:
-            raise ValueError("not an AMEP verdict statement")
+        if stmt.get("_type") != STATEMENT_TYPE or stmt.get("predicateType") not in predicate_types:
+            raise ValueError(f"predicate type {stmt.get('predicateType')!r} is not one of {list(predicate_types)}")
         return stmt
     raise ValueError("no signature verifies with the given keys")

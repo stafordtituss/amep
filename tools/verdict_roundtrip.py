@@ -36,13 +36,18 @@ def main():
     json.dump({k.kid: k.public_entry()["x"]}, open(pub, "w"))
 
     py_env, js_env = os.path.join(d, "py.env.json"), os.path.join(d, "js.env.json")
+    py_svr, js_svr = os.path.join(d, "py.svr.json"), os.path.join(d, "js.svr.json")
     sign = ["--keys", KEYS, "--sign-with", key_file, "--sign-kid", k.kid]
-    run([sys.executable, "-m", "amep_protocol.cli", "verify", packet, "--verdict-out", py_env, *sign])
-    run(["node", os.path.join("packages", "js", "bin", "amep-protocol.mjs"), "verify", packet, "--verdict-out", js_env, *sign])
+    run([sys.executable, "-m", "amep_protocol.cli", "verify", packet, "--verdict-out", py_env, "--svr-out", py_svr, *sign])
+    run(["node", os.path.join("packages", "js", "bin", "amep-protocol.mjs"), "verify", packet, "--verdict-out", js_env,
+         "--svr-out", js_svr, *sign])
 
     ok = True
-    for label, envf, checker in (("Python-signed, checked by JS", py_env, ["node", os.path.join("tools", "verify_verdict.mjs")]),
-                                 ("JS-signed, checked by Python", js_env, [sys.executable, os.path.join("tools", "verify_verdict.py")])):
+    js_check, py_check = ["node", os.path.join("tools", "verify_verdict.mjs")], [sys.executable, os.path.join("tools", "verify_verdict.py")]
+    for label, envf, checker in (("Python-signed verdict, checked by JS", py_env, js_check),
+                                 ("JS-signed verdict, checked by Python", js_env, py_check),
+                                 ("Python-signed SVR, checked by JS", py_svr, js_check),
+                                 ("JS-signed SVR, checked by Python", js_svr, py_check)):
         if not os.path.exists(envf):
             print(f"FAIL {label}: no envelope written"); ok = False; continue
         r = run([*checker, envf, pub])
@@ -56,6 +61,14 @@ def main():
         same = a == b
         print(("ok   " if same else "FAIL ") + f"signed statements identical apart from the verifier ({names[0]} / {names[1]})")
         ok = same
+        # SVRs: identical apart from verifier.id and timeCreated, which name the tool and the time
+        a = json.loads(base64.b64decode(json.load(open(py_svr))["payload"]))
+        b = json.loads(base64.b64decode(json.load(open(js_svr))["payload"]))
+        ids = (a["predicate"]["verifier"].pop("id"), b["predicate"]["verifier"].pop("id"))
+        a["predicate"].pop("timeCreated"); b["predicate"].pop("timeCreated")
+        same = a == b
+        print(("ok   " if same else "FAIL ") + f"SVRs identical apart from verifier id and time ({ids[0]} / {ids[1]}); properties {a['predicate']['properties']}")
+        ok = ok and same
     return 0 if ok else 1
 
 

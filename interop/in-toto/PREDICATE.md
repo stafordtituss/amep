@@ -40,7 +40,9 @@ The predicate carries that conclusion as an attestation about the evidence packe
   - a digest of the key set the evidence was verified against, without which the outcome isn't reproducible.
 - **Test Result** records pass, warn or fail for a test run. It has the same limits as VSA, and the subject would be a test configuration rather than evidence.
 
-A VSA could reference an AMEP verdict among its inputs. Each predicate answers its own question.
+- **Simple Verification Result (SVR)** records the properties that passed, and by design doesn't carry what's needed to reproduce the result. It has the same limits as VSA.
+
+The predicates compose. Both reference verifiers also publish the verdict as an SVR (`verify --svr-out`), with the property `AMEP_VERDICT_PRESERVED` when the packet is preserved and none otherwise, for policy engines that only read SVRs. The AMEP verdict carries the detail when the outcome is anything else.
 
 ## Prerequisites
 

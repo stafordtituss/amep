@@ -1,6 +1,7 @@
 """amep-protocol command-line tool.
 
   amep-protocol verify PACKET --keys KEYS [--state FILE] [--state-out FILE] [--protected PATH ...] [--json]
+                         [--verdict-out FILE] [--svr-out FILE [--verifier-id URI]] [--sign-with KEY --sign-kid KID]
   amep-protocol check-suite DIR
   amep-protocol keygen --kid KID --roles issuer,approver --out PREFIX
   amep-protocol sign OBJECT --key PEM --kid KID [--roles ROLES]
@@ -48,6 +49,14 @@ def cmd_verify(a):
             stmt = sign_envelope(stmt, signer._key, signer.kid)
         with open(a.verdict_out, "w", encoding="utf-8") as f:
             json.dump(stmt, f, indent=1)
+    if a.svr_out:   # the same verdict as an in-toto Simple Verification Result, for policy engines that read SVRs
+        from .verdicts import sign_envelope, svr_statement
+        svr = svr_statement(data, keys, results, a.verifier_id or f"https://pypi.org/project/amep-protocol/{__version__}/")
+        if a.sign_with:
+            signer = sdk.Key.from_pem(open(a.sign_with, "rb").read(), a.sign_kid or "verifier", ["observer"])
+            svr = sign_envelope(svr, signer._key, signer.kid)
+        with open(a.svr_out, "w", encoding="utf-8") as f:
+            json.dump(svr, f, indent=1)
     if a.json:
         print(json.dumps({"verdict": {"outcome": v.outcome, "invariant": v.invariant, "reason": v.reason},
                           "results": [r.__dict__ for r in results]}, indent=1))
@@ -115,6 +124,8 @@ def main(argv=None) -> int:
     v.add_argument("--verdict-out", help="write the verdict as an in-toto statement (spec 10.8)")
     v.add_argument("--sign-with", help="Ed25519 key file (PKCS#8) to sign the statement in a DSSE envelope")
     v.add_argument("--sign-kid", help="key id to record in the DSSE signature")
+    v.add_argument("--svr-out", help="also write the verdict as an in-toto Simple Verification Result")
+    v.add_argument("--verifier-id", help="verifier URI for the SVR (default: this package's PyPI URL)")
     v.set_defaults(fn=cmd_verify)
     c = sub.add_parser("check-suite", help="run a conformance suite directory")
     c.add_argument("dir")

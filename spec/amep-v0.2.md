@@ -927,6 +927,8 @@ The record is the predicate of an in-toto Statement v1 [IN-TOTO], with predicate
 
 A signed record is the statement's JCS form carried in a DSSE envelope [DSSE] with payload type `application/vnd.in-toto+json`, signed with Ed25519 over the DSSE pre-authentication encoding. The strict acceptance rule of Section 12.2 applies to its signatures. A verifier of an envelope MUST check the signature before parsing the payload, and MUST parse the payload under the rules of Section 12.1.
 
+For policy engines that consume in-toto Simple Verification Results [SVR], a verifier MAY also publish the verdict as an SVR (predicate type `https://in-toto.io/attestation/svr/v0.2`) about the same subject. Its only AMEP property is `AMEP_VERDICT_PRESERVED`, listed when the packet verdict is `preserved`; a `violated` or `unresolved` packet gets an SVR with no properties, and the verdict record carries the detail. Its `verifier.policies` name the key set (by the same digest as `keyset.sha256`) and the AMEP version whose rules were applied. An SVR names its verifier and the time of verification, so it is not deterministic; with `verifier.id` and `timeCreated` removed, two conforming verifiers produce identical SVRs.
+
 A verdict record is a statement by its signer, not evidence of what the agent did. It does not take the place of the packet in a dispute: the packet is the evidence and the record is one verifier's reading of it.
 
 ---
@@ -1271,6 +1273,7 @@ The file names in Appendix B, without extension, are stable identifiers.
 - **[VC-DM-2]** W3C Verifiable Credentials Data Model 2.0.
 - **[IN-TOTO]** in-toto Attestation Framework, Statement v1.
 - **[DSSE]** Dead Simple Signing Envelope, v1.
+- **[SVR]** in-toto Attestation Framework, Simple Verification Result predicate, v0.2.
 
 ---
 

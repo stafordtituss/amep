@@ -11,6 +11,7 @@ Specification drafts, conformance-suite versions and package versions are listed
   - Both CLIs: `verify --verdict-out FILE` writes the statement; with `--sign-with KEY --sign-kid KID` it writes a signed envelope.
   - `tools/compare_verifiers.py` now also checks byte-identical statements (240/240 vectors); `tools/verdict_roundtrip.py` signs with each CLI and checks each envelope with the other language.
   - `interop/in-toto/PREDICATE.md`: the predicate written up for a proposal to in-toto/attestation, with a generated example.
+  - The same verdict as an in-toto Simple Verification Result (SVR v0.2), for policy engines that read SVRs: property `AMEP_VERDICT_PRESERVED` when the packet is preserved, none otherwise; policies are the key set and the AMEP version. `svr_statement`/`svrStatement`, and `verify --svr-out FILE [--verifier-id URI]` in both CLIs. `tools/compare_verifiers.py` checks byte-identical SVRs (fixed verifier id and time) over all 240 vectors.
 - **`amep-conformance import`:** a profile for OpenID DA execution layer action receipts (`oidf-action-receipt`), with the execution layer's §9.1 travel-agent scenario as tests.
 
 ## Payment-limit fixes from review amep#10 (packages 0.3.0a1 / 0.3.0-alpha.1, 2026-11-22)

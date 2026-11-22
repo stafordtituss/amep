@@ -177,3 +177,48 @@ class VerdictStatementTest(unittest.TestCase):
                                 os.path.join(d, "env.json"), os.path.join(d, "pub.json")], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertIn("verified: violated I2", r.stdout)
+
+
+class SvrStatementTest(unittest.TestCase):
+    """The same verdict as an in-toto Simple Verification Result (SVR v0.2)."""
+
+    def _load(self, sub, name):
+        here = os.path.dirname(os.path.abspath(__file__))
+        f = os.path.join(here, "..", "..", "..", "vectors", sub, name)
+        if not os.path.exists(f):
+            self.skipTest("conformance vectors not present")
+        keys = json.load(open(os.path.join(here, "..", "..", "..", "vectors", "keys.json")))
+        return json.dumps(json.load(open(f))["packet"]).encode(), keys
+
+    def test_preserved_violated_and_unresolved(self):
+        from amep_protocol import SPEC_VERSION, canon, evaluate_text, verdicts
+        positive = os.listdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "vectors", "positive"))
+        cases = [("positive", sorted(positive)[0], [verdicts.SVR_PRESERVED]),
+                 ("must-reject", "payment-over-the-per-call-limit-without-approval.json", []),
+                 ("must-reject", "missing-effect-receipt.json", [])]
+        for sub, name, props in cases:
+            data, keys = self._load(sub, name)
+            res = evaluate_text(data.decode(), keys)
+            s = verdicts.svr_statement(data, keys, res, "https://example.com/v", "2026-11-22T00:00:00Z")
+            self.assertEqual(s["predicateType"], "https://in-toto.io/attestation/svr/v0.2")
+            self.assertEqual(s["predicate"]["properties"], props, name)
+            self.assertEqual(s["predicate"]["timeCreated"], "2026-11-22T00:00:00Z")
+            self.assertEqual(s["predicate"]["verifier"]["id"], "https://example.com/v")
+            pol = s["predicate"]["verifier"]["policies"]
+            self.assertEqual(pol[0]["digest"]["sha256"], hashlib.sha256(canon(keys)).hexdigest())
+            self.assertEqual(pol[1]["name"], f"amep-{SPEC_VERSION}")
+            self.assertEqual(s["subject"], verdicts.statement(data, keys, res)["subject"])
+
+    def test_default_time_is_rfc3339_utc_and_svr_envelopes_verify(self):
+        import re
+        from amep_protocol import evaluate_text, verdicts
+        data, keys = self._load("must-reject", "payment-over-the-per-call-limit-without-approval.json")
+        s = verdicts.svr_statement(data, keys, evaluate_text(data.decode(), keys), "https://example.com/v")
+        self.assertRegex(s["predicate"]["timeCreated"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+        k = sdk.Key.generate("verifier-1", ["observer"])
+        env = verdicts.sign_envelope(s, k._key, k.kid)
+        pub = {k.kid: k.public_entry()["x"]}
+        with self.assertRaises(ValueError):   # by default only AMEP verdict statements are accepted
+            verdicts.verify_envelope(env, pub)
+        both = (verdicts.PREDICATE_TYPE, verdicts.SVR_TYPE)
+        self.assertEqual(verdicts.verify_envelope(env, pub, both)["predicateType"], verdicts.SVR_TYPE)

@@ -9,6 +9,10 @@ import { canon, verdict, ed25519StrictOk, parseStrict } from "./core.mjs";
 export const PREDICATE_TYPE = "https://github.com/stafordtituss/amep/verdict/v0.3";
 export const STATEMENT_TYPE = "https://in-toto.io/Statement/v1";
 export const PAYLOAD_TYPE = "application/vnd.in-toto+json";
+export const SVR_TYPE = "https://in-toto.io/attestation/svr/v0.2";
+export const SVR_PRESERVED = "AMEP_VERDICT_PRESERVED";
+export const RULES_URI = "https://github.com/stafordtituss/amep/blob/main/spec/amep-v0.2.md";
+const SPEC_VERSION = "0.3.0-draft.1";
 
 const sha256 = b => createHash("sha256").update(b).digest("hex");
 const resultOf = r => ({ id: r.id, outcome: r.outcome, invariant: r.invariant, blame: r.blame ?? null, gaps: [...(r.gaps ?? [])] });
@@ -33,6 +37,21 @@ export function statement(packetBytes, keys, results, verifier) {
     predicateType: PREDICATE_TYPE, predicate };
 }
 
+/** The same verdict as an in-toto Simple Verification Result (SVR v0.2), for policy engines that consume SVRs.
+ * The only AMEP property is AMEP_VERDICT_PRESERVED, present when the packet verdict is preserved; the verdict record
+ * (statement) carries the outcome, blame and gaps. Not deterministic: it names its verifier and the time. */
+export function svrStatement(packetBytes, keys, results, verifierId, timeCreated) {
+  timeCreated ??= new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+  const passed = verdict(results).outcome === "preserved";
+  return { _type: STATEMENT_TYPE, subject: [{ name: "amep-packet", digest: { sha256: sha256(packetBytes) } }],
+    predicateType: SVR_TYPE,
+    predicate: {
+      verifier: { id: verifierId, policies: [
+        { name: "amep-keyset", digest: { sha256: sha256(Buffer.from(canon(keys), "utf8")) } },
+        { name: `amep-${SPEC_VERSION}`, uri: RULES_URI }] },
+      timeCreated, properties: passed ? [SVR_PRESERVED] : [] } };
+}
+
 // DSSE pre-authentication encoding: "DSSEv1" SP len(type) SP type SP len(body) SP body
 const pae = (type, body) => Buffer.concat([Buffer.from(`DSSEv1 ${Buffer.byteLength(type)} ${type} ${body.length} `), body]);
 
@@ -43,8 +62,9 @@ export function signEnvelope(stmt, privateKey, keyid) {
   return { payloadType: PAYLOAD_TYPE, payload: payload.toString("base64"), signatures: [{ keyid, sig: sig.toString("base64") }] };
 }
 
-/** Check a DSSE envelope against {keyid: public key hex}; returns the statement, or throws. */
-export function verifyEnvelope(env, publicKeys) {
+/** Check a DSSE envelope against {keyid: public key hex}; returns the statement, or throws. Only AMEP verdict
+ * statements are accepted unless predicateTypes says otherwise, e.g. [PREDICATE_TYPE, SVR_TYPE]. */
+export function verifyEnvelope(env, publicKeys, predicateTypes = [PREDICATE_TYPE]) {
   if (env?.payloadType !== PAYLOAD_TYPE) throw new Error("not an in-toto payload");
   const payload = Buffer.from(env.payload, "base64");
   for (const s of env.signatures || []) {
@@ -55,7 +75,7 @@ export function verifyEnvelope(env, publicKeys) {
     const pub = createPublicKey({ key: Buffer.concat([Buffer.from("302a300506032b6570032100", "hex"), Buffer.from(x, "hex")]), format: "der", type: "spki" });
     if (!edVerify(null, pae(PAYLOAD_TYPE, payload), pub, sig)) continue;
     const stmt = parseStrict(payload.toString("utf8"));
-    if (stmt._type !== STATEMENT_TYPE || stmt.predicateType !== PREDICATE_TYPE) throw new Error("not an AMEP verdict statement");
+    if (stmt._type !== STATEMENT_TYPE || !predicateTypes.includes(stmt.predicateType)) throw new Error(`predicate type ${stmt.predicateType} is not one of ${predicateTypes.join(", ")}`);
     return stmt;
   }
   throw new Error("no signature verifies with the given keys");

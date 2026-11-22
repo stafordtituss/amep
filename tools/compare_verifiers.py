@@ -11,7 +11,7 @@ import sys
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, os.path.join(ROOT, "packages", "python", "src"))
 from amep_protocol.core import canon, evaluate, evaluate_text  # noqa: E402
-from amep_protocol.verdicts import statement  # noqa: E402
+from amep_protocol.verdicts import statement, svr_statement  # noqa: E402
 
 SUITES = ["vectors", "interop/approval-path-attacks", "interop/w3c-agent-identity/delegation-continuity"]
 
@@ -55,7 +55,9 @@ def statements():
                 data = open(pf, "rb").read()
                 st = json.loads(json.dumps(v["state"])) if v.get("state") else None
                 res = evaluate_text(data.decode("utf-8", "surrogatepass"), keys, state=json.loads(json.dumps(st)) if st else None)
-                mine[name] = hashlib.sha256(canon(statement(data, keys, res))).hexdigest()
+                h = lambda x: hashlib.sha256(canon(x)).hexdigest()  # noqa: E731
+                mine[name] = [h(statement(data, keys, res)),
+                              h(svr_statement(data, keys, res, "urn:amep:compare", "2026-01-01T00:00:00Z"))]
                 manifest[name] = {"packet": pf, "keys": keys_path, "state": st}
     mf = os.path.join(tmp, "manifest.json")
     json.dump(manifest, open(mf, "w"))
@@ -74,11 +76,15 @@ def main():
         print(f"DIFFER {k}\n  python: {py[k]}\n  js:     {js.get(k)}")
     print(f"{len(py) - len(bad)}/{len(py)} vectors ({results} results): both verifiers agree on outcome, invariant, blame and gaps")
     sp, sj = statements()
-    sbad = [k for k in sp if sp[k] != sj.get(k)]
+    sbad = [k for k in sp if sp[k][0] != (sj.get(k) or [None])[0]]
+    vbad = [k for k in sp if sp[k][1] != (sj.get(k) or [None, None])[1]]
     for k in sbad[:10]:
         print(f"STATEMENT DIFFERS {k}")
+    for k in vbad[:10]:
+        print(f"SVR DIFFERS {k}")
     print(f"{len(sp) - len(sbad)}/{len(sp)} vectors: both verifiers produce byte-identical verdict statements")
-    return 1 if bad or sbad else 0
+    print(f"{len(sp) - len(vbad)}/{len(sp)} vectors: both verifiers produce byte-identical SVRs (fixed verifier id and time)")
+    return 1 if bad or sbad or vbad else 0
 
 
 if __name__ == "__main__":

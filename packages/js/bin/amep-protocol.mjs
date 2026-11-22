@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // amep-protocol command-line tool (JavaScript). Same commands and exit codes as the Python package:
 //   amep-protocol verify PACKET --keys KEYS [--state FILE] [--state-out FILE] [--protected PATH ...] [--json]
+//                          [--verdict-out FILE] [--svr-out FILE [--verifier-id URI]] [--sign-with KEY --sign-kid KID]
 //   amep-protocol check-suite DIR
 //   amep-protocol keygen --kid KID --roles issuer,approver --out PREFIX
 //   amep-protocol sign OBJECT --key PEM --kid KID [--roles ROLES]
@@ -13,7 +14,7 @@ import { parseArgs } from "node:util";
 import { evaluate, evaluateText, verdict, approvalDigest, parseStrict } from "../src/core.mjs";
 import { sigOk, Key, ROLES } from "../src/node.mjs";
 import { VERSION, SPEC_VERSION } from "../src/index.mjs";
-import { statement, signEnvelope } from "../src/verdict.mjs";
+import { statement, signEnvelope, svrStatement } from "../src/verdict.mjs";
 
 const EXIT = { preserved: 0, violated: 1, unresolved: 2 };
 const load = p => parseStrict(readFileSync(p === "-" ? 0 : p, "utf8"));   // spec 12.1: strict number literals
@@ -25,7 +26,7 @@ function run(argv) {
     keys: { type: "string" }, state: { type: "string" }, "state-out": { type: "string" },
     protected: { type: "string", multiple: true }, json: { type: "boolean" },
     kid: { type: "string" }, roles: { type: "string" }, out: { type: "string" }, key: { type: "string" },
-    "verdict-out": { type: "string" }, "sign-with": { type: "string" }, "sign-kid": { type: "string" } } });
+    "verdict-out": { type: "string" }, "sign-with": { type: "string" }, "sign-kid": { type: "string" }, "svr-out": { type: "string" }, "verifier-id": { type: "string" } } });
   switch (cmd) {
     case "verify": {
       if (!pos[0] || !o.keys) throw new Error("usage: amep-protocol verify PACKET --keys KEYS");
@@ -39,6 +40,11 @@ function run(argv) {
         let stmt = statement(bytes, keySet, results, { name: "@stafordtituss/amep", version: VERSION });
         if (o["sign-with"]) { const k = Key.fromPem(readFileSync(o["sign-with"]), o["sign-kid"] || "verifier", ["observer"]); stmt = signEnvelope(stmt, k.keyObject, k.kid); }
         writeFileSync(o["verdict-out"], JSON.stringify(stmt, null, 1));
+      }
+      if (o["svr-out"]) { // the same verdict as an in-toto Simple Verification Result, for policy engines that read SVRs
+        let svr = svrStatement(bytes, keySet, results, o["verifier-id"] || `https://www.npmjs.com/package/@stafordtituss/amep/v/${VERSION}`);
+        if (o["sign-with"]) { const k = Key.fromPem(readFileSync(o["sign-with"]), o["sign-kid"] || "verifier", ["observer"]); svr = signEnvelope(svr, k.keyObject, k.kid); }
+        writeFileSync(o["svr-out"], JSON.stringify(svr, null, 1));
       }
       if (o.json) console.log(JSON.stringify({ verdict: v, results }, null, 1));
       else { for (const r of results) console.log(`${r.id}\t${r.outcome}\t${r.invariant}\t${r.reason}`); console.log(`verdict: ${v.outcome} ${v.invariant}`); }
