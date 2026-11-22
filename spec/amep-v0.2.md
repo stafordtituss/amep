@@ -844,6 +844,39 @@ The **packet verdict** is:
 
 Its **deciding invariant** is that of the first result, in result order, with the verdict's outcome. Verifiers MUST report every result, not only the verdict.
 
+#### 10.5.1 Blame and evidence gaps *(v0.3)*
+
+Each result carries two further members. Both are derived only from the signed evidence. A Verifier MUST NOT infer blame that the evidence does not show.
+
+**`blame`** (on `violated` results; otherwise null) names the party whose own signed record is the first to depart from authority:
+
+| Value | Meaning | Examples |
+|---|---|---|
+| `agent` | The acting agent asked for, or acted on, something the authority did not allow. Its request was declared through the host. | Effect outside claims (I2), release (I5), guardrail target (I9), untrusted influence (I4), approval misuse (I8), limits and budgets exceeded, acting after revocation (I6) |
+| `delegator` | A delegation widened what its parent granted. | Attenuation (I1) |
+| `host` | The host or PEP failed at its own role. | An effect despite its signed deny (I11), a bypass (I11), quarantined content passed on (I4), a recorded spend that doesn't match (I7) |
+| `transport` | The call the server received differs from the one the host signed. | `args_digest` mismatch (Section 5.14) |
+| `server` | The executing party's own records contradict the authorized call, or each other. | Declared ≠ executed, or mediated ≠ executed (I2); receipts contradicting `not_executed` (I11); more receipts than its call statement counts, or an inconsistent period total (I7) |
+
+**`gaps`** (on `unresolved` results; otherwise empty) lists the evidence that would let the evaluation continue, as `{need, ref}`. `ref` is the id of the object concerned, or `-`. Values of `need`:
+
+| Value | Meaning |
+|---|---|
+| `well_formed_packet` / `well_formed_evidence` | The packet or an object is malformed (Section 12.1). A corrected packet is needed. |
+| `root_mandate`, `intent`, `lineage`, `invocation` | A referenced object is missing. |
+| `signature`, `receipt_signature`, `call_statement_signature`, `revocation_signature` | A required signature is missing or invalid, or the signer lacks the role. |
+| `interpretation`, `interpretation_pin` | An approved interpretation, or the pinned adapter revision, is needed (I3). |
+| `revocation_status`, `revocation_settled` | A fresh signed status is needed, or the revocation's propagation window must end (I6). |
+| `receipt`, `receipt_observer`, `receipt_binding` | A receipt is missing, names no observer, or is bound to another invocation. |
+| `call_statement`, `call_statement_binding`, `unaltered_call` | A well-formed call statement bound to this invocation is needed, or a call that arrived unaltered. |
+| `actor`, `independent_observer` | The actor, or an observer other than the actor, is needed (I10). |
+| `principal_confirmation` | The principal's confirmation of an influenced action is needed (I4). |
+| `approval` | A signed approval is needed. |
+| `value`, `period_total` | A quantity in the limited unit, or a period total from the counting observer or earlier state, is needed (Section 7.6). |
+| `verifier_support` | The packet uses a claim member this Verifier does not implement (Section 16). |
+
+Both reference verifiers return identical `blame` and `gaps` for every result of every conformance vector, which `tools/compare_verifiers.py` checks.
+
 ### 10.6 Lineage checks
 
 Section 10.2 also applies these lineage checks (Section 5.9.1):

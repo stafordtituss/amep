@@ -2,6 +2,12 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## Blame and evidence gaps (unreleased, 2026-11-22)
+
+- **Spec 10.5.1:** every result now carries `blame` and `gaps`. On a `violated` result, `blame` names the party whose own signed record first departs from authority: `agent`, `delegator`, `host`, `transport` or `server`. On an `unresolved` result, `gaps` names the evidence that would let the evaluation continue (`{need, ref}`, from a fixed set of values). Both are derived from the signed evidence only.
+- **`tools/compare_verifiers.py`:** a differential check that both reference verifiers return the same outcome, invariant, blame and gaps for every result of every vector, not only the same verdict. It agrees on all 258 results of the 240 vectors in the three suites.
+- **`amep-conformance import`:** a profile for OpenID DA execution layer action receipts (`oidf-action-receipt`), with the execution layer's §9.1 travel-agent scenario as tests.
+
 ## Payment-limit fixes from review amep#10 (packages 0.3.0a1 / 0.3.0-alpha.1, 2026-11-22)
 
 Found by Carlos Vendrell Felici (Zealynx Security) in an independent review of the v0.3 limits, stafordtituss/amep#10, with signed packets checked against both reference verifiers. All fixed in both verifiers; suite now 204 vectors.

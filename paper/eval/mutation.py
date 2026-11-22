@@ -81,10 +81,10 @@ def mutants(src):
     for i, l in enumerate(lines, 1):
         if in_fn(i, *eval_fns) and "_check(" in l and "def _check" not in l:
             inv = re.search(r'"(I\d+)"', l + (lines[i] if i < len(lines) else ""))
-            yield ("CHECK", i, inv.group(1) if inv else "?", l.replace("_check(", "(lambda *a: None)(", 1))
+            yield ("CHECK", i, inv.group(1) if inv else "?", l.replace("_check(", "(lambda *a, **k: None)(", 1))
         if in_fn(i, "evaluate") and re.search(r'out\.append\(Result\([^)]*"(violated)"', l):
             inv = re.search(r'"(I\d+)"', l)
-            yield ("CHECK", i, inv.group(1), l.replace("out.append(", "(lambda *a: None)(", 1))
+            yield ("CHECK", i, inv.group(1), l.replace("out.append(", "(lambda *a, **k: None)(", 1))
     # RULE: rejection rules of the claim algebra and the signer-role rule
     for i, l in enumerate(lines, 1):
         if in_fn(i, "narrower", "effect_ok") and "return False" in l:
@@ -169,8 +169,8 @@ EQUIVALENT = {
     'if parent["depth"] == 0: return False, "parent may not be delegated (depth 0)"',
     # v0.3: without these two explicit checks the next statement indexes the missing or non-object value and raises,
     # which evaluate() turns into the same unresolved (I7). Kept for clear reasons; vectors cover both paths.
-    '_check(not isinstance(v, dict), "unresolved", "I7", "value must be an object")',
-    '_check(v is None, "unresolved", "I7", f"{n[\'id\']} limits this effect but the receipt records no value")',
+    '_check(not isinstance(v, dict), "unresolved", "I7", "value must be an object", need="value"',
+    '_check(v is None, "unresolved", "I7", f"{n[\'id\']} limits this effect but the receipt records no value"',
 }
 
 

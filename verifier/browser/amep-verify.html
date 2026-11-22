@@ -82,8 +82,16 @@ const COST_BASE = { read: 0, write_local: 1, write_shared: 3, external_send: 5, 
 const DATA_MULT = { public: 1, internal: 1, source: 1, confidential: 2, secret: 5, phi: 5, pci: 5 };
 
 class Malformed extends Error {}
-class Stop { constructor(outcome, invariant, reason) { Object.assign(this, { outcome, invariant, reason }); } }
-const check = (cond, outcome, invariant, reason) => { if (cond) throw new Stop(outcome, invariant, reason); };
+// spec 10.5 (v0.3): a violation names the party whose own signed record departs from authority; an unresolved result
+// names the one piece of evidence that would let the evaluation continue
+class Stop {
+  constructor(outcome, invariant, reason, { blame, need, ref } = {}) {
+    Object.assign(this, { outcome, invariant, reason, blame: outcome === "violated" ? blame ?? null : null,
+      gaps: outcome === "unresolved" && need ? [{ need, ref: String(ref) }] : [] });
+  }
+}
+const check = (cond, outcome, invariant, reason, tags) => { if (cond) throw new Stop(outcome, invariant, reason, tags); };
+const result = (id, outcome, invariant, reason, blame = null, gaps = []) => ({ id, outcome, invariant, reason, blame, gaps });
 
 const isGuardrail = (res, extra = []) => {
   const r = "/" + res.replace("~", "home").replace(/^\/+/, "");
@@ -401,15 +409,15 @@ const fmt = n => String(n); // Python's :g for the integer and short decimal tim
 // read on entry and updated on exit, so approval single use, risk budgets and period limits hold across packets.
 const allUnresolved = (pk, reason) => {
   const ids = (pk.invocations || []).map(i => (i && typeof i === "object" && i.id) || "?");
-  return (ids.length ? ids : ["-"]).map(id => ({ id, outcome: "unresolved", invariant: "I7", reason }));
+  return (ids.length ? ids : ["-"]).map(id => result(id, "unresolved", "I7", reason, null, [{ need: "well_formed_packet", ref: "-" }]));
 };
 function evaluateText(text, keys, sigOk, extraProtected = [], state = {}) {
   let pk;
-  try { pk = parseStrict(text); } catch (e) { return [{ id: "-", outcome: "unresolved", invariant: "I7", reason: `malformed packet text: ${e.message}` }]; }
+  try { pk = parseStrict(text); } catch (e) { return [result("-", "unresolved", "I7", `malformed packet text: ${e.message}`, null, [{ need: "well_formed_packet", ref: "-" }])]; }
   return evaluate(pk, keys, sigOk, extraProtected, state);
 }
 function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
-  if (!pk || typeof pk !== "object" || Array.isArray(pk)) return [{ id: "-", outcome: "unresolved", invariant: "I7", reason: "packet is not a JSON object" }];
+  if (!pk || typeof pk !== "object" || Array.isArray(pk)) return [result("-", "unresolved", "I7", "packet is not a JSON object", null, [{ need: "well_formed_packet", ref: "-" }])];
   let bad = unsafeNumber(pk);
   if (bad) return allUnresolved(pk, `number outside the I-JSON range at ${bad}`); // spec 12.1
   bad = malformedReason(pk);
@@ -465,12 +473,12 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     const id = inv.id ?? "?";
     try {
       const leaked = (inv.influenced_by || []).filter(f => quarantined.has(f) && n > quarantined.get(f));
-      check(leaked.length > 0 && !inv.principal_confirmed, "violated", "I4", `quarantined content reached the agent (${leaked.join(", ")})`);
+      check(leaked.length > 0 && !inv.principal_confirmed, "violated", "I4", `quarantined content reached the agent (${leaked.join(", ")})`, { blame: "host" });
       evalInvocation(inv);
-      out.push({ id, outcome: "preserved", invariant: "-", reason: "continuity preserved" });
+      out.push(result(id, "preserved", "-", "continuity preserved"));
     } catch (e) {
-      if (e instanceof Stop) out.push({ id, outcome: e.outcome, invariant: e.invariant, reason: e.reason });
-      else out.push({ id, outcome: "unresolved", invariant: "I7", reason: `malformed evidence: ${e.message}` });
+      if (e instanceof Stop) out.push(result(id, e.outcome, e.invariant, e.reason, e.blame, e.gaps));
+      else out.push(result(id, "unresolved", "I7", `malformed evidence: ${e.message}`, null, [{ need: "well_formed_evidence", ref: String(id) }]));
     }
   }
 
@@ -478,17 +486,17 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     const id = inv.id, tInv = toTime(inv.t);
     const chain = []; const seen = new Set(); let n = objs[inv.authority_ref];
     while (n && !seen.has(n.id)) { seen.add(n.id); chain.unshift(n); n = objs[n.parent]; }
-    check(!chain.length || chain[0].kind !== "mandate", "unresolved", "I7", "no root mandate");
+    check(!chain.length || chain[0].kind !== "mandate", "unresolved", "I7", "no root mandate", { need: "root_mandate", ref: inv.authority_ref ?? "-" });
     const interp = objs[inv.interpretation_ref];
     const needed = [...chain, inv, ...(interp ? [interp] : [])];
     let intent = null;
     if ("intent_ref" in inv) {
       intent = objs[inv.intent_ref];
-      check(!intent || intent.kind !== "intent", "unresolved", "I7", "cited intent not found");
+      check(!intent || intent.kind !== "intent", "unresolved", "I7", "cited intent not found", { need: "intent", ref: inv.intent_ref ?? "-" });
       needed.push(intent);
     }
-    check(needed.some(o => !verify(o)), "unresolved", "I7", "missing or invalid signature, or signer lacks the role");
-    check((inv.derived_from || []).some(j => (order.get(j) ?? order.get(id)) >= order.get(id)), "unresolved", "I7", "lineage reference not found among earlier invocations");
+    check(needed.some(o => !verify(o)), "unresolved", "I7", "missing or invalid signature, or signer lacks the role", { need: "signature", ref: id });
+    check((inv.derived_from || []).some(j => (order.get(j) ?? order.get(id)) >= order.get(id)), "unresolved", "I7", "lineage reference not found among earlier invocations", { need: "lineage", ref: id });
     // claim members (spec 16, v0.3): an unknown claim member may be a constraint this verifier cannot enforce, so it
     // is never ignored. Limits are validated wherever they appear.
     const nodes = [...chain, ...(intent ? [intent] : [])];
@@ -496,18 +504,18 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     for (const x of limited) checkLimits(x.claims.limits);
     if (v03) for (const x of nodes) {
       let unknown = Object.keys(x.claims).filter(k => !CLAIM_MEMBERS.has(k) && !isExtensionMember(k)).sort();
-      check(unknown.length > 0, "unresolved", "I7", `${x.id}: claim member not understood (${unknown.join(", ")})`);
+      check(unknown.length > 0, "unresolved", "I7", `${x.id}: claim member not understood (${unknown.join(", ")})`, { need: "verifier_support", ref: x.id });
       for (const lim of x.claims.limits || []) {
         unknown = Object.keys(lim).filter(k => !LIMIT_MEMBERS.has(k) && !isExtensionMember(k)).sort();
-        check(unknown.length > 0, "unresolved", "I7", `${x.id}: limit member not understood (${unknown.join(", ")})`);
+        check(unknown.length > 0, "unresolved", "I7", `${x.id}: limit member not understood (${unknown.join(", ")})`, { need: "verifier_support", ref: x.id });
       }
     }
-    check(!interp || !["curated", "customer"].includes(interp.source), "unresolved", "I3", "no approved interpretation");
+    check(!interp || !["curated", "customer"].includes(interp.source), "unresolved", "I3", "no approved interpretation", { need: "interpretation", ref: inv.interpretation_ref ?? "-" });
     const pinned = pk.pinned_adapters || {};
-    check(Object.keys(pinned).length > 0 && pinned[interp.adapter] !== interp.version, "unresolved", "I3", "adapter revision not approved (pin mismatch)");
+    check(Object.keys(pinned).length > 0 && pinned[interp.adapter] !== interp.version, "unresolved", "I3", "adapter revision not approved (pin mismatch)", { need: "interpretation_pin", ref: inv.interpretation_ref ?? "-" });
     for (let i = 1; i < chain.length; i++) {
-      const [ok, why] = narrower(chain[i].claims, chain[i - 1].claims); check(!ok, "violated", "I1", `${chain[i].id}: ${why}`);
-      const lw = limitsNarrower(chain[i].claims, chain[i - 1].claims); check(!!lw, "violated", "I1", `${chain[i].id}: ${lw}`);
+      const [ok, why] = narrower(chain[i].claims, chain[i - 1].claims); check(!ok, "violated", "I1", `${chain[i].id}: ${why}`, { blame: "delegator" });
+      const lw = limitsNarrower(chain[i].claims, chain[i - 1].claims); check(!!lw, "violated", "I1", `${chain[i].id}: ${lw}`, { blame: "delegator" });
     }
     // liveness (spec 5.12), at the invocation and at each effect's own time. A revocation still inside the revoked
     // node's declared propagation window is unresolved, not violated (spec 5.12.1, v0.3).
@@ -520,81 +528,81 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     const liveness = (t, what) => {
       for (const [rT, target, why] of revokedAt) if (rT <= t) {
         const w = revocationWindow(byId.get(target));
-        check(t < rT + w, "unresolved", "I6", `${why} ${fmt(t - rT)}s before ${what}, inside its ${fmt(w)}s propagation window`);
-        check(true, "violated", "I6", `${why} before ${what}`);
+        check(t < rT + w, "unresolved", "I6", `${why} ${fmt(t - rT)}s before ${what}, inside its ${fmt(w)}s propagation window`, { blame: "agent", need: "revocation_settled", ref: target });
+        check(true, "violated", "I6", `${why} before ${what}`, { blame: "agent" });
       }
     };
     const freshStatus = (t, what) => {
       for (const c of chain) if (c.revocation && c.revocation.status_ref)
-        check(!sts.some(s => s.target === c.id && toTime(s.as_of) >= t), "unresolved", "I7", `no signed revocation status for ${c.id} as of ${what}`);
+        check(!sts.some(s => s.target === c.id && toTime(s.as_of) >= t), "unresolved", "I7", `no signed revocation status for ${c.id} as of ${what}`, { need: "revocation_status", ref: c.id });
     };
     liveness(tInv, "invocation");
-    check(revs.some(r => !verify(r)), "unresolved", "I7", "unverifiable revocation on the chain");
+    check(revs.some(r => !verify(r)), "unresolved", "I7", "unverifiable revocation on the chain", { need: "revocation_signature", ref: id });
     freshStatus(tInv, "the invocation");
-    check(isGuardrail(inv.declared.resource, extraProtected), "violated", "I9", "targets guardrail/evidence store");
+    check(isGuardrail(inv.declared.resource, extraProtected), "violated", "I9", "targets guardrail/evidence store", { blame: "agent" });
     // influence (spec 5.11): trusted only if the finding exists, is signed and is labelled trusted
     const mine = effects.filter(e => e.invocation === id);
     const untrusted = (inv.influenced_by || []).filter(f => !(objs[f] && verify(objs[f]) && objs[f].integrity_label === "trusted"));
-    check(untrusted.length > 0 && inv.declared.effect !== "read" && !inv.principal_confirmed, mine.length ? "violated" : "unresolved", "I4", "mutation shaped by untrusted content");
+    check(untrusted.length > 0 && inv.declared.effect !== "read" && !inv.principal_confirmed, mine.length ? "violated" : "unresolved", "I4", "mutation shaped by untrusted content", { blame: "agent", need: "principal_confirmation", ref: id });
     // call statements (spec 5.14, v0.3): the observer's signed account of the whole call. It binds the call to this
     // exact signed invocation and to the arguments the server received, says whether anything was executed, and how
     // many receipts to expect, so that "no receipt" is no longer ambiguous.
     const invDigest = digest(inv);
     const stmts = (pk.call_statements || []).filter(c => c && typeof c === "object" && c.invocation === id);
     for (const c of stmts) {
-      check(!verify(c), "unresolved", "I7", "call statement unsigned or signer lacks the role");
-      check(!DISPOSITIONS.includes(c.disposition), "unresolved", "I7", "call statement with an unknown disposition");
-      check(!Number.isInteger(c.effect_count) || c.effect_count < 0, "unresolved", "I7", "call statement effect_count must be a non-negative integer");
-      check(c.disposition === "not_executed" && c.effect_count !== 0, "unresolved", "I7", "call statement says not executed but counts effects");
-      check("invocation_digest" in c && c.invocation_digest !== invDigest, "unresolved", "I7", "call statement is bound to a different invocation (invocation_digest mismatch)");
+      check(!verify(c), "unresolved", "I7", "call statement unsigned or signer lacks the role", { need: "call_statement_signature", ref: c.id ?? "?" });
+      check(!DISPOSITIONS.includes(c.disposition), "unresolved", "I7", "call statement with an unknown disposition", { need: "call_statement", ref: c.id ?? "?" });
+      check(!Number.isInteger(c.effect_count) || c.effect_count < 0, "unresolved", "I7", "call statement effect_count must be a non-negative integer", { need: "call_statement", ref: c.id ?? "?" });
+      check(c.disposition === "not_executed" && c.effect_count !== 0, "unresolved", "I7", "call statement says not executed but counts effects", { need: "call_statement", ref: c.id ?? "?" });
+      check("invocation_digest" in c && c.invocation_digest !== invDigest, "unresolved", "I7", "call statement is bound to a different invocation (invocation_digest mismatch)", { need: "call_statement_binding", ref: c.id ?? "?" });
     }
     const notExecuted = stmts.some(c => c.disposition === "not_executed");
     const sentArgs = inv.args_digest;
     const rewritten = stmts.filter(c => sentArgs !== undefined && sentArgs !== null && "args_digest" in c && c.args_digest !== sentArgs);
-    check(rewritten.length > 0 && !notExecuted, "violated", "I2", "the arguments the server received differ from those the host signed (changed in transit)");
-    check(rewritten.length > 0, "unresolved", "I7", "the arguments were changed in transit; the server executed nothing");
-    check(notExecuted && mine.length > 0, "violated", "I11", "effect receipts contradict a signed not_executed statement");
+    check(rewritten.length > 0 && !notExecuted, "violated", "I2", "the arguments the server received differ from those the host signed (changed in transit)", { blame: "transport" });
+    check(rewritten.length > 0, "unresolved", "I7", "the arguments were changed in transit; the server executed nothing", { need: "unaltered_call", ref: id });
+    check(notExecuted && mine.length > 0, "violated", "I11", "effect receipts contradict a signed not_executed statement", { blame: "server" });
     if (!mine.length && notExecuted) {
       // provably nothing was executed; for a high-impact call the statement must come from a party other than the actor (I10)
       const hi = CEILING.indexOf(inv.declared.effect) >= CEILING.indexOf("write_shared");
       check(hi && stmts.filter(c => c.disposition === "not_executed").every(c => c.observed_by === inv.actor),
-        "unresolved", "I10", "high-impact call reported not executed only by the actor itself");
+        "unresolved", "I10", "high-impact call reported not executed only by the actor itself", { need: "independent_observer", ref: id });
       return;
     }
-    check(!mine.length, "unresolved", "I7", "no executed-effect receipt");
+    check(!mine.length, "unresolved", "I7", "no executed-effect receipt", { need: "receipt", ref: id });
     const highImpact = CEILING.indexOf(inv.declared.effect) >= CEILING.indexOf("write_shared");
     let claims = chain[0].claims; for (const c of chain.slice(1)) claims = meet(c.claims, claims);
     if (intent) claims = meet(intent.claims, claims);
     const ap = "approval_ref" in inv ? objs[inv.approval_ref] : undefined;
     const byObserver = new Map();   // observer -> effect identity digest -> its receipts, in packet order
     for (const e of mine) {
-      check(!verify(e), "unresolved", "I7", "effect receipt unsigned or signer lacks the role");
-      check(typeof e.observed_by !== "string", "unresolved", "I7", `receipt ${e.id ?? "?"} names no observer`);
-      check("invocation_digest" in e && e.invocation_digest !== invDigest, "unresolved", "I7", `receipt ${e.id ?? "?"} is bound to a different invocation (invocation_digest mismatch)`);
+      check(!verify(e), "unresolved", "I7", "effect receipt unsigned or signer lacks the role", { need: "receipt_signature", ref: e.id ?? "?" });
+      check(typeof e.observed_by !== "string", "unresolved", "I7", `receipt ${e.id ?? "?"} names no observer`, { need: "receipt_observer", ref: e.id ?? "?" });
+      check("invocation_digest" in e && e.invocation_digest !== invDigest, "unresolved", "I7", `receipt ${e.id ?? "?"} is bound to a different invocation (invocation_digest mismatch)`, { need: "receipt_binding", ref: e.id ?? "?" });
       if (highImpact) {
-        check(!inv.actor, "unresolved", "I10", "actor not recorded; observer independence cannot be shown");
-        check(e.observed_by === inv.actor || e.assurance === "L0", "unresolved", "I10", "high-impact effect only self-reported");
+        check(!inv.actor, "unresolved", "I10", "actor not recorded; observer independence cannot be shown", { need: "actor", ref: id });
+        check(e.observed_by === inv.actor || e.assurance === "L0", "unresolved", "I10", "high-impact effect only self-reported", { need: "independent_observer", ref: e.id ?? "?" });
       }
       const x = e.executed;
       // liveness at each effect's own time (spec 8 I6, v0.3): authority must still be in force when the effect occurs,
       // not only when it was invoked. Proposed by Cliff Singletary on audit@ietf.org, 19 Nov 2026.
       liveness(toTime(x.t), `effect ${e.id ?? "?"}`);
       freshStatus(toTime(x.t), `effect ${e.id ?? "?"}`);
-      if ("mediated" in inv) check(canon(x) !== canon(inv.mediated), "violated", "I2", "executed differs from mediated effect");
-      else check(x.action !== inv.declared.action || x.resource !== inv.declared.resource, "violated", "I2", "declared != executed");
-      check(isGuardrail(x.resource, extraProtected), "violated", "I9", "executed effect targets guardrail/evidence store");
+      if ("mediated" in inv) check(canon(x) !== canon(inv.mediated), "violated", "I2", "executed differs from mediated effect", { blame: "server" });
+      else check(x.action !== inv.declared.action || x.resource !== inv.declared.resource, "violated", "I2", "declared != executed", { blame: "server" });
+      check(isGuardrail(x.resource, extraProtected), "violated", "I9", "executed effect targets guardrail/evidence store", { blame: "agent" });
       const [ok, why] = effectOk(x, claims);
-      check(!ok, "violated", why.startsWith("released") ? "I5" : "I2", why);
+      check(!ok, "violated", why.startsWith("released") ? "I5" : "I2", why, { blame: "agent" });
       // spec 5.9.1: data classes carried in through lineage (or read by this effect) reach the recipient too
       if ("recipient" in x) {
         const inherited = new Set(x.accessed || []);
         for (const j of inv.derived_from || []) for (const c of taint.get(j) || []) inherited.add(c);
         const leaked = [...inherited].map(c => `${c}->${x.recipient}`).filter(f => !(claims.data || []).includes(f)).sort();
-        check(leaked.length > 0, "violated", "I5", `derived data released: ${leaked.join(", ")}`);
+        check(leaked.length > 0, "violated", "I5", `derived data released: ${leaked.join(", ")}`, { blame: "agent" });
       }
       if ("value" in x) { // validate wherever present, so a malformed amount is never silently ignored
         const v = x.value;
-        check(!v || typeof v !== "object" || Array.isArray(v), "unresolved", "I7", "value must be an object");
+        check(!v || typeof v !== "object" || Array.isArray(v), "unresolved", "I7", "value must be an object", { need: "value", ref: e.id ?? "?" });
         unitOf(v.unit); amountUnits(v.amount, v.unit); periodSpentOf(v, v.unit);
       }
       const d = approvalDigest(x);
@@ -616,20 +624,20 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     // every receipt a statement promises must be present, and no more (spec 5.14)
     for (const c of stmts) {
       const k = mine.filter(e => e.observed_by === c.observed_by).length;
-      check(k > c.effect_count, "violated", "I7", `${k} receipts from ${c.observed_by} but its call statement counts ${c.effect_count}`);
-      check(k < c.effect_count, "unresolved", "I7", `call statement promises ${c.effect_count} receipts from ${c.observed_by}, ${k} present (lost or withheld)`);
+      check(k > c.effect_count, "violated", "I7", `${k} receipts from ${c.observed_by} but its call statement counts ${c.effect_count}`, { blame: "server" });
+      check(k < c.effect_count, "unresolved", "I7", `call statement promises ${c.effect_count} receipts from ${c.observed_by}, ${k} present (lost or withheld)`, { need: "receipt", ref: id });
     }
     if ("approval_ref" in inv) {
-      check(!ap || !verify(ap), "unresolved", "I7", "approval missing, unsigned or not signed by an approver");
+      check(!ap || !verify(ap), "unresolved", "I7", "approval missing, unsigned or not signed by an approver", { need: "approval", ref: inv.approval_ref ?? "-" });
       for (const [d, x] of bodies) {
-        check(ap.effect_digest !== d, "violated", "I8", "approval not bound to the executed effect");
+        check(ap.effect_digest !== d, "violated", "I8", "approval not bound to the executed effect", { blame: "agent" });
         const nExec = effectsOf.filter(([, dd]) => dd === d).length;
-        check(nExec > 1, "violated", "I8", `one approval, but the approved effect was executed ${nExec} times`);
-        check(!!ap.consumed, "violated", "I8", "approval already consumed");
-        check("expiry" in ap && toTime(ap.expiry) < Math.max(tInv, toTime(x.t)), "violated", "I8", "approval expired");
-        check("nbf" in ap && toTime(ap.nbf) > tInv, "violated", "I8", "approval not yet valid");
+        check(nExec > 1, "violated", "I8", `one approval, but the approved effect was executed ${nExec} times`, { blame: "agent" });
+        check(!!ap.consumed, "violated", "I8", "approval already consumed", { blame: "agent" });
+        check("expiry" in ap && toTime(ap.expiry) < Math.max(tInv, toTime(x.t)), "violated", "I8", "approval expired", { blame: "agent" });
+        check("nbf" in ap && toTime(ap.nbf) > tInv, "violated", "I8", "approval not yet valid", { blame: "agent" });
         const first = approvalUse[ap.id] ??= [id, d];
-        check(first[0] !== id || first[1] !== d, "violated", "I8", `approval already used by ${first[0]}`);
+        check(first[0] !== id || first[1] !== d, "violated", "I8", `approval already used by ${first[0]}`, { blame: "agent" });
       }
     }
     // quantity limits (spec 7.6, v0.3), on every node of the chain and on the intent. An approval that passed I8
@@ -640,20 +648,20 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
         const applicable = node.claims.limits.map((lim, i) => [i, lim]).filter(([, lim]) => limitApplies(lim, x));
         if (!applicable.length) continue;
         const v = x.value;
-        check(v === undefined, "unresolved", "I7", `${node.id} limits this effect but the receipt records no value`);
+        check(v === undefined, "unresolved", "I7", `${node.id} limits this effect but the receipt records no value`, { need: "value", ref: node.id });
         const unit = v.unit, amt = amountUnits(v.amount, unit);
         const matching = applicable.filter(([, lim]) => lim.unit === unit);
         if (!matching.length) {
           const money = MONEY_UNITS.some(m => unit.startsWith(m)) || x.effect === "financial";
-          check(money, "violated", "I2", `${unit} is not an asset ${node.id} authorizes`);
-          check(true, "unresolved", "I7", `${node.id} limits this effect in another unit than ${unit}`);
+          check(money, "violated", "I2", `${unit} is not an asset ${node.id} authorizes`, { blame: "agent" });
+          check(true, "unresolved", "I7", `${node.id} limits this effect in another unit than ${unit}`, { need: "value", ref: node.id });
         }
         for (const [i, lim] of matching) {
           check("per_effect" in lim && amt > amountUnits(lim.per_effect) && !ap, "violated", "I2",
-            `amount ${v.amount} ${unit} exceeds the per-effect limit ${lim.per_effect} of ${node.id}`);
+            `amount ${v.amount} ${unit} exceeds the per-effect limit ${lim.per_effect} of ${node.id}`, { blame: "agent" });
           callSum.set(i, (callSum.get(i) ?? 0n) + amt);
           check("per_call" in lim && callSum.get(i) > amountUnits(lim.per_call) && !ap, "violated", "I2",
-            `this call moves ${unitsStr(callSum.get(i))} ${unit}, over the per-call limit ${lim.per_call} of ${node.id}`);
+            `this call moves ${unitsStr(callSum.get(i))} ${unit}, over the per-call limit ${lim.per_call} of ${node.id}`, { blame: "agent" });
           if (!("per_period" in lim)) continue;
           const anchor = "nbf" in node.claims ? toTime(node.claims.nbf) : 0;
           const window = Math.floor((toTime(x.t) - anchor) / lim.period);
@@ -664,21 +672,21 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
           // the unit: the limit names it in counted_by (amep#10). Other observers' totals never count.
           const counted = lim.counted_by === obs ? periodSpentOf(v, unit).get(String(lim.period)) : undefined;
           if (counted !== undefined) {
-            check(counted < total, "violated", "I7", `${obs}'s period total ${unitsStr(counted)} ${unit} is below the payments recorded for ${node.id}`);
+            check(counted < total, "violated", "I7", `${obs}'s period total ${unitsStr(counted)} ${unit} is below the payments recorded for ${node.id}`, { blame: "server" });
             total = counted;
           }
           check(total > amountUnits(lim.per_period) && !ap, "violated", "I2",
-            `period total ${unitsStr(total)} ${unit} exceeds the per-period limit ${lim.per_period} of ${node.id}`);
+            `period total ${unitsStr(total)} ${unit} exceeds the per-period limit ${lim.per_period} of ${node.id}`, { blame: "agent" });
           check(counted === undefined && !priorWindows.has(key), "unresolved", "I7",
-            `period total for ${node.id} cannot be established: no total from its counting observer and no earlier state`);
+            `period total for ${node.id} cannot be established: no total from its counting observer and no earlier state`, { need: "period_total", ref: node.id });
           totals.set(key, total);
         }
       }
     }
     const c = effectsOf.reduce((s, [x]) => s + cost(x), 0);
-    check("budget_spent" in inv && inv.budget_spent !== c, "violated", "I7", "recorded budget spend does not match receipts");
+    check("budget_spent" in inv && inv.budget_spent !== c, "violated", "I7", "recorded budget spend does not match receipts", { blame: "host" });
     const over = chain.find(n => "budget" in n.claims && (spent[n.id] || 0) + c > n.claims.budget);
-    check(!!over && !ap, "violated", "I2", `risk budget of ${over && over.id} exceeded without approval`);
+    check(!!over && !ap, "violated", "I2", `risk budget of ${over && over.id} exceeded without approval`, { blame: "agent" });
     for (const n of chain) spent[n.id] = (spent[n.id] || 0) + c;
   }
 
@@ -687,12 +695,12 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   for (const d of decisions) {
     if (!["deny", "hold"].includes(d.mode) || d.phase !== "pre_execution") continue;
     const en = d.enforcement || {};
-    if (effInv.has(d.invocation)) { out = out.filter(r => r.id !== d.invocation); out.push({ id: d.invocation, outcome: "violated", invariant: "I11", reason: "effect despite deny" }); }
-    else if (en.fail_mode === "closed" || en.applied === "confirmed") { out = out.filter(r => r.id !== d.invocation); out.push({ id: d.invocation, outcome: "preserved", invariant: "-", reason: "denied; no effect" }); }
+    if (effInv.has(d.invocation)) { out = out.filter(r => r.id !== d.invocation); out.push(result(d.invocation, "violated", "I11", "effect despite deny", "host")); }
+    else if (en.fail_mode === "closed" || en.applied === "confirmed") { out = out.filter(r => r.id !== d.invocation); out.push(result(d.invocation, "preserved", "-", "denied; no effect")); }
   }
   // spec 10.4 orphan effects
   const invIds = new Set((pk.invocations || []).map(i => i.id));
-  for (const e of effects) if (!invIds.has(e.invocation)) out.push({ id: e.id ?? "?", outcome: "violated", invariant: "I11", reason: "effect without any authorized invocation (bypass)" });
+  for (const e of effects) if (!invIds.has(e.invocation)) out.push(result(e.id ?? "?", "violated", "I11", "effect without any authorized invocation (bypass)", "host"));
   state.spent = spent;
   state.approvals_used = approvalUse;
   if (totals.size) state.period_totals = Object.fromEntries([...totals].map(([k, v]) => [k, unitsStr(v)]));
@@ -702,7 +710,7 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
 // spec 10.5
 function verdict(results) {
   for (const o of ["violated", "unresolved"]) { const r = results.find(x => x.outcome === o); if (r) return r; }
-  return results[0] || { id: "-", outcome: "unresolved", invariant: "I7", reason: "empty packet" };
+  return results[0] || result("-", "unresolved", "I7", "empty packet", null, [{ need: "invocation", ref: "-" }]);
 }
 
 const DATA = JSON.parse(document.getElementById("amep-data").textContent);

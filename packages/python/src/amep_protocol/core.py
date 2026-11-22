@@ -9,7 +9,7 @@ import os
 import re
 import sys
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 
@@ -467,16 +467,21 @@ class Result:
     outcome: str
     invariant: str
     reason: str
+    blame: str | None = None                    # violated: agent, host, delegator, transport or server (spec 10.5)
+    gaps: list = field(default_factory=list)    # unresolved: [{"need": ..., "ref": ...}]
 
 
 class Stop(Exception):
-    def __init__(self, outcome, invariant, reason):
-        self.r = (outcome, invariant, reason)
+    def __init__(self, outcome, invariant, reason, blame=None, need=None, ref=None):
+        # spec 10.5 (v0.3): a violation names the party whose own signed record departs from authority; an
+        # unresolved result names the one piece of evidence that would let the evaluation continue
+        self.r = (outcome, invariant, reason, blame if outcome == "violated" else None,
+                  [{"need": need, "ref": str(ref)}] if outcome == "unresolved" and need else [])
 
 
-def _check(cond, outcome, invariant, reason):
+def _check(cond, outcome, invariant, reason, blame=None, need=None, ref=None):
     if cond:
-        raise Stop(outcome, invariant, reason)
+        raise Stop(outcome, invariant, reason, blame, need, ref)
 
 
 SUPPORTED_VERSIONS = (None, "0.2", "0.3")
@@ -484,14 +489,14 @@ SUPPORTED_VERSIONS = (None, "0.2", "0.3")
 
 def _all_unresolved(packet, reason):
     ids = [i.get("id", "?") if isinstance(i, dict) else "?" for i in packet.get("invocations", [])] or ["-"]
-    return [Result(i, "unresolved", "I7", reason) for i in ids]
+    return [Result(i, "unresolved", "I7", reason, gaps=[{"need": "well_formed_packet", "ref": "-"}]) for i in ids]
 
 
 def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = None) -> list[Result]:
     """state (spec 10.6): carries approval use, risk-budget spending and per-period limit totals across packets.
     Read on entry, updated on exit."""
     if not isinstance(packet, dict):
-        return [Result("-", "unresolved", "I7", "packet is not a JSON object")]
+        return [Result("-", "unresolved", "I7", "packet is not a JSON object", gaps=[{"need": "well_formed_packet", "ref": "-"}])]
     bad = unsafe_number(packet)
     if bad:   # spec 12.1: such a packet cannot be canonicalized the same way by every verifier
         return _all_unresolved(packet, f"number outside the I-JSON range at {bad}")
@@ -547,13 +552,13 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
         rid = inv.get("id", "?")
         try:
             leaked = [f for f in inv.get("influenced_by", []) if f in quarantined and n > quarantined[f]]
-            _check(bool(leaked) and not inv.get("principal_confirmed"), "violated", "I4", f"quarantined content reached the agent ({', '.join(leaked)})")
+            _check(bool(leaked) and not inv.get("principal_confirmed"), "violated", "I4", f"quarantined content reached the agent ({', '.join(leaked)})", blame="host")
             _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects, spent, approval_use, extra_protected, order, taint, ctx)
             out.append(Result(rid, "preserved", "-", "continuity preserved"))
         except Stop as s:
             out.append(Result(rid, *s.r))
         except (Malformed, KeyError, TypeError, ValueError, AttributeError) as e:
-            out.append(Result(rid, "unresolved", "I7", f"malformed evidence: {e}"))
+            out.append(Result(rid, "unresolved", "I7", f"malformed evidence: {e}", gaps=[{"need": "well_formed_evidence", "ref": str(rid)}]))
 
     # spec 10.3: decision reconciliation. Only PRE-execution decisions can be contradicted or confirm a block;
     # a post-execution decision is detection and a simulation is hypothetical (spec 5.13).
@@ -564,7 +569,7 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
         enf = d.get("enforcement", {})
         if d.get("invocation") in eff_by_inv:
             out = [r for r in out if r.invocation != d["invocation"]]
-            out.append(Result(d["invocation"], "violated", "I11", "effect executed despite a deny/hold decision (enforcement contradicted)"))
+            out.append(Result(d["invocation"], "violated", "I11", "effect executed despite a deny/hold decision (enforcement contradicted)", blame="host"))
         elif enf.get("fail_mode") == "closed" or enf.get("applied") == "confirmed":
             out = [r for r in out if r.invocation != d["invocation"]]
             out.append(Result(d["invocation"], "preserved", "-", "denied before execution; no effect (enforcement confirmed)"))
@@ -572,7 +577,7 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
     inv_ids = {i.get("id") for i in packet.get("invocations", [])}
     for e in effects:
         if e.get("invocation") not in inv_ids:
-            out.append(Result(e.get("id", "?"), "violated", "I11", "effect without any authorized invocation (bypass)"))
+            out.append(Result(e.get("id", "?"), "violated", "I11", "effect without any authorized invocation (bypass)", blame="host"))
     state["spent"] = spent
     state["approvals_used"] = {k: list(v) for k, v in approval_use.items()}
     if totals:
@@ -586,7 +591,7 @@ def evaluate_text(text: str, keys: dict, extra_protected=(), state: dict | None 
     try:
         packet = parse_strict(text)
     except (Malformed, ValueError) as e:
-        return [Result("-", "unresolved", "I7", f"malformed packet text: {e}")]
+        return [Result("-", "unresolved", "I7", f"malformed packet text: {e}", gaps=[{"need": "well_formed_packet", "ref": "-"}])]
     return evaluate(packet, keys, extra_protected, state)
 
 
@@ -610,18 +615,18 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
     while node and node["id"] not in seen:
         seen.add(node["id"]); chain.append(node); node = objs.get(node.get("parent"))
     chain.reverse()
-    _check(not chain or chain[0].get("kind") != "mandate", "unresolved", "I7", "no root mandate")
+    _check(not chain or chain[0].get("kind") != "mandate", "unresolved", "I7", "no root mandate", need="root_mandate", ref=inv.get("authority_ref") or "-")
     # 2. signatures (and signer roles) on everything the decision rests on
     interp = objs.get(inv.get("interpretation_ref"))
     needed = chain + [inv] + ([interp] if interp else [])
     intent = None
     if "intent_ref" in inv:
         intent = objs.get(inv["intent_ref"])
-        _check(not intent or intent.get("kind") != "intent", "unresolved", "I7", "cited intent not found")
+        _check(not intent or intent.get("kind") != "intent", "unresolved", "I7", "cited intent not found", need="intent", ref=inv.get("intent_ref") or "-")
         needed.append(intent)
-    _check(any(not vsig(o) for o in needed), "unresolved", "I7", "missing or invalid signature, or signer lacks the role")
+    _check(any(not vsig(o) for o in needed), "unresolved", "I7", "missing or invalid signature, or signer lacks the role", need="signature", ref=rid)
     _check(any(order.get(j, order[rid]) >= order[rid] for j in inv.get("derived_from", [])),
-           "unresolved", "I7", "lineage reference not found among earlier invocations")
+           "unresolved", "I7", "lineage reference not found among earlier invocations", need="lineage", ref=rid)
     # claim members (spec 16, v0.3): an unknown claim member may be a constraint this verifier cannot enforce, so
     # it is never ignored. Limits are validated wherever they appear.
     limited = [n for n in chain + ([intent] if intent else []) if "limits" in n["claims"]]
@@ -630,20 +635,20 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
     if ctx["v03"]:
         for n in chain + ([intent] if intent else []):
             unknown = sorted(k for k in n["claims"] if k not in CLAIM_MEMBERS and not is_extension_member(k))
-            _check(bool(unknown), "unresolved", "I7", f"{n['id']}: claim member not understood ({', '.join(unknown)})")
+            _check(bool(unknown), "unresolved", "I7", f"{n['id']}: claim member not understood ({', '.join(unknown)})", need="verifier_support", ref=n['id'])
             for lim in n["claims"].get("limits", []):
                 unknown = sorted(k for k in lim if k not in LIMIT_MEMBERS and not is_extension_member(k))
-                _check(bool(unknown), "unresolved", "I7", f"{n['id']}: limit member not understood ({', '.join(unknown)})")
+                _check(bool(unknown), "unresolved", "I7", f"{n['id']}: limit member not understood ({', '.join(unknown)})", need="verifier_support", ref=n['id'])
     # 3-4. interpretation
-    _check(not interp or interp.get("source") not in ("curated", "customer"), "unresolved", "I3", "no approved interpretation")
+    _check(not interp or interp.get("source") not in ("curated", "customer"), "unresolved", "I3", "no approved interpretation", need="interpretation", ref=inv.get("interpretation_ref") or "-")
     pinned = packet.get("pinned_adapters", {})
-    _check(bool(pinned) and pinned.get(interp.get("adapter")) != interp.get("version"), "unresolved", "I3", "adapter revision not approved (pin mismatch)")
+    _check(bool(pinned) and pinned.get(interp.get("adapter")) != interp.get("version"), "unresolved", "I3", "adapter revision not approved (pin mismatch)", need="interpretation_pin", ref=inv.get("interpretation_ref") or "-")
     # 5. attenuation
     for p, c in zip(chain, chain[1:]):
         ok, why = narrower(c["claims"], p["claims"])
-        _check(not ok, "violated", "I1", f"{c['id']}: {why}")
+        _check(not ok, "violated", "I1", f"{c['id']}: {why}", blame="delegator")
         why = limits_narrower(c["claims"], p["claims"])
-        _check(bool(why), "violated", "I1", f"{c['id']}: {why}")
+        _check(bool(why), "violated", "I1", f"{c['id']}: {why}", blame="delegator")
     # 6. liveness at the invocation: signed revocations and signed status assertions (spec 5.12). A revocation
     # still inside the revoked node's declared propagation window is unresolved, not violated (spec 5.12.1, v0.3).
     ids = {n["id"] for n in chain}
@@ -657,56 +662,56 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         for r_t, target, why in sorted(revoked_at):
             if r_t <= t:
                 w = _revocation_window(by_id[target])
-                _check(t < r_t + w, "unresolved", "I6", f"{why} {t - r_t:g}s before {what}, inside its {w:g}s propagation window")
-                _check(True, "violated", "I6", f"{why} before {what}")
+                _check(t < r_t + w, "unresolved", "I6", f"{why} {t - r_t:g}s before {what}, inside its {w:g}s propagation window", blame="agent", need="revocation_settled", ref=target)
+                _check(True, "violated", "I6", f"{why} before {what}", blame="agent")
 
     def fresh_status(t, what):
         for n in chain:
             if (n.get("revocation") or {}).get("status_ref"):
                 fresh = [s for s in sts if s["target"] == n["id"] and to_time(s["as_of"]) >= t]
-                _check(not fresh, "unresolved", "I7", f"no signed revocation status for {n['id']} as of {what}")
+                _check(not fresh, "unresolved", "I7", f"no signed revocation status for {n['id']} as of {what}", need="revocation_status", ref=n['id'])
 
     liveness(t_inv, "invocation")
-    _check(any(not vsig(r) for r in revs), "unresolved", "I7", "unverifiable revocation on the chain")
+    _check(any(not vsig(r) for r in revs), "unresolved", "I7", "unverifiable revocation on the chain", need="revocation_signature", ref=rid)
     fresh_status(t_inv, "the invocation")
     # 7. self-protection on the declared target
-    _check(is_guardrail(inv["declared"]["resource"], extra_protected), "violated", "I9", "targets guardrail/evidence store")
+    _check(is_guardrail(inv["declared"]["resource"], extra_protected), "violated", "I9", "targets guardrail/evidence store", blame="agent")
     # 8-9. influence: a finding counts as trusted only if it exists, is signed and is labelled trusted (spec 5.11)
     mine = [e for e in effects if e.get("invocation") == rid]
     untrusted = [f for f in inv.get("influenced_by", [])
                  if not (objs.get(f) and vsig(objs[f]) and objs[f].get("integrity_label") == "trusted")]
     _check(bool(untrusted) and inv["declared"]["effect"] != "read" and not inv.get("principal_confirmed"),
-           "violated" if mine else "unresolved", "I4", "mutation shaped by untrusted content")
+           "violated" if mine else "unresolved", "I4", "mutation shaped by untrusted content", blame="agent", need="principal_confirmation", ref=rid)
     # 10. call statements (spec 5.14, v0.3): the observer's signed account of the whole call. It binds the call to
     # this exact signed invocation and to the arguments the server received, says whether anything was executed,
     # and how many receipts to expect, so that "no receipt" is no longer ambiguous.
     inv_digest = digest(inv)
     stmts = [c for c in packet.get("call_statements", []) if isinstance(c, dict) and c.get("invocation") == rid]
     for c in stmts:
-        _check(not vsig(c), "unresolved", "I7", "call statement unsigned or signer lacks the role")
-        _check(c.get("disposition") not in DISPOSITIONS, "unresolved", "I7", "call statement with an unknown disposition")
+        _check(not vsig(c), "unresolved", "I7", "call statement unsigned or signer lacks the role", need="call_statement_signature", ref=c.get('id', '?'))
+        _check(c.get("disposition") not in DISPOSITIONS, "unresolved", "I7", "call statement with an unknown disposition", need="call_statement", ref=c.get('id', '?'))
         n_eff = c.get("effect_count")
         _check(isinstance(n_eff, bool) or not isinstance(n_eff, (int, float)) or n_eff != int(n_eff) or n_eff < 0,
-               "unresolved", "I7", "call statement effect_count must be a non-negative integer")
-        _check(c["disposition"] == "not_executed" and n_eff != 0, "unresolved", "I7", "call statement says not executed but counts effects")
+               "unresolved", "I7", "call statement effect_count must be a non-negative integer", need="call_statement", ref=c.get('id', '?'))
+        _check(c["disposition"] == "not_executed" and n_eff != 0, "unresolved", "I7", "call statement says not executed but counts effects", need="call_statement", ref=c.get('id', '?'))
         _check("invocation_digest" in c and c["invocation_digest"] != inv_digest, "unresolved", "I7",
-               "call statement is bound to a different invocation (invocation_digest mismatch)")
+               "call statement is bound to a different invocation (invocation_digest mismatch)", need="call_statement_binding", ref=c.get('id', '?'))
     not_executed = any(c["disposition"] == "not_executed" for c in stmts)
     sent_args = inv.get("args_digest")
     rewritten = [c for c in stmts if sent_args is not None and "args_digest" in c and c["args_digest"] != sent_args]
     _check(bool(rewritten) and not not_executed, "violated", "I2",
-           "the arguments the server received differ from those the host signed (changed in transit)")
-    _check(bool(rewritten), "unresolved", "I7", "the arguments were changed in transit; the server executed nothing")
-    _check(not_executed and bool(mine), "violated", "I11", "effect receipts contradict a signed not_executed statement")
+           "the arguments the server received differ from those the host signed (changed in transit)", blame="transport")
+    _check(bool(rewritten), "unresolved", "I7", "the arguments were changed in transit; the server executed nothing", need="unaltered_call", ref=rid)
+    _check(not_executed and bool(mine), "violated", "I11", "effect receipts contradict a signed not_executed statement", blame="server")
     if not mine and not_executed:
         # provably nothing was executed, so the call cannot have exceeded its authority; for a high-impact call the
         # statement must come from a party other than the actor (I10)
         hi = CEILING.index(inv["declared"]["effect"]) >= CEILING.index("write_shared")
         _check(hi and all(c.get("observed_by") == inv.get("actor") for c in stmts if c["disposition"] == "not_executed"),
-               "unresolved", "I10", "high-impact call reported not executed only by the actor itself")
+               "unresolved", "I10", "high-impact call reported not executed only by the actor itself", need="independent_observer", ref=rid)
         return
     # 11. effect receipts
-    _check(not mine, "unresolved", "I7", "no executed-effect receipt")
+    _check(not mine, "unresolved", "I7", "no executed-effect receipt", need="receipt", ref=rid)
     high_impact = CEILING.index(inv["declared"]["effect"]) >= CEILING.index("write_shared")
     eff_claims = chain[0]["claims"]
     for n in chain[1:]:
@@ -717,35 +722,35 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
     # 11-15. every receipt for this invocation is checked (spec 10.2)
     by_observer: dict = {}   # observer -> effect identity digest -> its receipts, in packet order
     for e in mine:
-        _check(not vsig(e), "unresolved", "I7", "effect receipt unsigned or signer lacks the role")
-        _check(not isinstance(e.get("observed_by"), str), "unresolved", "I7", f"receipt {e.get('id', '?')} names no observer")
+        _check(not vsig(e), "unresolved", "I7", "effect receipt unsigned or signer lacks the role", need="receipt_signature", ref=e.get('id', '?'))
+        _check(not isinstance(e.get("observed_by"), str), "unresolved", "I7", f"receipt {e.get('id', '?')} names no observer", need="receipt_observer", ref=e.get('id', '?'))
         _check("invocation_digest" in e and e["invocation_digest"] != inv_digest, "unresolved", "I7",
-               f"receipt {e.get('id', '?')} is bound to a different invocation (invocation_digest mismatch)")
+               f"receipt {e.get('id', '?')} is bound to a different invocation (invocation_digest mismatch)", need="receipt_binding", ref=e.get('id', '?'))
         if high_impact:
-            _check(not inv.get("actor"), "unresolved", "I10", "actor not recorded; observer independence cannot be shown")
-            _check(e.get("observed_by") == inv["actor"] or e.get("assurance") == "L0", "unresolved", "I10", "high-impact effect only self-reported")
+            _check(not inv.get("actor"), "unresolved", "I10", "actor not recorded; observer independence cannot be shown", need="actor", ref=rid)
+            _check(e.get("observed_by") == inv["actor"] or e.get("assurance") == "L0", "unresolved", "I10", "high-impact effect only self-reported", need="independent_observer", ref=e.get('id', '?'))
         x = e["executed"]
         # liveness at each effect's own time (spec 8 I6, v0.3): authority must still be in force when the effect
         # occurs, not only when it was invoked. Proposed by Cliff Singletary on audit@ietf.org, 19 Nov 2026.
         liveness(to_time(x["t"]), f"effect {e.get('id', '?')}")
         fresh_status(to_time(x["t"]), f"effect {e.get('id', '?')}")
         if "mediated" in inv:
-            _check(canon(x) != canon(inv["mediated"]), "violated", "I2", "executed differs from mediated effect")
+            _check(canon(x) != canon(inv["mediated"]), "violated", "I2", "executed differs from mediated effect", blame="server")
         else:
-            _check((x["action"], x["resource"]) != (inv["declared"]["action"], inv["declared"]["resource"]), "violated", "I2", "declared != executed")
-        _check(is_guardrail(x["resource"], extra_protected), "violated", "I9", "executed effect targets guardrail/evidence store")
+            _check((x["action"], x["resource"]) != (inv["declared"]["action"], inv["declared"]["resource"]), "violated", "I2", "declared != executed", blame="server")
+        _check(is_guardrail(x["resource"], extra_protected), "violated", "I9", "executed effect targets guardrail/evidence store", blame="agent")
         ok, why = effect_ok(x, eff_claims)
-        _check(not ok, "violated", "I5" if why.startswith("released") else "I2", why)
+        _check(not ok, "violated", "I5" if why.startswith("released") else "I2", why, blame="agent")
         # spec 5.9.1: data classes carried in through lineage (or read by this effect) reach the recipient too
         if "recipient" in x:
             inherited = set(x.get("accessed", []))
             for j in inv.get("derived_from", []):
                 inherited |= taint.get(j, set())
             leaked = sorted(f"{d}->{x['recipient']}" for d in inherited if f"{d}->{x['recipient']}" not in eff_claims.get("data", []))
-            _check(bool(leaked), "violated", "I5", f"derived data released: {', '.join(leaked)}")
+            _check(bool(leaked), "violated", "I5", f"derived data released: {', '.join(leaked)}", blame="agent")
         if "value" in x:   # validate wherever present, so a malformed amount is never silently ignored
             v = x["value"]
-            _check(not isinstance(v, dict), "unresolved", "I7", "value must be an object")
+            _check(not isinstance(v, dict), "unresolved", "I7", "value must be an object", need="value", ref=e.get('id', '?'))
             _unit(v.get("unit")); amount_units(v.get("amount"), v["unit"]); period_spent_of(v, v["unit"])
         by_observer.setdefault(e.get("observed_by"), {}).setdefault(approval_digest(x), []).append(e)
     # spec 10.2 (v0.3): the same effect recorded by several observers counts once, but within one observer every receipt
@@ -760,20 +765,20 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
     # every receipt a statement promises must be present, and no more (spec 5.14)
     for c in stmts:
         k = sum(1 for e in mine if e.get("observed_by") == c.get("observed_by"))
-        _check(k > c["effect_count"], "violated", "I7", f"{k} receipts from {c.get('observed_by')} but its call statement counts {c['effect_count']}")
-        _check(k < c["effect_count"], "unresolved", "I7", f"call statement promises {c['effect_count']} receipts from {c.get('observed_by')}, {k} present (lost or withheld)")
+        _check(k > c["effect_count"], "violated", "I7", f"{k} receipts from {c.get('observed_by')} but its call statement counts {c['effect_count']}", blame="server")
+        _check(k < c["effect_count"], "unresolved", "I7", f"call statement promises {c['effect_count']} receipts from {c.get('observed_by')}, {k} present (lost or withheld)", need="receipt", ref=rid)
     if "approval_ref" in inv:
-        _check(not appr or not vsig(appr), "unresolved", "I7", "approval missing, unsigned or not signed by an approver")
+        _check(not appr or not vsig(appr), "unresolved", "I7", "approval missing, unsigned or not signed by an approver", need="approval", ref=inv.get("approval_ref") or "-")
         for d, x in bodies.items():
             t_x = to_time(x["t"])
-            _check(appr["effect_digest"] != d, "violated", "I8", "approval not bound to the executed effect")
+            _check(appr["effect_digest"] != d, "violated", "I8", "approval not bound to the executed effect", blame="agent")
             n_exec = sum(1 for _, dd, _ in effects_of if dd == d)
-            _check(n_exec > 1, "violated", "I8", f"one approval, but the approved effect was executed {n_exec} times")
-            _check(bool(appr.get("consumed")), "violated", "I8", "approval already consumed")
-            _check("expiry" in appr and to_time(appr["expiry"]) < max(t_inv, t_x), "violated", "I8", "approval expired")
-            _check("nbf" in appr and to_time(appr["nbf"]) > t_inv, "violated", "I8", "approval not yet valid")
+            _check(n_exec > 1, "violated", "I8", f"one approval, but the approved effect was executed {n_exec} times", blame="agent")
+            _check(bool(appr.get("consumed")), "violated", "I8", "approval already consumed", blame="agent")
+            _check("expiry" in appr and to_time(appr["expiry"]) < max(t_inv, t_x), "violated", "I8", "approval expired", blame="agent")
+            _check("nbf" in appr and to_time(appr["nbf"]) > t_inv, "violated", "I8", "approval not yet valid", blame="agent")
             first = approval_use.setdefault(appr["id"], (rid, d))
-            _check(first != (rid, d), "violated", "I8", f"approval already used by {first[0]}")
+            _check(first != (rid, d), "violated", "I8", f"approval already used by {first[0]}", blame="agent")
     # 16. quantity limits (spec 7.6, v0.3), on every node of the chain and on the intent. An approval that passed I8
     # authorizes going over a limit; the amount still counts toward the period total.
     for n in limited:
@@ -783,20 +788,20 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
             if not applicable:
                 continue
             v = x.get("value")
-            _check(v is None, "unresolved", "I7", f"{n['id']} limits this effect but the receipt records no value")
+            _check(v is None, "unresolved", "I7", f"{n['id']} limits this effect but the receipt records no value", need="value", ref=n['id'])
             unit = v["unit"]
             amt = amount_units(v["amount"], unit)
             matching = [(i, lim) for i, lim in applicable if lim["unit"] == unit]
             if not matching:
                 money = unit.startswith(MONEY_UNITS) or x["effect"] == "financial"
-                _check(money, "violated", "I2", f"{unit} is not an asset {n['id']} authorizes")
-                _check(True, "unresolved", "I7", f"{n['id']} limits this effect in another unit than {unit}")
+                _check(money, "violated", "I2", f"{unit} is not an asset {n['id']} authorizes", blame="agent")
+                _check(True, "unresolved", "I7", f"{n['id']} limits this effect in another unit than {unit}", need="value", ref=n['id'])
             for i, lim in matching:
                 _check("per_effect" in lim and amt > amount_units(lim.get("per_effect", "0")) and not appr, "violated", "I2",
-                       f"amount {v['amount']} {unit} exceeds the per-effect limit {lim.get('per_effect')} of {n['id']}")
+                       f"amount {v['amount']} {unit} exceeds the per-effect limit {lim.get('per_effect')} of {n['id']}", blame="agent")
                 call_sum[i] = call_sum.get(i, 0) + amt
                 _check("per_call" in lim and call_sum[i] > amount_units(lim.get("per_call", "0")) and not appr, "violated", "I2",
-                       f"this call moves {_units_str(call_sum[i])} {unit}, over the per-call limit {lim.get('per_call')} of {n['id']}")
+                       f"this call moves {_units_str(call_sum[i])} {unit}, over the per-call limit {lim.get('per_call')} of {n['id']}", blame="agent")
                 if "per_period" not in lim:
                     continue
                 anchor = to_time(n["claims"]["nbf"]) if "nbf" in n["claims"] else 0
@@ -809,18 +814,18 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
                 counted = period_spent_of(v, unit).get(str(int(lim["period"]))) if lim.get("counted_by") == obs else None
                 if counted is not None:
                     _check(counted < total, "violated", "I7",
-                           f"{obs}'s period total {_units_str(counted)} {unit} is below the payments recorded for {n['id']}")
+                           f"{obs}'s period total {_units_str(counted)} {unit} is below the payments recorded for {n['id']}", blame="server")
                     total = counted
                 _check(total > amount_units(lim["per_period"]) and not appr, "violated", "I2",
-                       f"period total {_units_str(total)} {unit} exceeds the per-period limit {lim['per_period']} of {n['id']}")
+                       f"period total {_units_str(total)} {unit} exceeds the per-period limit {lim['per_period']} of {n['id']}", blame="agent")
                 _check(counted is None and key not in ctx["prior_windows"], "unresolved", "I7",
-                       f"period total for {n['id']} cannot be established: no total from its counting observer and no earlier state")
+                       f"period total for {n['id']} cannot be established: no total from its counting observer and no earlier state", need="period_total", ref=n['id'])
                 ctx["totals"][key] = total
     # 17. risk budget: recorded spend must match receipts; over budget needs a bound approval
     c = sum(cost(x) for x, _, _ in effects_of)
-    _check("budget_spent" in inv and inv["budget_spent"] != c, "violated", "I7", "recorded budget spend does not match receipts")
+    _check("budget_spent" in inv and inv["budget_spent"] != c, "violated", "I7", "recorded budget spend does not match receipts", blame="host")
     over = next((n["id"] for n in chain if "budget" in n["claims"] and spent.get(n["id"], 0) + c > n["claims"]["budget"]), None)
-    _check(bool(over) and not appr, "violated", "I2", f"risk budget of {over} exceeded without approval")
+    _check(bool(over) and not appr, "violated", "I2", f"risk budget of {over} exceeded without approval", blame="agent")
     for n in chain:
         spent[n["id"]] = spent.get(n["id"], 0) + c
 
@@ -831,6 +836,6 @@ def verdict(results: list[Result]) -> Result:
         r = next((r for r in results if r.outcome == o), None)
         if r:
             return r
-    return results[0] if results else Result("-", "unresolved", "I7", "empty packet")
+    return results[0] if results else Result("-", "unresolved", "I7", "empty packet", gaps=[{"need": "invocation", "ref": "-"}])
 
 
