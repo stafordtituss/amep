@@ -1,4 +1,4 @@
-// Import profile for AER-1 execution receipts (draft-zambo-aer1-23, B. Zambo).
+// Import profile for AER-1 execution receipts (draft-zambo-aer1-26, B. Zambo).
 //
 // AER-1 commits to a tool call's output bytes (output_hash) and to its metadata (metadata_hash), and is served at a
 // public URL. It is not signed, so it does not authenticate its issuer; the profile reports what the hashes do and do
@@ -106,10 +106,22 @@ export const aer1 = {
       tool: { name: r.tool?.name ?? r.tool, version: r.tool?.version, committed: "metadata_hash" in r },
       provenance: r.provenance_class,
       side_effects: committed?.side_effects?.declared ?? null,      // inside the output commitment
+      // Since -25 a receipt is issued for every call, including calls a gateway refused. A deployment's output can say
+      // so; only a statement inside the output commitment counts (a hosted display field such as steps[].status is
+      // not committed and could be edited).
+      executed: committed?.output && typeof committed.output === "object" ? committed.output.executed : undefined,
+      output_status: committed?.output && typeof committed.output === "object" ? committed.output.status : undefined,
       input_hash: r.input_hash ?? null, input_hash_layout: r.input_hash_layout ?? null,
       fields: r,
     };
   },
+
+  /** A record whose committed output says the call was not executed (for example a gateway refusal) describes no
+   * effect, so no AMEP effect is produced. AMEP's confirmed non-execution is a call statement signed by the server
+   * (disposition not_executed, spec 5.14); an unsigned AER-1 record cannot supply that, so the call stays unresolved. */
+  importable: info => info.executed === false
+    ? `the record's committed output says the call was not executed${info.output_status ? ` (status ${JSON.stringify(info.output_status)})` : ""}: there is no effect to import; a confirmed non-execution needs the server's signed not_executed call statement`
+    : null,
 
   /** AMEP assurance for the derived receipt (spec 5.1.4), capped at L1: AER-1 is unsigned, so this is a reconstruction. */
   assurance: provenance => (provenance === "LOGGED BY AGENT" ? "L0" : "L1"),

@@ -107,7 +107,7 @@ Questions, vectors, implementations in other languages and research results are 
 
 Open an issue, then an `AMEP-Proposal-N` document. Every normative change needs at least one positive and one must-reject vector.
 
-**Implementations.** Python (`amep-protocol`), JavaScript (`@stafordtituss/amep`) and the browser verifier, all by the specification's author. Implementations by others are especially welcome; open an [implementation report](https://github.com/stafordtituss/amep/issues/new?template=implementation-report.yml) and yours will be listed here and in [`REVIEWS.md`](REVIEWS.md).
+**Implementations.** Python (`amep-protocol`), JavaScript (`@stafordtituss/amep`) and the browser verifier, all by the specification's author. **Run by others:** Brennan Zambo ran the conformance import over 12 live AER-1 receipts from the Zambo MCP server, and published the results ([amep#11](https://github.com/stafordtituss/amep/issues/11)). Implementations by others are especially welcome; open an [implementation report](https://github.com/stafordtituss/amep/issues/new?template=implementation-report.yml) and yours will be listed here and in [`REVIEWS.md`](REVIEWS.md).
 
 ## Citation
 

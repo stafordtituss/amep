@@ -2,6 +2,12 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## AER-1 refusal records; VATE case 1 (unreleased, 2026-11-22)
+
+- **Fix (`amep-conformance import`, AER-1 profile):** a record of a call a gateway refused imported as an executed effect, although its committed output says `"executed": false`. Such records now produce no effect; the call stays `unresolved`, since an unsigned record can't confirm non-execution either. Only content inside the record's output commitment counts. Found by Brennan Zambo running the import over 12 live Zambo receipts ([amep#11](https://github.com/stafordtituss/amep/issues/11)); the same records now give 8 imported and 4 not.
+- The AER-1 profile cites draft-zambo-aer1-26, and the conformance README gives the install step beside the import example (both from the same report).
+- **`interop/authzen-receipts/vate-01-lost-response`:** Takao Sato's VATE case 1 for openid/authzen#795 (a lost response, then recovery) as AMEP evidence. Three signed packets and the caller's signed verdict for each phase; both verifiers agree on all three.
+
 ## amep-mcp on the v0.3 suites (unreleased, 2026-11-22)
 
 - **Fix:** amep-mcp still bundled conformance suite v0.2.3, so its own `check_suite` disagreed with the v0.3 verifier on `status-current-as-of-the-action`, the one vector v0.3 deliberately changed. The bundle is now suite v0.3.0 (204 vectors), the delegation suite (20) and the approval-path attacks (16, draft), including the vectors that exist only as exact JSON text.

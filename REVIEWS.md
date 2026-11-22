@@ -36,7 +36,7 @@ Entries are added only with the person's agreement and link to the public record
 
 | Date | Who | Relationship to author | What | Link |
 |---|---|---|---|---|
-| | *None yet* | | | |
+| 2026-11-22 | Brennan Zambo, Zambo (zambo.dev); author of AER-1, the receipt format the run imports | None (no prior collaboration, employment or financial relationship), as stated in the report | Conformance run of `amep-conformance import` (commit `97183f5`) over 12 live AER-1 receipts from the Zambo MCP server, with Zambo's own tool map. All 12 passed the six AER-1 format checks, and 9 imported as AMEP effects. Of the 3 not imported, 2 lacked a field the resource template needs, and the tool map deliberately has no entry for the third. The report states what an unsigned receipt cannot establish: who issued it, and which call authorized it. **Findings:** a gateway refusal record imported as an effect although the call was not executed. That's fixed: such records are no longer imported, so the same 12 records now give 8 imported and 4 not. Also a stale draft citation in the profile, and a missing install step beside the import example (both fixed). | [stafordtituss/amep#11](https://github.com/stafordtituss/amep/issues/11), [results and tool map](https://gist.github.com/zambodotdev/a70a6df54e8ba89ed780abde108aa5fd) |
 
 ### References to AMEP in others' work
 

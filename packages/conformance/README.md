@@ -41,7 +41,10 @@ node packages/conformance/bin/amep-conformance.mjs verify \
 
 AMEP evaluates whether executed effects stayed within delegated authority. Other formats record what happened. The import adapter checks a record by its own format's rules, maps it to an AMEP effect, and reports what AMEP needs that the record does not carry. With an AMEP packet that holds the authorizing mandate and invocation, it also gives the verdict.
 
+From a fresh clone, install the tool's one dependency (the JavaScript reference package in this repository) first:
+
 ```bash
+(cd packages/conformance && npm install)
 node packages/conformance/bin/amep-conformance.mjs import receipt.json --map toolmap.json \
   --packet gateway-packet.json --keys gateway-keys.json --invocation i-1
 ```
@@ -77,6 +80,7 @@ Templates fill from the record's own fields.
 - **Invent a value.** If the map has no entry for a tool, or the record lacks a field the resource template needs, the effect is not produced, and the call stays `unresolved`.
 - **Accept a record that fails its own format's checks.**
 - **Understate a call.** If the record's committed side effects contradict a `read` mapping, the import is refused.
+- **Import a call that did not run.** If the record's committed output says the call was not executed (for example, an AER-1 record of a call a gateway refused), no effect is produced. An unsigned record can't confirm non-execution either, which needs the server's signed `not_executed` call statement, so the call stays `unresolved`. Only committed content counts; display fields outside the record's hash are ignored. Reported by Brennan Zambo in [amep#11](https://github.com/stafordtituss/amep/issues/11).
 - **Import high-impact effects without a declared release.** An effect of class `external_send` or above needs `released` in the map.
 - **Claim more than it knows.** AER-1 records are unsigned, so derived effects are reconstructions: assurance is capped at L1, and the importer's own key signs them as the AMEP observer.
 

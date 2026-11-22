@@ -143,6 +143,24 @@ describe("import adapter: AER-1 profile", () => {
     assert.match(out.not_imported, /declared release/);
   });
 
+  test("a refused call (committed output says executed: false) produces no effect; uncommitted fields are ignored", () => {
+    // the shape of a live gateway refusal record (Zambo, stafordtituss/amep#11): the refusal is inside canonical_bytes
+    const refusal = JSON.stringify({ status: "payment_required", tool: "live_price", executed: false, reason: "daily_quota_exhausted" });
+    const out = importRecord(aer1Receipt({ output: JSON.parse(refusal) }), { map: MAP });
+    assert.equal(out.integrity.verdict, "pass");
+    assert.equal(out.effect, null);
+    assert.match(out.not_imported, /not executed \(status "payment_required"\).*not_executed call statement/);
+    // a "not executed" outside the commitment (a hosted display field) must not suppress an executed record's effect
+    const r = aer1Receipt({ output: { price: "1621.82" } });
+    r.steps = [{ tool: "live_price", status: "payment_required" }]; r.result_preview = JSON.stringify({ executed: false });
+    const ok = importRecord(r, { map: MAP });
+    assert.equal(ok.not_imported, null);
+    assert.equal(ok.effect.executed.resource, "market:price/ETH");
+    // an output that says executed: true, or a string output, imports as before
+    assert.ok(importRecord(aer1Receipt({ output: { executed: true, price: "1" } }), { map: MAP }).effect);
+    assert.ok(importRecord(aer1Receipt(), { map: MAP }).effect);
+  });
+
   test("a tool missing from the map, or a resource the record cannot fill, is a gap, never a guess", () => {
     assert.match(importRecord(aer1Receipt({ tool: "other_tool" }), { map: MAP }).not_imported, /not in the tool map/);
     const r = aer1Receipt(); delete r.provenance.request.symbol;
