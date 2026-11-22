@@ -4,11 +4,11 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Key, keyset, sdk } from "@stafordtituss/amep";
+import { Key, keyset, sdk, sigOk } from "@stafordtituss/amep";
 import { loadSuite, verifyImplementation, splitCommand, markdownReport } from "../src/verify.mjs";
 import { importRecord, evaluateImported } from "../src/import.mjs";
 
@@ -248,5 +248,77 @@ describe("import adapter: OpenID action receipt profile, travel-agent scenario (
     assert.equal(amount.status, "missing");
     assert.match(amount.detail, /accumulated_spend_usd/);
     assert.equal(out.effect.assurance, "L1");
+  });
+});
+
+// ---- Provared books (import-book) ----
+import { importProvaredBook, fingerprint as provaredFingerprint } from "../src/profiles/provared.mjs";
+import { evaluate as amepEvaluate } from "@stafordtituss/amep/core";
+import { generateKeyPairSync } from "node:crypto";
+
+describe("import-book: Provared", () => {
+  const FIX = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "provared");
+  const book = readFileSync(join(FIX, "office-supplies.jsonl"), "utf8");
+  const expected = JSON.parse(readFileSync(join(FIX, "office-supplies.expected.json"), "utf8"));
+  const mldsa = (() => { try { generateKeyPairSync("ml-dsa-87"); return true; } catch { return false; } })();
+  const keys = { issuer: Key.generate("ii", ["issuer", "approver"]), host: Key.generate("ih", ["host"]), observer: Key.generate("io", ["observer"]) };
+  const run = text => importProvaredBook(text, { keys });
+
+  test("the sample book passes the format's own checks, with the format's own fingerprints and counts", () => {
+    const out = run(book);
+    assert.deepEqual(out.lines.flatMap(l => l.problems), []);
+    // ML-DSA-87 needs Node 24.7 or later; without it the profile must say so, never pass the signature silently
+    const unchecked = out.lines.flatMap(l => l.notChecked);
+    if (mldsa) assert.deepEqual(unchecked, ["seal: signatures and tree root are not checked by this profile"]);
+    else assert.ok(unchecked.some(u => u.includes("ML-DSA-87")));
+    const L = book.trim().split("\n").map(l => JSON.parse(l));
+    const main = e => e.stub ?? e[Object.keys(e).find(k => k !== "stamps")];
+    assert.deepEqual(L.map(e => provaredFingerprint(main(e).payload)), expected.fingerprints);
+    const stubs = out.lines.filter(l => l.stub);
+    assert.equal(stubs.filter(l => l.stub.countersigned).length, expected.summary.counts.countersigned);
+    assert.equal(stubs.filter(l => !l.stub.countersigned).length, expected.summary.counts.oneSided);
+  });
+
+  test("AMEP's verdicts on the sample book, line by line, beside the Provared checker's findings", (t) => {
+    if (!mldsa) return t.skip("needs ML-DSA-87 (Node 24.7 or later) to verify the stubs");
+    const out = run(book);
+    const res = amepEvaluate(out.packet, out.keys, sigOk, [], structuredClone(out.state));
+    const got = Object.fromEntries(res.map(r => [out.byInvocation[r.id], [r.outcome, r.invariant, r.blame]]));
+    assert.deepEqual(got, {
+      2: ["preserved", "-", null],         // Provared: no breach
+      3: ["unresolved", "I10", null],      // Provared: no breach (AMEP needs an independent observer for external_send)
+      4: ["preserved", "-", null],         // approved, countersigned
+      5: ["unresolved", "I10", null],      // Provared: countersignature-missing
+      6: ["violated", "I2", "agent"],      // Provared: over-limit, approval-missing
+      8: ["unresolved", "I10", null],      // Provared: action-not-allowed (an AMEP gap: see interop/provared/README.md)
+    });
+    assert.deepEqual(expected.breaches[6], ["over-limit", "approval-missing"]);
+  });
+
+  test("tampered books fail closed", (t) => {
+    if (!mldsa) return t.skip("needs ML-DSA-87 (Node 24.7 or later)");
+    const b = s => Buffer.from(s, "base64url"), e = x => Buffer.from(x).toString("base64url");
+    const base = book.trim().split("\n").map(l => JSON.parse(l));
+    const problems = mutate => { const L = structuredClone(base); mutate(L); return run(L.map(x => JSON.stringify(x)).join("\n")).lines.flatMap(l => l.problems); };
+    const flip = (rec, i, at) => { const s = b(rec.signatures[i].signature); s[at] ^= 1; rec.signatures[i].signature = e(s); };
+    for (const [name, mutate, pattern] of [
+      ["an amount changed", L => { const c = JSON.parse(b(L[6].stub.payload)); c.amount.value = 8;
+        L[6].stub.payload = e(JSON.stringify(Object.fromEntries(Object.keys(c).sort().map(k => [k, c[k]])))); }, /Ed25519 signature does not check/],
+      ["the ML-DSA-87 signature removed", L => L[2].stub.signatures.pop(), /exactly two signatures/],
+      ["an Ed25519 signature flipped", L => flip(L[2].stub, 0, 5), /Ed25519 signature does not check/],
+      ["an ML-DSA-87 signature flipped", L => flip(L[2].stub, 1, 100), /ML-DSA-87 signature does not check/],
+      ["the slip's passkey signature flipped", L => flip(L[0].slip, 0, 60), /passkey signature does not check|malformed/],
+      ["a stub deleted from the chain", L => L.splice(4, 1), /seq 3 where 2 was expected/],
+      ["a countersignature moved to another stub", L => { L[3].countersignature = L[2].countersignature; }, /countersignature/],
+      ["an approval moved to an unapproved stub", L => { L[6].approval = L[4].approval; }, /approval/],
+      ["non-canonical content", L => { L[2].stub.payload = e(b(L[2].stub.payload).toString().replace(",", ", ")); }, /canonical form/],
+    ]) assert.match(problems(mutate).join(" | "), pattern, name);
+  });
+
+  test("a gap, never an approximation: limits AMEP cannot express are reported, not mapped", () => {
+    const out = run(book);
+    assert.ok(out.gaps.some(g => g.need.startsWith("hard per-stub cap")));
+    assert.ok(out.gaps.some(g => g.need.startsWith("count limit")));
+    assert.ok(!out.mapping.limits.some(l => "per_effect" in l && l.per_effect === "100"));
   });
 });

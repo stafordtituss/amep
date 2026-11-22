@@ -12,6 +12,10 @@
 //       AMEP needs that the record does not carry. With --packet, signs the mapped effect as the importer and gives
 //       the AMEP verdict for the call.
 //
+//   amep-conformance import-book BOOK.jsonl [--profile provared] [--map MAP.json] [--json FILE]
+//       Checks a whole book of records (a Provared book) by its format's own rules, re-expresses the verified records
+//       as AMEP evidence signed by the importer, and gives the AMEP verdict for every action.
+//
 //   amep-conformance profiles        lists the import profiles
 // Exit status: verify 0 when every vector agrees; import 0 when the record imports (and, with --packet, the verdict is
 // preserved), 1 otherwise; 3 on usage errors.
@@ -19,8 +23,9 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { parseStrict } from "@stafordtituss/amep/core";
-import { Key } from "@stafordtituss/amep";
+import { evaluate, parseStrict, verdict } from "@stafordtituss/amep/core";
+import { Key, sigOk } from "@stafordtituss/amep";
+import { importProvaredBook } from "../src/profiles/provared.mjs";
 import { loadSuite, markdownReport, verifyImplementation, TOOL_VERSION } from "../src/verify.mjs";
 import { PROFILES, importRecord, evaluateImported } from "../src/import.mjs";
 
@@ -72,13 +77,36 @@ async function main(argv) {
       if (o.json) writeFileSync(o.json, JSON.stringify(out, null, 1));
       return code;
     }
+    case "import-book": {
+      if (!pos[0]) throw new Usage("import-book needs a book file");
+      if (o.profile && o.profile !== "provared") throw new Usage(`unknown book profile ${o.profile}; books: provared`);
+      const keys = { issuer: Key.generate("importer-issuer", ["issuer", "approver"]), host: Key.generate("importer-host", ["host"]),
+        observer: Key.generate("importer-observer", ["observer"]) };
+      const out = importProvaredBook(readFileSync(pos[0], "utf8"), { keys, map: o.map ? load(o.map) : { actions: {} } });
+      for (const l of out.lines) {
+        console.log(`line ${l.line}: ${l.role ?? l.kinds.join("+")}${l.problems.length ? `  ${l.problems.length} problem(s)` : "  checks pass"}`);
+        for (const p of l.problems) console.log(`  FAIL ${p}`);
+        for (const p of l.notChecked) console.log(`  not checked: ${p}`);
+        for (const p of l.notHandled) console.log(`  not handled: ${p}`);
+      }
+      if (!out.packet) { console.log("no verified slip: nothing to evaluate"); return 1; }
+      const results = evaluate(out.packet, out.keys, sigOk, [], structuredClone(out.state));
+      for (const r of results) console.log(`AMEP ${r.id} (line ${out.byInvocation[r.id]}): ${r.outcome} ${r.invariant}${r.blame ? ` blame ${r.blame}` : ""}${r.gaps.length ? ` gaps ${r.gaps.map(g => g.need).join(",")}` : ""}: ${r.reason}`);
+      const v = verdict(results);
+      console.log(`AMEP verdict for the book: ${v.outcome} ${v.invariant}`);
+      console.log("what the import could not express:");
+      for (const g of out.gaps) console.log(`  ${g.need}: ${g.detail}`);
+      if (o.json) writeFileSync(o.json, JSON.stringify({ ...out, results, verdict: v }, null, 1));
+      return out.lines.some(l => l.problems.length) ? 1 : v.outcome === "preserved" ? 0 : 1;
+    }
     case "profiles":
       for (const p of Object.values(PROFILES)) console.log(`${p.id}\t${p.title}`);
+      console.log("provared\tProvared book (draft-izmaylov-agent-permission-receipts), via import-book");
       return 0;
     case "version":
       console.log(TOOL_VERSION); return 0;
     default:
-      throw new Usage("commands: verify, import, profiles, version");
+      throw new Usage("commands: verify, import, import-book, profiles, version");
   }
 }
 

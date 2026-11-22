@@ -65,6 +65,18 @@ A profile teaches the adapter one format:
 
 Adding a format means adding one profile file to `src/profiles/`. Nothing else changes.
 
+### Books of records: `import-book`
+
+Some formats record a whole session as one file: a permission, then every action, with countersignatures and seals. `import-book` checks every record by the format's own rules first, re-expresses the verified records as AMEP evidence signed by the importer, and gives the AMEP verdict for every action:
+
+```bash
+node packages/conformance/bin/amep-conformance.mjs import-book book.jsonl --json report.json
+```
+
+| Profile | Format | Integrity checks |
+|---|---|---|
+| `provared` | Provared books (draft-izmaylov-agent-permission-receipts, github.com/provared/provared) | envelope, protected-header labels, canonical form, both hybrid signatures (Ed25519 under AMEP's strict acceptance rule, and ML-DSA-87), the slip's and approvals' passkey (WebAuthn) signatures, fingerprints, the chain, countersignature and approval binding. ML-DSA-87 needs Node 24.7 or later; on an older runtime the profile reports it as not checked and never passes it. Comparison with the format's own checker on its sample book: [`interop/provared/`](../../interop/provared/README.md) |
+
 ### The tool map
 
 What a tool call means in AMEP terms is not recorded by these formats. It comes from a map the deployment publishes:
@@ -83,6 +95,7 @@ Templates fill from the record's own fields.
 - **Import a call that did not run.** If the record's committed output says the call was not executed (for example, an AER-1 record of a call a gateway refused), no effect is produced. An unsigned record can't confirm non-execution either, which needs the server's signed `not_executed` call statement, so the call stays `unresolved`. Only committed content counts; display fields outside the record's hash are ignored. Reported by Brennan Zambo in [amep#11](https://github.com/stafordtituss/amep/issues/11).
 - **Import high-impact effects without a declared release.** An effect of class `external_send` or above needs `released` in the map.
 - **Claim more than it knows.** AER-1 records are unsigned, so derived effects are reconstructions: assurance is capped at L1, and the importer's own key signs them as the AMEP observer.
+- **Map a limit inexactly.** A Provared limit AMEP can't express exactly (a cap an approval can't lift, a count, or a sliding window) is reported as a gap instead of being approximated.
 
 ### Binding to the authorizing call
 
