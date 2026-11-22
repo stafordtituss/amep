@@ -84,6 +84,10 @@ verdict, results = recorder.evaluate(keys)
 | Agent acted on a resource outside its delegation | `violated`, I2 |
 | A delegation is wider than its parent, or was revoked before the call | `violated`, I1 or I6 |
 | Tool failed, or reported nothing | `unresolved`, I7 |
+| LangGraph `interrupt()`, resumed with approval | one invocation and one receipt, for the run after the resume: `preserved` |
+| LangGraph `RetryPolicy`: an attempt fails, the retry succeeds | one invocation per attempt; the failed attempt is `unresolved` (I7: its effect is unknown), the retry `preserved` |
+
+The interrupt and retry cases are in [`tests/test_langgraph_interrupt_retry.py`](tests/test_langgraph_interrupt_retry.py).
 
 ## Keys and trust
 
