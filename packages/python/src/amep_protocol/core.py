@@ -769,16 +769,34 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         _check(k < c["effect_count"], "unresolved", "I7", f"call statement promises {c['effect_count']} receipts from {c.get('observed_by')}, {k} present (lost or withheld)", need="receipt", ref=rid)
     if "approval_ref" in inv:
         _check(not appr or not vsig(appr), "unresolved", "I7", "approval missing, unsigned or not signed by an approver", need="approval", ref=inv.get("approval_ref") or "-")
+        # An operation approval (spec 5.10, v0.3) lists the digests of the effects of one call instead of one digest.
+        # From Takao Sato's VATE case 1 (openid/authzen#795): one admission covering an operation that writes two files.
+        listed = appr.get("effect_digests") if "effect_digests" in appr else None
+        if "effect_digests" in appr:
+            _check("effect_digest" in appr or not isinstance(listed, list) or not listed
+                   or not all(isinstance(x, str) and re.fullmatch(r"[0-9a-f]{64}", x) for x in listed),
+                   "unresolved", "I7", "an operation approval needs a non-empty effect_digests list of digests, and no effect_digest",
+                   need="approval", ref=appr.get("id", "?"))
+            op_use = (rid, "set:" + hashlib.sha256(canon(sorted(listed))).hexdigest())
+        else:   # neither form: malformed (spec 5.10), the same result in every verifier
+            _check("effect_digest" not in appr, "unresolved", "I7", "approval has no effect_digest or effect_digests",
+                   need="approval", ref=appr.get("id", "?"))
         for d, x in bodies.items():
             t_x = to_time(x["t"])
-            _check(appr["effect_digest"] != d, "violated", "I8", "approval not bound to the executed effect", blame="agent")
             n_exec = sum(1 for _, dd, _ in effects_of if dd == d)
-            _check(n_exec > 1, "violated", "I8", f"one approval, but the approved effect was executed {n_exec} times", blame="agent")
+            if listed is None:
+                _check(appr["effect_digest"] != d, "violated", "I8", "approval not bound to the executed effect", blame="agent")
+                _check(n_exec > 1, "violated", "I8", f"one approval, but the approved effect was executed {n_exec} times", blame="agent")
+            else:
+                n_ok = listed.count(d)
+                _check(n_exec > n_ok, "violated", "I8", "the operation approval does not cover the executed effect" if n_ok == 0
+                       else f"the operation approval covers this effect {n_ok} time(s), but it was executed {n_exec} times", blame="agent")
             _check(bool(appr.get("consumed")), "violated", "I8", "approval already consumed", blame="agent")
             _check("expiry" in appr and to_time(appr["expiry"]) < max(t_inv, t_x), "violated", "I8", "approval expired", blame="agent")
             _check("nbf" in appr and to_time(appr["nbf"]) > t_inv, "violated", "I8", "approval not yet valid", blame="agent")
-            first = approval_use.setdefault(appr["id"], (rid, d))
-            _check(first != (rid, d), "violated", "I8", f"approval already used by {first[0]}", blame="agent")
+            use = (rid, d) if listed is None else op_use
+            first = approval_use.setdefault(appr["id"], use)
+            _check(first != use, "violated", "I8", f"approval already used by {first[0]}", blame="agent")
     # 16. quantity limits (spec 7.6, v0.3), on every node of the chain and on the intent. An approval that passed I8
     # authorizes going over a limit; the amount still counts toward the period total.
     for n in limited:

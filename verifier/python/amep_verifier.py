@@ -768,6 +768,42 @@ def vectors():
         shared_noop(p, I, H, O, "agent:assistant-1"))
     add("two objects with the same id", ("unresolved", "I7"), lambda p, I, H, O, X: (
         p["effects"].append(O.sign({**p["effects"][0], "invocation": "i-1"}))))
+
+    # 7. Operation approvals (spec 5.10, v0.3). From Takao Sato's VATE case 1 (openid/authzen#795): one admission
+    # covers an operation that writes two files, and a retry of the operation must not be able to spend it again.
+    def op(p, I, H, O, n_effects=2, n_listed=None, same_body=False, retry=False, extra=None):
+        v03(p, I, H, O)
+        inv0 = p["invocations"][0]
+        part = lambda k: {**p["effects"][0]["executed"], "x-part": "1" if same_body else str(k + 1)}
+        bodies = [part(k) for k in range(max(n_effects, n_listed or 0))]
+        digests = [approval_digest(b) for b in bodies[: n_effects if n_listed is None else n_listed]]
+        ap = {"id": "ap-op", "kind": "approval", "effect_digests": digests, "presence": "webauthn", "expiry": 50}
+        p["approvals"] = [I.sign({**ap, **(extra or {})}, v=2)]
+        calls = [("i-1", 10)] + ([("i-2", 20)] if retry else [])
+        p["invocations"] = [H.sign({**inv0, "id": i, "t": t, "approval_ref": "ap-op"}, v=2) for i, t in calls]
+        p["effects"] = [O.sign({"id": f"e-{i[2:]}-{k + 1}", "kind": "effect", "invocation": i, "observed_by": "hook:host",
+                                "assurance": "L1", "executed": {**bodies[k], "t": t + 1 + k}}, v=2)
+                        for i, t in calls for k in range(n_effects)]
+    add("one approval for a two-effect operation", ("preserved", "-"), lambda p, I, H, O, X: op(p, I, H, O))
+    add("operation approval, an approved effect not executed", ("preserved", "-"), lambda p, I, H, O, X:
+        op(p, I, H, O, n_effects=1, n_listed=2))
+    add("operation approval listing one body twice, executed twice", ("preserved", "-"), lambda p, I, H, O, X:
+        op(p, I, H, O, same_body=True, n_listed=2))
+    add("operation approval spent again by a retried invocation", ("violated", "I8"), lambda p, I, H, O, X:
+        op(p, I, H, O, retry=True))
+    add("effect outside the operation approval", ("violated", "I8"), lambda p, I, H, O, X:
+        op(p, I, H, O, n_listed=1))
+    add("operation approval covers a body once, executed twice", ("violated", "I8"), lambda p, I, H, O, X:
+        op(p, I, H, O, same_body=True, n_listed=1))
+    add("operation approval that also has effect_digest", ("unresolved", "I7"), lambda p, I, H, O, X:
+        op(p, I, H, O, extra={"effect_digest": "a" * 64}))
+    add("operation approval with an empty list", ("unresolved", "I7"), lambda p, I, H, O, X:
+        op(p, I, H, O, extra={"effect_digests": []}))
+    add("operation approval expired before the second effect", ("violated", "I8"), lambda p, I, H, O, X:
+        op(p, I, H, O, extra={"expiry": 11}))
+    add("approval with neither effect_digest nor effect_digests", ("unresolved", "I7"), lambda p, I, H, O, X: (
+        v03(p, I, H, O), p.update(approvals=[I.sign({"id": "ap-x", "kind": "approval", "presence": "webauthn"}, v=2)],
+                                  invocations=[H.sign({**p["invocations"][0], "approval_ref": "ap-x"}, v=2)])))
     return keys, V
 
 

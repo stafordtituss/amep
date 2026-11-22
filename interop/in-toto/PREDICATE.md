@@ -119,7 +119,7 @@ amep-protocol verify packet.json --keys keys.json --verdict-out verdict.dsse.jso
 - Python: `amep-protocol` (PyPI), `amep_protocol.verdicts`.
 - JavaScript: `@stafordtituss/amep` (npm), `@stafordtituss/amep/verdict`.
 
-`tools/compare_verifiers.py` checks that the two produce byte-identical statements over all 240 conformance vectors.
+`tools/compare_verifiers.py` checks that the two produce byte-identical statements over every AMEP conformance vector (all three suites).
 
 ## Changelog
 

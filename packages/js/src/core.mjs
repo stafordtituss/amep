@@ -564,15 +564,35 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     }
     if ("approval_ref" in inv) {
       check(!ap || !verify(ap), "unresolved", "I7", "approval missing, unsigned or not signed by an approver", { need: "approval", ref: inv.approval_ref ?? "-" });
+      // An operation approval (spec 5.10, v0.3) lists the digests of the effects of one call instead of one digest.
+      // From Takao Sato's VATE case 1 (openid/authzen#795): one admission covering an operation that writes two files.
+      const listed = "effect_digests" in ap ? ap.effect_digests : null;
+      let opUse = null;
+      if ("effect_digests" in ap) {
+        check("effect_digest" in ap || !Array.isArray(listed) || !listed.length || !listed.every(x => typeof x === "string" && /^[0-9a-f]{64}$/.test(x)),
+          "unresolved", "I7", "an operation approval needs a non-empty effect_digests list of digests, and no effect_digest",
+          { need: "approval", ref: ap.id ?? "?" });
+        opUse = "set:" + sha256Hex(canon([...listed].sort()));
+      } else { // neither form: malformed (spec 5.10), the same result in every verifier
+        check(!("effect_digest" in ap), "unresolved", "I7", "approval has no effect_digest or effect_digests",
+          { need: "approval", ref: ap.id ?? "?" });
+      }
       for (const [d, x] of bodies) {
-        check(ap.effect_digest !== d, "violated", "I8", "approval not bound to the executed effect", { blame: "agent" });
         const nExec = effectsOf.filter(([, dd]) => dd === d).length;
-        check(nExec > 1, "violated", "I8", `one approval, but the approved effect was executed ${nExec} times`, { blame: "agent" });
+        if (listed === null) {
+          check(ap.effect_digest !== d, "violated", "I8", "approval not bound to the executed effect", { blame: "agent" });
+          check(nExec > 1, "violated", "I8", `one approval, but the approved effect was executed ${nExec} times`, { blame: "agent" });
+        } else {
+          const nOk = listed.filter(y => y === d).length;
+          check(nExec > nOk, "violated", "I8", nOk === 0 ? "the operation approval does not cover the executed effect"
+            : `the operation approval covers this effect ${nOk} time(s), but it was executed ${nExec} times`, { blame: "agent" });
+        }
         check(!!ap.consumed, "violated", "I8", "approval already consumed", { blame: "agent" });
         check("expiry" in ap && toTime(ap.expiry) < Math.max(tInv, toTime(x.t)), "violated", "I8", "approval expired", { blame: "agent" });
         check("nbf" in ap && toTime(ap.nbf) > tInv, "violated", "I8", "approval not yet valid", { blame: "agent" });
-        const first = approvalUse[ap.id] ??= [id, d];
-        check(first[0] !== id || first[1] !== d, "violated", "I8", `approval already used by ${first[0]}`, { blame: "agent" });
+        const use = listed === null ? d : opUse;
+        const first = approvalUse[ap.id] ??= [id, use];
+        check(first[0] !== id || first[1] !== use, "violated", "I8", `approval already used by ${first[0]}`, { blame: "agent" });
       }
     }
     // quantity limits (spec 7.6, v0.3), on every node of the chain and on the intent. An approval that passed I8

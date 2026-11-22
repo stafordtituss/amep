@@ -164,9 +164,15 @@ call-statement = {                             ; [observer] (spec 5.14, AMEP 0.3
   * extension-key => any
 }
 
+approved-effects = (
+  effect_digest: tstr .regexp "[0-9a-f]{64}"   ; SHA-256 of JCS(executed-body without t)
+  //
+  effect_digests: [+ tstr .regexp "[0-9a-f]{64}"]   ; operation approval (v0.3): one per approved effect of one call
+)
+
 approval = {                                   ; [approver]
   id: ref, kind: "approval"
-  effect_digest: tstr .regexp "[0-9a-f]{64}"   ; SHA-256 of JCS(executed-body without t)
+  approved-effects
   presence: "webauthn" / "chat_user" / "host_ui" / "none"
   ? approver: tstr
   ? resource_version: tstr

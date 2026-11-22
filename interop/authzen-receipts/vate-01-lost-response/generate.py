@@ -20,8 +20,13 @@ In AMEP:
                  the same args_digest) but does not decide it: holding the same logical effect is an idempotency
                  property of the enforcement point, which VATE's PEP comparison covers and AMEP does not.
 
-Where AMEP differs: an AMEP approval binds the digest of exactly one executed effect, and an invocation cites at
-most one approval, so VATE's single admission covering a two-file operation has no one-approval equivalent.
+  4-approved-recovered  As 2-recovered, with the owner's admission carried as an AMEP operation approval (spec
+                 5.10, v0.3) listing the digests of both file effects: preserved.
+  5-approved-retried    As 3-retried, under that approval: the retry spends the admission a second time, so the
+                 packet is violated (I8). With an admission, AMEP decides the hold.
+
+Operation approvals were added to AMEP because of this case: before them, an approval bound exactly one executed
+effect, so a single admission covering a two-file operation had no AMEP equivalent.
 
 Each evaluation's conclusion is kept as a signed verdict record (spec 10.8) by the caller's verifier key, so
 the pending "unresolved" stays in the history next to the later "preserved", each naming the packet it read.
@@ -45,7 +50,7 @@ sys.path.insert(0, os.path.join(ROOT, "packages", "python", "src"))
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey  # noqa: E402
 
 from amep_verifier import Signer  # noqa: E402
-from amep_protocol.core import canon, digest, evaluate_text, verdict  # noqa: E402
+from amep_protocol.core import approval_digest, canon, digest, evaluate_text, verdict  # noqa: E402
 from amep_protocol.verdicts import sign_envelope, statement, verify_envelope  # noqa: E402
 
 VATE = ("https://github.com/Poke-nushi/Verifiable-Agent-Trust-Envelope/tree/c7533ad70c20e71b7912cdf708f33220e49c1f00/"
@@ -60,7 +65,7 @@ ARGS_DIGEST = hashlib.sha256(canon(OPERATION)).hexdigest()
 
 
 def build():
-    I = Signer("owner", ["issuer"])                  # the local owner: issues the mandate
+    I = Signer("owner", ["issuer", "approver"])      # the local owner: issues the mandate and admits the operation
     H = Signer("runtime-a", ["host"])                # the caller's runtime: signs what it asked for
     O = Signer("provider-local", ["observer"])       # the provider: signs what it executed
     keys = {s.kid: s.public() for s in (I, H, O)}
@@ -76,9 +81,12 @@ def build():
     adapter = H.sign({"id": "a-1", "kind": "interpretation", "source": "curated", "adapter": "vate-demo-file-set",
                       "version": "v1"}, v=2)
 
-    def invocation(n, t):
+    admission = I.sign({"id": "ap-1", "kind": "approval", "effect_digests": [approval_digest(b) for b in file_set],
+                        "presence": "host_ui", "expiry": 50}, v=2)
+
+    def invocation(n, t, approved=False):
         return H.sign({"id": f"i-{n}", "kind": "invocation", "authority_ref": "m-1", "interpretation_ref": "a-1",
-                       "actor": "urn:vate:demo:requester", "t": t,
+                       "actor": "urn:vate:demo:requester", "t": t, **({"approval_ref": "ap-1"} if approved else {}),
                        "declared": {"action": "demo.create_file_set", "resource": RESOURCE, "effect": "write_local"},
                        "args_digest": ARGS_DIGEST}, v=2)
 
@@ -100,10 +108,19 @@ def build():
     i2 = invocation(2, 20)
     r2, c2 = provider_evidence(i2, 2)
     retried = {**base, "invocations": [i1, i2], "effects": r1 + r2, "call_statements": [c1, c2]}
+    a1 = invocation(1, 10, approved=True)
+    ra1, ca1 = provider_evidence(a1, 1)
+    a2 = invocation(2, 20, approved=True)
+    ra2, ca2 = provider_evidence(a2, 2)
+    approved = {**base, "approvals": [admission]}
+    approved_recovered = {**approved, "invocations": [a1], "effects": ra1, "call_statements": [ca1]}
+    approved_retried = {**approved, "invocations": [a1, a2], "effects": ra1 + ra2, "call_statements": [ca1, ca2]}
     return keys, [
         ("1-pending", "The response was lost: the caller holds only its own signed invocation", pending),
         ("2-recovered", "The provider's signed statement and receipts for the original invocation are recovered", recovered),
         ("3-retried", "Instead of holding, the caller retried with a new invocation; the provider ran it again", retried),
+        ("4-approved-recovered", "Recovered, with the admission as an operation approval over both effects", approved_recovered),
+        ("5-approved-retried", "Retried under that approval: the admission is spent twice", approved_retried),
     ]
 
 
@@ -115,7 +132,8 @@ def main():
         json.dump(keys, fh, indent=1)
     with open(os.path.join(HERE, "verifier-key.json"), "w") as fh:
         json.dump({"caller-verifier": pub}, fh, indent=1)
-    expected = {"1-pending": ("unresolved", "I7"), "2-recovered": ("preserved", "-"), "3-retried": ("preserved", "-")}
+    expected = {"1-pending": ("unresolved", "I7"), "2-recovered": ("preserved", "-"), "3-retried": ("preserved", "-"),
+                "4-approved-recovered": ("preserved", "-"), "5-approved-retried": ("violated", "I8")}
     texts = {}
     for name, title, packet in cases:
         text = json.dumps(packet, indent=1, ensure_ascii=False) + "\n"
@@ -131,7 +149,7 @@ def main():
         with open(os.path.join(HERE, f"{name}.verdict.dsse.json"), "w") as fh:
             json.dump(env, fh, indent=1)
         detail = v.blame if v.outcome == "violated" else ", ".join(f"{g['need']} {g['ref']}" for g in v.gaps)
-        print(f"{name:12} {v.outcome:10} {v.invariant:3} {detail or ''}  ({title})")
+        print(f"{name:20} {v.outcome:10} {v.invariant:3} {detail or ''}  ({title})")
     # nothing in the pending packet is replaced by recovery: every object in it appears unchanged in 2-recovered
     for kind, objs in texts["1-pending"].items():
         if isinstance(objs, list):

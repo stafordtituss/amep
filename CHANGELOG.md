@@ -2,6 +2,14 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## Operation approvals (unreleased, 2026-11-22)
+
+- **Spec 5.10:** an approval may carry `effect_digests`, a non-empty list of effect digests, instead of `effect_digest`. It approves the effects of one call. Every executed effect of that invocation must be listed, and no body may run more often than it is listed; otherwise the result is `violated` (I8). An approved effect that didn't run is not a violation. It's single use like any approval, so a retry that cites it is `violated` (I8). An approval with both members, or with an empty or malformed list, is `unresolved` (I7).
+- **Additive:** approvals with `effect_digest` are evaluated exactly as before (every earlier vector and `verify` output is unchanged), and a verifier without this rule never returns `preserved` for one.
+- **Fix (both verifiers):** an approval with no digest at all was `unresolved` in Python but `violated` (I8) in JavaScript; the spec makes it malformed, and both now return `unresolved` (I7). No earlier vector covered it, so the differential check couldn't see the disagreement. Found while testing how earlier verifiers treat operation approvals; there's now a vector for it.
+- Motivated by Takao Sato's VATE reference case 1 for openid/authzen#795: a single admission covering an operation that writes two files had no AMEP equivalent. `interop/authzen-receipts/vate-01-lost-response` adds the admission, and the retry is now `violated` (I8).
+- Suite v0.3.0 is now 214 vectors (57 positive, 157 must-reject), 10 of them new; both verifiers agree on all 250 vectors of the three suites. JSON Schema (with `oneOf`, now in the built-in validator too) and CDDL updated.
+
 ## AER-1 refusal records; VATE case 1 (unreleased, 2026-11-22)
 
 - **Fix (`amep-conformance import`, AER-1 profile):** a record of a call a gateway refused imported as an executed effect, although its committed output says `"executed": false`. Such records now produce no effect; the call stays `unresolved`, since an unsigned record can't confirm non-execution either. Only content inside the record's output commitment counts. Found by Brennan Zambo running the import over 12 live Zambo receipts ([amep#11](https://github.com/stafordtituss/amep/issues/11)); the same records now give 8 imported and 4 not.

@@ -24,7 +24,11 @@ EXPECTED_INVALID = {"must-reject/malformed-timestamp.json",
                     "must-reject/value-given-as-a-string-instead-of-an-object.json",
                     "must-reject/call-statement-with-an-unknown-disposition.json",
                     "must-reject/call-statement-with-a-negative-effect-count.json",
-                    "must-reject/receipt-that-names-no-observer.json"}
+                    "must-reject/receipt-that-names-no-observer.json",
+                    # v0.3: an operation approval must carry exactly one non-empty effect_digests list
+                    "must-reject/operation-approval-that-also-has-effect-digest.json",
+                    "must-reject/operation-approval-with-an-empty-list.json",
+                    "must-reject/approval-with-neither-effect-digest-nor-effect-digests.json"}
 
 def _no_dups(pairs):
     if len({k for k, _ in pairs}) != len(pairs):
@@ -64,6 +68,8 @@ def validate(v, s, doc, path="$"):
         errs.append(f"{path}: {v!r} not in {s['enum']}")
     if "anyOf" in s and not any(not validate(v, alt, doc, path) for alt in s["anyOf"]):
         errs.append(f"{path}: matches none of anyOf")
+    if "oneOf" in s and sum(1 for alt in s["oneOf"] if not validate(v, alt, doc, path)) != 1:
+        errs.append(f"{path}: does not match exactly one of oneOf")
     if isinstance(v, str):
         if "pattern" in s and not re.search(s["pattern"], v):
             errs.append(f"{path}: {v!r} does not match {s['pattern']}")

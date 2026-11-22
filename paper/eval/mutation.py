@@ -171,6 +171,10 @@ EQUIVALENT = {
     # which evaluate() turns into the same unresolved (I7). Kept for clear reasons; vectors cover both paths.
     '_check(not isinstance(v, dict), "unresolved", "I7", "value must be an object", need="value"',
     '_check(v is None, "unresolved", "I7", f"{n[\'id\']} limits this effect but the receipt records no value"',
+    # v0.3: an approval with neither digest. Without this check Python indexes the missing effect_digest and raises,
+    # which evaluate() turns into the same unresolved (I7); the check is there so that the JavaScript verifier, which
+    # would compare against undefined and return violated (I8), agrees. A vector covers it.
+    '_check("effect_digest" not in appr, "unresolved", "I7", "approval has no effect_digest or effect_digests"',
 }
 
 

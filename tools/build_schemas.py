@@ -120,11 +120,13 @@ schemas["call_statement"] = obj("call_statement", "CallStatement (spec 5.14). Si
     "disposition": {"enum": ["completed", "not_executed", "failed_after_effects"]},
     "effect_count": {"type": "integer", "minimum": 0}, "t": ref("time"),
     "invocation_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "args_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "proof": ref("proof")}, "call_statement")
-schemas["approval"] = obj("approval", "ApprovalBinding (spec 5.10). Signed by role approver. The digest excludes t.", ["id", "effect_digest", "presence"], {
+schemas["approval"] = obj("approval", "ApprovalBinding (spec 5.10). Signed by role approver. The digest excludes t. Exactly one of effect_digest and effect_digests (an operation approval, v0.3).", ["id", "presence"], {
     "id": ref("ref"), "effect_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "effect_digests": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
     "presence": {"enum": ["webauthn", "chat_user", "host_ui", "none"]}, "approver": {"type": "string"},
     "resource_version": {"type": "string"}, "nbf": ref("time"), "expiry": ref("time"), "consumed": {"type": "boolean"},
     "proof": ref("proof")}, "approval")
+schemas["approval"]["oneOf"] = [{"required": ["effect_digest"]}, {"required": ["effect_digests"]}]
 schemas["finding"] = obj("finding", "ContentFinding (spec 5.11). Counts as trusted only when signed (role host or observer).",
     ["id", "source_locator", "content_hash", "integrity_label"], {
     "id": ref("ref"), "source_locator": {"type": "string"}, "content_hash": {"type": "string"},
