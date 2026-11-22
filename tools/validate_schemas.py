@@ -28,7 +28,11 @@ EXPECTED_INVALID = {"must-reject/malformed-timestamp.json",
                     # v0.3: an operation approval must carry exactly one non-empty effect_digests list
                     "must-reject/operation-approval-that-also-has-effect-digest.json",
                     "must-reject/operation-approval-with-an-empty-list.json",
-                    "must-reject/approval-with-neither-effect-digest-nor-effect-digests.json"}
+                    "must-reject/approval-with-neither-effect-digest-nor-effect-digests.json",
+                    # v0.3: grants is exclusive with actions/resources and never empty; an unversioned packet that
+                    # carries both keeps v0.2 handling in the verifier, but is not valid against the v0.3 schema
+                    "must-reject/grants-beside-actions-and-resources.json", "must-reject/grants--an-empty-list.json",
+                    "must-reject/unversioned-packet-with-grants.json"}
 
 def _no_dups(pairs):
     if len({k for k, _ in pairs}) != len(pairs):

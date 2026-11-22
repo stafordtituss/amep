@@ -37,9 +37,20 @@ unit = tstr .regexp "[a-z][a-z0-9-]{0,31}:[!-~]{1,128}"
 value = { amount: amount, unit: unit, ? period_spent: { * tstr .regexp "[1-9][0-9]{0,15}" => amount }, * extension-key => any }
 limit = { unit: unit, ? per_effect: amount, ? per_call: amount, ? counted_by: tstr, ? (per_period: amount, period: uint .ge 1), ? actions: [* tstr], * extension-key => any }
 
-claims = {
+authority = (
   actions: [+ tstr]
   resources: [+ tstr]
+  //
+  grants: [+ grant]                            ; v0.3: a union of (actions x resources) products (spec 5.3)
+)
+
+grant = {
+  actions: [+ tstr]
+  resources: [+ tstr]
+}
+
+claims = {
+  authority
   ? data: [* data-flow]
   ceiling: effect-class
   exp: amep-time

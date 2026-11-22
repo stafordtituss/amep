@@ -229,9 +229,20 @@ export const approvalDigest = x => digest(effectIdentity(x));
 // ---- claim algebra (spec 6.3, 7) ----
 const patMatch = (v, p) => p === "*" || v === p || (p.endsWith("*") && v.startsWith(p.slice(0, -1)));
 const subsumed = (cs, ps) => cs.every(c => ps.some(p => p === "*" || c === p || (p.endsWith("*") && c.replace(/\*+$/, "").startsWith(p.slice(0, -1)))));
-function narrower(c, p) {
-  if (!subsumed(c.actions, p.actions)) return [false, "actions widened"];
-  if (!subsumed(c.resources, p.resources)) return [false, "resources widened"];
+// grants (spec 5.3, v0.3): authority as a union of (actions x resources) products instead of one product. Plain
+// actions and resources are one grant. Used only in v0.3 packets; elsewhere the original single-product rules apply.
+const usesGrants = (c, v03) => v03 && "grants" in c;
+const grantsOf = (c, v03) => (usesGrants(c, v03) ? c.grants : [{ actions: c.actions, resources: c.resources }]);
+function narrower(c, p, v03 = false) {
+  if (usesGrants(c, v03) || usesGrants(p, v03)) {
+    // every child grant must lie within one parent grant (sound: it never accepts a widening)
+    const pg = grantsOf(p, v03);
+    if (!grantsOf(c, v03).every(g => pg.some(G => subsumed(g.actions, G.actions) && subsumed(g.resources, G.resources))))
+      return [false, "grants widened"];
+  } else {
+    if (!subsumed(c.actions, p.actions)) return [false, "actions widened"];
+    if (!subsumed(c.resources, p.resources)) return [false, "resources widened"];
+  }
   if (!(c.data || []).every(d => (p.data || []).includes(d))) return [false, "data classes widened"];
   if (CEILING.indexOf(c.ceiling) > CEILING.indexOf(p.ceiling)) return [false, "effect ceiling raised"];
   if (toTime(c.exp) > toTime(p.exp)) return [false, "validity extended"];
@@ -248,8 +259,12 @@ function narrower(c, p) {
   }
   return [true, ""];
 }
-function meet(a, b) {
-  const m = { actions: a.actions.filter(x => subsumed([x], b.actions)), resources: a.resources.filter(x => subsumed([x], b.resources)),
+function meet(a, b, v03 = false) {
+  const authority = (usesGrants(a, v03) || usesGrants(b, v03))
+    ? { grants: grantsOf(a, v03).flatMap(g => grantsOf(b, v03).map(G => ({ actions: g.actions.filter(x => subsumed([x], G.actions)),
+        resources: g.resources.filter(x => subsumed([x], G.resources)) }))).filter(p => p.actions.length && p.resources.length) }
+    : { actions: a.actions.filter(x => subsumed([x], b.actions)), resources: a.resources.filter(x => subsumed([x], b.resources)) };
+  const m = { ...authority,
     data: (a.data || []).filter(d => (b.data || []).includes(d)).sort(),
     ceiling: CEILING[Math.min(CEILING.indexOf(a.ceiling), CEILING.indexOf(b.ceiling))], exp: Math.min(toTime(a.exp), toTime(b.exp)) };
   const nbfs = [a, b].filter(c => "nbf" in c).map(c => toTime(c.nbf)); if (nbfs.length) m.nbf = Math.max(...nbfs);
@@ -258,10 +273,12 @@ function meet(a, b) {
     if (key in a || key in b) m[key] = [...new Set([...(a[key] || []), ...(b[key] || [])])].sort();
   return m;
 }
-function effectOk(x, c) {
-  if (!c.actions.some(p => patMatch(x.action, p))) return [false, "action outside claims"];
+function effectOk(x, c, v03 = false) {
+  const act = grantsOf(c, v03).filter(g => g.actions.some(p => patMatch(x.action, p)));
+  if (!act.length) return [false, "action outside claims"];
   if ((c.deny_actions || []).some(p => patMatch(x.action, p))) return [false, "action denied"];
-  if (!c.resources.some(p => patMatch(x.resource, p))) return [false, "resource outside claims"];
+  // with grants, the action and the resource must fall within the same grant
+  if (!act.some(g => g.resources.some(p => patMatch(x.resource, p)))) return [false, "resource outside claims"];
   if ((c.deny_resources || []).some(p => patMatch(x.resource, p))) return [false, "resource denied"];
   if (CEILING.indexOf(x.effect) > CEILING.indexOf(c.ceiling)) return [false, "effect above ceiling"];
   for (const d of x.released || []) if (!(c.data || []).includes(d)) return [false, `released ${d} not allowed`];
@@ -281,7 +298,7 @@ const cost = x => {
 const AMOUNT = /^(0|[1-9][0-9]{0,38})(\.[0-9]{1,18})?$/, UNIT = /^[a-z][a-z0-9-]{0,31}:[!-~]{1,128}$/;
 const SCALE = 10n ** 18n;
 const MONEY_UNITS = ["iso4217:", "caip19:"];
-export const CLAIM_MEMBERS = new Set(["actions", "resources", "data", "ceiling", "exp", "nbf", "purpose", "deny_actions", "deny_resources", "depth", "budget", "limits"]);
+export const CLAIM_MEMBERS = new Set(["actions", "resources", "grants", "data", "ceiling", "exp", "nbf", "purpose", "deny_actions", "deny_resources", "depth", "budget", "limits"]);
 const LIMIT_MEMBERS = new Set(["unit", "per_effect", "per_call", "per_period", "period", "actions", "counted_by"]);
 const INTEGER_AMOUNT = /^(0|[1-9][0-9]{0,38})$/, PERIOD_KEY = /^[1-9][0-9]{0,15}$/;
 // Amounts in caip19: units are integers in the asset's smallest unit, as the chain records them (spec 5.9.2).
@@ -437,9 +454,21 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     const nodes = [...chain, ...(intent ? [intent] : [])];
     const limited = nodes.filter(x => "limits" in x.claims);
     for (const x of limited) checkLimits(x.claims.limits);
+    // grants are an AMEP 0.3 member. Ignored, as v0.2 ignores unknown members, they could widen authority the
+    // producer meant to narrow, so an unversioned packet that uses them is malformed instead.
+    if (!v03) for (const x of nodes)
+      check("grants" in x.claims, "unresolved", "I7", `${x.id}: grants require amep_version 0.3`, { need: "well_formed_evidence", ref: x.id });
     if (v03) for (const x of nodes) {
       let unknown = Object.keys(x.claims).filter(k => !CLAIM_MEMBERS.has(k) && !isExtensionMember(k)).sort();
       check(unknown.length > 0, "unresolved", "I7", `${x.id}: claim member not understood (${unknown.join(", ")})`, { need: "verifier_support", ref: x.id });
+      if ("grants" in x.claims) {
+        const g = x.claims.grants;
+        const ok = Array.isArray(g) && g.length > 0 && !("actions" in x.claims) && !("resources" in x.claims)
+          && g.every(e => e && typeof e === "object" && !Array.isArray(e) && Object.keys(e).sort().join() === "actions,resources"
+            && ["actions", "resources"].every(k => Array.isArray(e[k]) && e[k].length > 0 && e[k].every(p => typeof p === "string")));
+        check(!ok, "unresolved", "I7", `${x.id}: grants must be a non-empty list of {actions, resources}, without actions or resources beside it`,
+          { need: "well_formed_evidence", ref: x.id });
+      }
       for (const lim of x.claims.limits || []) {
         unknown = Object.keys(lim).filter(k => !LIMIT_MEMBERS.has(k) && !isExtensionMember(k)).sort();
         check(unknown.length > 0, "unresolved", "I7", `${x.id}: limit member not understood (${unknown.join(", ")})`, { need: "verifier_support", ref: x.id });
@@ -449,7 +478,7 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     const pinned = pk.pinned_adapters || {};
     check(Object.keys(pinned).length > 0 && pinned[interp.adapter] !== interp.version, "unresolved", "I3", "adapter revision not approved (pin mismatch)", { need: "interpretation_pin", ref: inv.interpretation_ref ?? "-" });
     for (let i = 1; i < chain.length; i++) {
-      const [ok, why] = narrower(chain[i].claims, chain[i - 1].claims); check(!ok, "violated", "I1", `${chain[i].id}: ${why}`, { blame: "delegator" });
+      const [ok, why] = narrower(chain[i].claims, chain[i - 1].claims, v03); check(!ok, "violated", "I1", `${chain[i].id}: ${why}`, { blame: "delegator" });
       const lw = limitsNarrower(chain[i].claims, chain[i - 1].claims); check(!!lw, "violated", "I1", `${chain[i].id}: ${lw}`, { blame: "delegator" });
     }
     // liveness (spec 5.12), at the invocation and at each effect's own time. A revocation still inside the revoked
@@ -506,8 +535,8 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     }
     check(!mine.length, "unresolved", "I7", "no executed-effect receipt", { need: "receipt", ref: id });
     const highImpact = CEILING.indexOf(inv.declared.effect) >= CEILING.indexOf("write_shared");
-    let claims = chain[0].claims; for (const c of chain.slice(1)) claims = meet(c.claims, claims);
-    if (intent) claims = meet(intent.claims, claims);
+    let claims = chain[0].claims; for (const c of chain.slice(1)) claims = meet(c.claims, claims, v03);
+    if (intent) claims = meet(intent.claims, claims, v03);
     const ap = "approval_ref" in inv ? objs[inv.approval_ref] : undefined;
     const byObserver = new Map();   // observer -> effect identity digest -> its receipts, in packet order
     for (const e of mine) {
@@ -526,7 +555,7 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       if ("mediated" in inv) check(canon(x) !== canon(inv.mediated), "violated", "I2", "executed differs from mediated effect", { blame: "server" });
       else check(x.action !== inv.declared.action || x.resource !== inv.declared.resource, "violated", "I2", "declared != executed", { blame: "server" });
       check(isGuardrail(x.resource, extraProtected), "violated", "I9", "executed effect targets guardrail/evidence store", { blame: "agent" });
-      const [ok, why] = effectOk(x, claims);
+      const [ok, why] = effectOk(x, claims, v03);
       check(!ok, "violated", why.startsWith("released") ? "I5" : "I2", why, { blame: "agent" });
       // spec 5.9.1: data classes carried in through lineage (or read by this effect) reach the recipient too
       if ("recipient" in x) {

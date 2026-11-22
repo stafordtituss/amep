@@ -804,6 +804,43 @@ def vectors():
     add("approval with neither effect_digest nor effect_digests", ("unresolved", "I7"), lambda p, I, H, O, X: (
         v03(p, I, H, O), p.update(approvals=[I.sign({"id": "ap-x", "kind": "approval", "presence": "webauthn"}, v=2)],
                                   invocations=[H.sign({**p["invocations"][0], "approval_ref": "ap-x"}, v=2)])))
+
+    # 8. Grants (spec 5.3, v0.3): authority as a union of (actions x resources) products. Raised by comparing AMEP with
+    # the Delegation Receipt Protocol's (operation, resource) pairs, which one product cannot express without widening.
+    G = [{"actions": ["fs.read"], "resources": ["repo:app/docs/*"]}, {"actions": ["fs.write"], "resources": ["repo:app/src/*"]}]
+
+    def grants(p, I, H, O, mandate=None, deleg=None, resource=None, versioned=True):
+        if versioned:
+            v03(p, I, H, O)
+        sign = (lambda o: I.sign(o, v=2)) if versioned else I.sign
+        def with_authority(claims, auth):
+            c = {k: v for k, v in claims.items() if k not in ("actions", "resources")} if "grants" in auth and "keep" not in auth else dict(claims)
+            c.update({k: v for k, v in auth.items() if k != "keep"})
+            return c
+        if mandate is not None:
+            p["mandates"] = [sign({**p["mandates"][0], "claims": with_authority(p["mandates"][0]["claims"], mandate)})]
+        if deleg is not None:
+            p["delegations"] = [sign({**p["delegations"][0], "claims": with_authority(p["delegations"][0]["claims"], deleg)})]
+        if resource:
+            inv = p["invocations"][0]
+            p["invocations"] = [H.sign({**inv, "declared": {**inv["declared"], "resource": resource}}, v=2)]
+            eff = p["effects"][0]
+            p["effects"] = [O.sign({**eff, "executed": {**eff["executed"], "resource": resource}}, v=2)]
+    add("grants: an effect within one of the mandate's grants", ("preserved", "-"), lambda p, I, H, O, X:
+        grants(p, I, H, O, mandate={"grants": G}))
+    add("grants: action from one grant, resource from another", ("violated", "I2"), lambda p, I, H, O, X:
+        grants(p, I, H, O, mandate={"grants": G}, deleg={"grants": G}, resource="repo:app/docs/readme.md"))
+    add("grants: delegation wider than every mandate grant", ("violated", "I1"), lambda p, I, H, O, X:
+        grants(p, I, H, O, mandate={"grants": G}, deleg={"grants": [{"actions": ["fs.write"], "resources": ["repo:app/*"]}]}))
+    add("grants: delegation grants within a plain mandate", ("preserved", "-"), lambda p, I, H, O, X:
+        grants(p, I, H, O, deleg={"grants": [{"actions": ["fs.write"], "resources": ["repo:app/src/*"]},
+                                            {"actions": ["fs.read"], "resources": ["repo:app/docs/*"]}]}))
+    add("grants beside actions and resources", ("unresolved", "I7"), lambda p, I, H, O, X:
+        grants(p, I, H, O, mandate={"grants": G, "keep": True}))
+    add("grants: an empty list", ("unresolved", "I7"), lambda p, I, H, O, X:
+        grants(p, I, H, O, mandate={"grants": []}))
+    add("unversioned packet with grants", ("unresolved", "I7"), lambda p, I, H, O, X:
+        grants(p, I, H, O, mandate={"grants": [{"actions": ["fs.read"], "resources": ["repo:app/docs/*"]}], "keep": True}, versioned=False))
     return keys, V
 
 

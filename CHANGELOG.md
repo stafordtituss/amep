@@ -2,6 +2,15 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## Grants: authority as a union of products (unreleased, 2026-11-22)
+
+- **Spec 5.3:** a claim set may carry `grants`, a list of `{actions, resources}`, instead of `actions` and `resources`. Each grant permits its actions on its resources, and the authority is their union. One product (`actions` × `resources`) can't express "read the documents, write the reports" without also permitting "write the documents"; grants can. Plain claims count as one grant, so the two forms mix along a chain:
+  - an effect satisfies the claims when one grant permits both its action and its resource (I2);
+  - a delegation is narrower when each of its grants lies within one parent grant (I1), which never accepts a widening.
+- **Additive:** claims with `actions` and `resources` are evaluated exactly as before (every earlier vector and `verify` output is unchanged). In an AMEP 0.3 packet, a verifier without the rule returns `unresolved` (unknown claim member), never `preserved`. An unversioned packet that uses `grants` is `unresolved` (I7) rather than ignored, because ignoring a narrowing member could widen authority.
+- Raised by comparing AMEP with the Delegation Receipt Protocol, whose scopes allow (operation, resource) pairs.
+- Suite v0.3.0 is now 221 vectors (59 positive, 162 must-reject), 7 of them new. Both verifiers agree on all 257 vectors of the three suites; JSON Schema and CDDL are updated.
+
 ## Coverage matrix (unreleased, 2026-11-22)
 
 - **AER-1 profile, binding gap wording:** the report now says what `input_hash_layout` means. Under `rfc8785-jcs-utf8-v1`, `input_hash` *is* AMEP's `args_digest`. Under another layout, it equals `args_digest` only for arguments that serialize identically under both. The report also says whether a binding was made. This is wording only; binding stays by digest. It was noted before the blind fixture run in amep#11 and fixed after it, so the run used the code the expectations were written against.

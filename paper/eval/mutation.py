@@ -175,6 +175,9 @@ EQUIVALENT = {
     # which evaluate() turns into the same unresolved (I7); the check is there so that the JavaScript verifier, which
     # would compare against undefined and return violated (I8), agrees. A vector covers it.
     '_check("effect_digest" not in appr, "unresolved", "I7", "approval has no effect_digest or effect_digests"',
+    # v0.3 grants: with no grant matching the action, the next check (no matching grant also permits the resource)
+    # fails too, with the same outcome and invariant; this one is kept for the clearer reason.
+    'if not act: return False, "action outside claims"',
 }
 
 

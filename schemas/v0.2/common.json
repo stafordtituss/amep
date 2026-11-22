@@ -168,8 +168,6 @@
   "claims": {
    "type": "object",
    "required": [
-    "actions",
-    "resources",
     "ceiling",
     "exp"
    ],
@@ -178,6 +176,19 @@
     "^x-": {},
     "\\.": {}
    },
+   "oneOf": [
+    {
+     "required": [
+      "actions",
+      "resources"
+     ]
+    },
+    {
+     "required": [
+      "grants"
+     ]
+    }
+   ],
    "properties": {
     "actions": {
      "type": "array",
@@ -192,6 +203,34 @@
       "type": "string"
      },
      "minItems": 1
+    },
+    "grants": {
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "actions",
+       "resources"
+      ],
+      "properties": {
+       "actions": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        },
+        "minItems": 1
+       },
+       "resources": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        },
+        "minItems": 1
+       }
+      }
+     }
     },
     "data": {
      "type": "array",

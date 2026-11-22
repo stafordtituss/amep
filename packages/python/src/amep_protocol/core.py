@@ -314,9 +314,26 @@ def subsumed(child_pats, parent_pats) -> bool:
                for c in child_pats)
 
 
-def narrower(child: dict, parent: dict) -> tuple[bool, str]:
-    if not subsumed(child["actions"], parent["actions"]): return False, "actions widened"
-    if not subsumed(child["resources"], parent["resources"]): return False, "resources widened"
+# grants (spec 5.3, v0.3): authority as a union of (actions x resources) products instead of one product. Plain
+# actions and resources are one grant. Used only in v0.3 packets; elsewhere the original single-product rules apply.
+def _uses_grants(c: dict, v03: bool) -> bool:
+    return v03 and "grants" in c
+
+
+def grants_of(c: dict, v03: bool) -> list:
+    return c["grants"] if _uses_grants(c, v03) else [{"actions": c["actions"], "resources": c["resources"]}]
+
+
+def narrower(child: dict, parent: dict, v03: bool = False) -> tuple[bool, str]:
+    if _uses_grants(child, v03) or _uses_grants(parent, v03):
+        # every child grant must lie within one parent grant (sound: it never accepts a widening)
+        pg = grants_of(parent, v03)
+        if not all(any(subsumed(g["actions"], G["actions"]) and subsumed(g["resources"], G["resources"]) for G in pg)
+                   for g in grants_of(child, v03)):
+            return False, "grants widened"
+    else:
+        if not subsumed(child["actions"], parent["actions"]): return False, "actions widened"
+        if not subsumed(child["resources"], parent["resources"]): return False, "resources widened"
     if not set(child.get("data", [])) <= set(parent.get("data", [])): return False, "data classes widened"
     if CEILING.index(child["ceiling"]) > CEILING.index(parent["ceiling"]): return False, "effect ceiling raised"
     if to_time(child["exp"]) > to_time(parent["exp"]): return False, "validity extended"
@@ -337,10 +354,16 @@ def narrower(child: dict, parent: dict) -> tuple[bool, str]:
     return True, ""
 
 
-def meet(a: dict, b: dict) -> dict:
-    m = {"actions": [x for x in a["actions"] if subsumed([x], b["actions"])],
-         "resources": [x for x in a["resources"] if subsumed([x], b["resources"])],
-         "data": sorted(set(a.get("data", [])) & set(b.get("data", []))),
+def meet(a: dict, b: dict, v03: bool = False) -> dict:
+    if _uses_grants(a, v03) or _uses_grants(b, v03):
+        pairs = [{"actions": [x for x in g["actions"] if subsumed([x], G["actions"])],
+                  "resources": [x for x in g["resources"] if subsumed([x], G["resources"])]}
+                 for g in grants_of(a, v03) for G in grants_of(b, v03)]
+        m = {"grants": [p for p in pairs if p["actions"] and p["resources"]]}
+    else:
+        m = {"actions": [x for x in a["actions"] if subsumed([x], b["actions"])],
+             "resources": [x for x in a["resources"] if subsumed([x], b["resources"])]}
+    m |= {"data": sorted(set(a.get("data", [])) & set(b.get("data", []))),
          "ceiling": CEILING[min(CEILING.index(a["ceiling"]), CEILING.index(b["ceiling"]))],
          "exp": min(to_time(a["exp"]), to_time(b["exp"]))}
     nbfs = [to_time(c["nbf"]) for c in (a, b) if "nbf" in c]
@@ -351,10 +374,13 @@ def meet(a: dict, b: dict) -> dict:
     return m
 
 
-def effect_ok(x: dict, c: dict) -> tuple[bool, str]:
-    if not any(pat_match(x["action"], p) for p in c["actions"]): return False, "action outside claims"
+def effect_ok(x: dict, c: dict, v03: bool = False) -> tuple[bool, str]:
+    gs = grants_of(c, v03)
+    act = [g for g in gs if any(pat_match(x["action"], p) for p in g["actions"])]
+    if not act: return False, "action outside claims"
     if any(pat_match(x["action"], p) for p in c.get("deny_actions", [])): return False, "action denied"
-    if not any(pat_match(x["resource"], p) for p in c["resources"]): return False, "resource outside claims"
+    # with grants, the action and the resource must fall within the same grant
+    if not any(any(pat_match(x["resource"], p) for p in g["resources"]) for g in act): return False, "resource outside claims"
     if any(pat_match(x["resource"], p) for p in c.get("deny_resources", [])): return False, "resource denied"
     if CEILING.index(x["effect"]) > CEILING.index(c["ceiling"]): return False, "effect above ceiling"
     for d in x.get("released", []):
@@ -378,7 +404,7 @@ AMOUNT = re.compile(r"^(0|[1-9][0-9]{0,38})(\.[0-9]{1,18})?$")
 UNIT = re.compile(r"^[a-z][a-z0-9-]{0,31}:[!-~]{1,128}$")
 _SCALE = 10 ** 18
 MONEY_UNITS = ("iso4217:", "caip19:")
-CLAIM_MEMBERS = {"actions", "resources", "data", "ceiling", "exp", "nbf", "purpose", "deny_actions", "deny_resources",
+CLAIM_MEMBERS = {"actions", "resources", "grants", "data", "ceiling", "exp", "nbf", "purpose", "deny_actions", "deny_resources",
                  "depth", "budget", "limits"}
 LIMIT_MEMBERS = {"unit", "per_effect", "per_call", "per_period", "period", "actions", "counted_by"}
 INTEGER_AMOUNT = re.compile(r"^(0|[1-9][0-9]{0,38})$")
@@ -632,10 +658,24 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
     limited = [n for n in chain + ([intent] if intent else []) if "limits" in n["claims"]]
     for n in limited:
         check_limits(n["claims"]["limits"])
+    if not ctx["v03"]:
+        # grants are an AMEP 0.3 member. Ignored, as v0.2 ignores unknown members, they could widen authority the
+        # producer meant to narrow, so an unversioned packet that uses them is malformed instead.
+        for n in chain + ([intent] if intent else []):
+            _check("grants" in n["claims"], "unresolved", "I7", f"{n['id']}: grants require amep_version 0.3",
+                   need="well_formed_evidence", ref=n['id'])
     if ctx["v03"]:
         for n in chain + ([intent] if intent else []):
             unknown = sorted(k for k in n["claims"] if k not in CLAIM_MEMBERS and not is_extension_member(k))
             _check(bool(unknown), "unresolved", "I7", f"{n['id']}: claim member not understood ({', '.join(unknown)})", need="verifier_support", ref=n['id'])
+            if "grants" in n["claims"]:
+                g = n["claims"]["grants"]
+                ok = (isinstance(g, list) and g and "actions" not in n["claims"] and "resources" not in n["claims"]
+                      and all(isinstance(e, dict) and set(e) == {"actions", "resources"} and all(
+                          isinstance(e[k], list) and e[k] and all(isinstance(p, str) for p in e[k]) for k in ("actions", "resources"))
+                          for e in g))
+                _check(not ok, "unresolved", "I7", f"{n['id']}: grants must be a non-empty list of {{actions, resources}}, without actions or resources beside it",
+                       need="well_formed_evidence", ref=n['id'])
             for lim in n["claims"].get("limits", []):
                 unknown = sorted(k for k in lim if k not in LIMIT_MEMBERS and not is_extension_member(k))
                 _check(bool(unknown), "unresolved", "I7", f"{n['id']}: limit member not understood ({', '.join(unknown)})", need="verifier_support", ref=n['id'])
@@ -645,7 +685,7 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
     _check(bool(pinned) and pinned.get(interp.get("adapter")) != interp.get("version"), "unresolved", "I3", "adapter revision not approved (pin mismatch)", need="interpretation_pin", ref=inv.get("interpretation_ref") or "-")
     # 5. attenuation
     for p, c in zip(chain, chain[1:]):
-        ok, why = narrower(c["claims"], p["claims"])
+        ok, why = narrower(c["claims"], p["claims"], ctx["v03"])
         _check(not ok, "violated", "I1", f"{c['id']}: {why}", blame="delegator")
         why = limits_narrower(c["claims"], p["claims"])
         _check(bool(why), "violated", "I1", f"{c['id']}: {why}", blame="delegator")
@@ -715,9 +755,9 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
     high_impact = CEILING.index(inv["declared"]["effect"]) >= CEILING.index("write_shared")
     eff_claims = chain[0]["claims"]
     for n in chain[1:]:
-        eff_claims = meet(n["claims"], eff_claims)
+        eff_claims = meet(n["claims"], eff_claims, ctx["v03"])
     if intent:
-        eff_claims = meet(intent["claims"], eff_claims)
+        eff_claims = meet(intent["claims"], eff_claims, ctx["v03"])
     appr = objs.get(inv.get("approval_ref")) if "approval_ref" in inv else None
     # 11-15. every receipt for this invocation is checked (spec 10.2)
     by_observer: dict = {}   # observer -> effect identity digest -> its receipts, in packet order
@@ -739,7 +779,7 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         else:
             _check((x["action"], x["resource"]) != (inv["declared"]["action"], inv["declared"]["resource"]), "violated", "I2", "declared != executed", blame="server")
         _check(is_guardrail(x["resource"], extra_protected), "violated", "I9", "executed effect targets guardrail/evidence store", blame="agent")
-        ok, why = effect_ok(x, eff_claims)
+        ok, why = effect_ok(x, eff_claims, ctx["v03"])
         _check(not ok, "violated", "I5" if why.startswith("released") else "I2", why, blame="agent")
         # spec 5.9.1: data classes carried in through lineage (or read by this effect) reach the recipient too
         if "recipient" in x:

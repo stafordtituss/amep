@@ -1,0 +1,137 @@
+{
+ "name": "grants: delegation wider than every mandate grant",
+ "expect": {
+  "outcome": "violated",
+  "invariant": "I1"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 100,
+     "depth": 2,
+     "grants": [
+      {
+       "actions": [
+        "fs.read"
+       ],
+       "resources": [
+        "repo:app/docs/*"
+       ]
+      },
+      {
+       "actions": [
+        "fs.write"
+       ],
+       "resources": [
+        "repo:app/src/*"
+       ]
+      }
+     ]
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "ffef75b6c80f0926983c26053b5f034a6cf1838e60dbe40e9774c4c62938869180703a4a3dc834a55925af5c36bca214b4b1a63ab4de49dba3982dcb4b4c8f09"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 90,
+     "depth": 1,
+     "grants": [
+      {
+       "actions": [
+        "fs.write"
+       ],
+       "resources": [
+        "repo:app/*"
+       ]
+      }
+     ]
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "329c51b42b9cb31ed38bffabc1aabfcb13df3239045c09187a952ea126ddb7543142dbd3720cf856857a3de3699049dbd3f2b7f80467940b97d39238265f2d04"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "host_shell",
+    "version": "r9",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "39a6a8663dcd45b7c212805d517d108e3864048bd5b8146837d1d638a4138dca2ed75e828946f9e33e507e9c2efc26a71c216a2e698d868963db309d5523380c"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "write_local"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "cb2566b49dfd1ab2204711d122799b4edf4cfaa7713fa72702e1135cd00b1e3fe6823b55eafe25e1b87b6869706c2840d9875868cea1e9c5ee9691984aa5430a"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "hook:host",
+    "assurance": "L1",
+    "executed": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "write_local",
+     "released": [],
+     "t": 11
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "a52e8758e9b5fd07fc230f023e0043dcc5245277c08cb9003d85367e16a5036e0bee966f2f794a0d65ac0e8aeb68c57d477f5a9a217fe2cd27f550d7d4ee9302"
+    }
+   }
+  ],
+  "amep_version": "0.3"
+ }
+}
