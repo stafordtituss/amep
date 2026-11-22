@@ -7,8 +7,8 @@ An [MCP](https://modelcontextprotocol.io) server that checks **AMEP** (Agentic M
 Give it an evidence packet and a key set, and it returns one of three verdicts:
 
 - `preserved`: the executed effect stayed within the delegated authority;
-- `violated`: it did not, and the result names the broken invariant (I1 to I11);
-- `unresolved`: the evidence cannot show it either way. This is never permission.
+- `violated`: it did not; the result names the broken invariant (I1 to I11) and the party at fault (`blame`);
+- `unresolved`: the evidence cannot show it either way, and the result lists the evidence needed (`gaps`). This is never permission.
 
 Evaluation runs locally with the reference verifier from [`amep-protocol`](https://pypi.org/project/amep-protocol/). Nothing is sent anywhere.
 
@@ -16,10 +16,10 @@ Evaluation runs locally with the reference verifier from [`amep-protocol`](https
 
 | Tool | What it does |
 |---|---|
-| `verify_packet` | Evaluates a packet against a key set. Returns the verdict, a result per invocation, and the verifier state to pass along with the next packet in a stream. |
+| `verify_packet` | Evaluates a packet against a key set. Give the packet as `packet_text`, its exact JSON text, which is parsed strictly so that duplicate member names are caught, or as `packet`, an object. Returns the verdict, a result per invocation with blame and gaps, `parsed_strictly`, and the verifier state to pass along with the next packet in a stream. |
 | `explain_invariant` | Explains I1 to I11, the outcome when each is broken, and which conformance vectors exercise it. |
-| `list_vectors` | Lists the bundled conformance vectors: the 118-vector AMEP suite (`core`), and the 20-vector W3C delegation-continuity suite (`delegation`). |
-| `get_vector` | Returns one vector, with its packet and test keys, ready for `verify_packet`. |
+| `list_vectors` | Lists the bundled conformance vectors: the 204-vector AMEP suite v0.3.0 (`core`), the 20-vector W3C delegation-continuity suite (`delegation`), and the 16-vector approval-path attacks suite (`approval-path`, a draft). |
+| `get_vector` | Returns one vector, with its packet (or exact `packet_text`) and test keys, ready for `verify_packet`. |
 | `check_suite` | Runs a bundled suite through the verifier and reports agreement, vector by vector. |
 
 ## Install

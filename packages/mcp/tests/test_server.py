@@ -45,11 +45,44 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_core_suite_conforms(self):
         r = await self.call("check_suite", suite="core")
-        self.assertEqual((r["vectors"], r["agree"], r["failures"]), (118, 118, []))
+        self.assertEqual((r["vectors"], r["agree"], r["failures"]), (204, 204, []))
 
     async def test_delegation_suite_conforms(self):
         r = await self.call("check_suite", suite="delegation")
         self.assertEqual((r["vectors"], r["agree"]), (20, 20))
+
+    async def test_approval_path_suite_conforms(self):
+        r = await self.call("check_suite", suite="approval-path")
+        self.assertEqual((r["vectors"], r["agree"], r["failures"]), (16, 16, []))
+
+    async def test_blame_and_gaps(self):
+        v = await self.call("get_vector", name="arguments-rewritten-in-transit")
+        r = await self.call("verify_packet", packet=v["packet"], keys=v["keys"])
+        self.assertEqual((r["verdict"]["outcome"], r["verdict"]["blame"], r["verdict"]["gaps"]), ("violated", "transport", []))
+        v = await self.call("get_vector", name="missing-effect-receipt")
+        r = await self.call("verify_packet", packet=v["packet"], keys=v["keys"])
+        self.assertIsNone(r["verdict"]["blame"])
+        self.assertEqual([g["need"] for g in r["verdict"]["gaps"]], ["receipt"])
+
+    async def test_packet_text_is_parsed_strictly(self):
+        v = await self.call("get_vector", name="duplicate-member-name-in-a-signed-effect-body")
+        self.assertIn("packet_text", v)
+        r = await self.call("verify_packet", packet_text=v["packet_text"], keys=v["keys"])
+        self.assertEqual((r["verdict"]["outcome"], r["verdict"]["invariant"]), ("unresolved", "I7"))
+        # a duplicated member name, which an object would silently lose, makes packet_text unresolved
+        ok = await self.call("get_vector", name="valid-preserved-flow")
+        text = json.dumps(ok["packet"])
+        dup = text.replace('"invocations": [', '"invocations": [], "invocations": [', 1)
+        self.assertNotEqual(dup, text)
+        r = await self.call("verify_packet", packet_text=dup, keys=ok["keys"])
+        self.assertEqual(r["verdict"]["outcome"], "unresolved")
+        r = await self.call("verify_packet", packet_text=text, keys=ok["keys"])
+        self.assertEqual(r["verdict"]["outcome"], "preserved")
+        # exactly one form of the packet
+        r = await self.raw("verify_packet", keys=ok["keys"])
+        self.assertTrue(getattr(r, "is_error", None) or getattr(r, "isError", None))
+        r = await self.raw("verify_packet", keys=ok["keys"], packet=ok["packet"], packet_text=text)
+        self.assertTrue(getattr(r, "is_error", None) or getattr(r, "isError", None))
 
     async def test_fetch_and_verify_a_vector(self):
         v = await self.call("get_vector", name="revoked-root-with-live-child")
@@ -59,8 +92,10 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_accepts_json_strings_and_key_lists(self):
         v = await self.call("get_vector", name="valid-preserved-flow")
-        r = await self.call("verify_packet", packet=json.dumps(v["packet"]), keys=list(v["keys"].values()))
-        self.assertEqual(r["verdict"]["outcome"], "preserved")
+        r = await self.call("verify_packet", packet_text=json.dumps(v["packet"]), keys=list(v["keys"].values()))
+        self.assertEqual((r["verdict"]["outcome"], r["parsed_strictly"]), ("preserved", True))
+        r = await self.call("verify_packet", packet=v["packet"], keys=json.dumps(v["keys"]))
+        self.assertEqual((r["verdict"]["outcome"], r["parsed_strictly"]), ("preserved", False))
 
     async def test_missing_evidence_is_never_permission(self):
         v = await self.call("get_vector", name="missing-effect-receipt")
@@ -89,7 +124,7 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         r = await self.raw("explain_invariant", invariant="I99")
         self.assertTrue(getattr(r, "is_error", None) or getattr(r, "isError", None))
         self.assertIn("unknown invariant", r.content[0].text)   # the model sees why, so it can correct itself
-        r = await self.raw("verify_packet", packet="{not json", keys={})
+        r = await self.raw("verify_packet", packet_text="{not json", keys={})
         self.assertTrue(getattr(r, "is_error", None) or getattr(r, "isError", None))
 
 

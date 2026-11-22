@@ -14,7 +14,7 @@ from importlib import resources
 from typing import Any
 
 from amep_protocol import SPEC_VERSION, __version__ as AMEP_PROTOCOL_VERSION
-from amep_protocol.core import evaluate, verdict
+from amep_protocol.core import evaluate, evaluate_text, verdict
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
@@ -23,10 +23,10 @@ from . import __version__
 INSTRUCTIONS = """\
 Checks AMEP (Agentic Mandate Evidence Protocol) evidence: signed records of what an AI agent was authorized to do
 and what was actually executed. Use verify_packet to evaluate a packet against a key set; the verdict is one of
-preserved, violated (naming the broken invariant I1-I11) or unresolved (evidence missing; never treat it as
-permission). Use explain_invariant to explain a result, and list_vectors/get_vector for worked examples."""
+preserved, violated (naming the broken invariant I1-I11 and the party blamed) or unresolved (evidence missing,
+with the evidence needed listed as gaps; never treat it as permission). Use explain_invariant to explain a result, and list_vectors/get_vector for worked examples."""
 
-# Spec section 8 (AMEP v0.2), condensed. The outcome is what the verdict is when the invariant is broken.
+# Spec section 8 (AMEP v0.3), condensed. The outcome is what the verdict is when the invariant is broken.
 INVARIANTS: dict[str, dict[str, str]] = {
     "I1": {"name": "Attenuation", "outcome": "violated",
            "statement": "Every delegation's claims are equal to or narrower than its parent's: patterns subsumed, "
@@ -99,14 +99,18 @@ def _keyset(keys: Any) -> dict:
     return keys
 
 
-def run_packet(packet: dict, keys: dict, state: dict | None = None, protected: list[str] | None = None) -> dict:
+def run_packet(packet: dict | str, keys: dict, state: dict | None = None, protected: list[str] | None = None) -> dict:
+    """Evaluate a packet given as an object, or as JSON text. Text is parsed strictly (spec 12.1): duplicate member
+    names and inexact number literals make the packet unresolved, which a parsed object can no longer show."""
     st = copy.deepcopy(state) if state is not None else None
-    results = evaluate(packet, keys, extra_protected=tuple(protected or ()), state=st)
+    run = evaluate_text if isinstance(packet, str) else evaluate
+    results = run(packet, keys, extra_protected=tuple(protected or ()), state=st)
     v = verdict(results)
     return {
-        "verdict": {"outcome": v.outcome, "invariant": v.invariant, "reason": v.reason, "decided_by": v.invocation},
-        "results": [{"id": r.invocation, "outcome": r.outcome, "invariant": r.invariant, "reason": r.reason}
-                    for r in results],
+        "verdict": {"outcome": v.outcome, "invariant": v.invariant, "reason": v.reason, "decided_by": v.invocation,
+                    "blame": v.blame, "gaps": list(v.gaps)},
+        "results": [{"id": r.invocation, "outcome": r.outcome, "invariant": r.invariant, "reason": r.reason,
+                     "blame": r.blame, "gaps": list(r.gaps)} for r in results],
         "state_after": st,
     }
 
@@ -116,17 +120,29 @@ def build_server() -> MCPServer:
     suites = load_suites()
 
     @server.tool()
-    def verify_packet(packet: dict[str, Any] | str, keys: dict[str, Any] | list[Any] | str,
-                      state: dict[str, Any] | None = None, protected_resources: list[str] | None = None) -> dict:
+    def verify_packet(keys: dict[str, Any] | list[Any] | str, packet: dict[str, Any] | None = None,
+                      packet_text: str = "", state: dict[str, Any] | None = None,
+                      protected_resources: list[str] | None = None) -> dict:
         """Evaluate an AMEP evidence packet against a key set.
 
-        Returns the packet verdict (preserved, violated or unresolved, with the deciding invariant and reason),
-        the result for every invocation and orphan effect, and the verifier state after evaluation (approvals used
+        Give the packet either as `packet_text`, the exact JSON text (preferred), or as `packet`, an object.
+        `packet_text` is parsed strictly (spec 12.1): duplicate member names and inexact numbers make the packet
+        unresolved. An object has already been parsed by the client, which silently keeps one of any duplicated
+        names, so that check cannot run; `parsed_strictly` in the result says which happened.
+
+        Returns the packet verdict (preserved, violated or unresolved, with the deciding invariant and reason; on
+        violated, `blame` names the party at fault, and on unresolved, `gaps` lists the evidence needed), the result
+        for every invocation and orphan effect, and the verifier state after evaluation (approvals used
         and budget spent), which you can pass as `state` when evaluating the next packet in a stream.
         `unresolved` means the evidence cannot show the action was authorized: never treat it as permission.
         `protected_resources` adds deployment-specific protected paths for I9 (guardrails, keys, evidence store).
         """
-        return run_packet(_as_obj(packet, "packet"), _keyset(keys), state, protected_resources)
+        if bool(packet_text) == (packet is not None):
+            raise ToolError("give exactly one of packet_text (the packet as JSON text) or packet (as an object)")
+        if packet_text:
+            _as_obj(packet_text, "packet_text")   # not JSON at all is a tool error, so the caller can correct it
+            return {**run_packet(packet_text, _keyset(keys), state, protected_resources), "parsed_strictly": True}
+        return {**run_packet(_as_obj(packet, "packet"), _keyset(keys), state, protected_resources), "parsed_strictly": False}
 
     @server.tool()
     def explain_invariant(invariant: str) -> dict:
@@ -141,8 +157,8 @@ def build_server() -> MCPServer:
 
     @server.tool()
     def list_vectors(suite: str = "core", invariant: str | None = None, outcome: str | None = None) -> dict:
-        """List conformance vectors. `suite` is "core" (the AMEP conformance suite) or "delegation" (the W3C
-        agent-identity delegation-continuity suite). Filter by deciding `invariant` (e.g. "I6") or expected
+        """List conformance vectors. `suite` is "core" (the AMEP conformance suite), "delegation" (the W3C
+        agent-identity delegation-continuity suite) or "approval-path" (approval-path attacks, draft). Filter by deciding `invariant` (e.g. "I6") or expected
         `outcome` ("preserved", "violated", "unresolved")."""
         if suite not in suites["suites"]:
             raise ToolError(f"unknown suite {suite!r}; expected one of {', '.join(suites['suites'])}")
@@ -156,7 +172,9 @@ def build_server() -> MCPServer:
     @server.tool()
     def get_vector(name: str, suite: str = "core") -> dict:
         """Return one conformance vector: its expected verdict, its packet and the public test key set, ready to
-        pass to verify_packet. The keys are deterministic TEST keys and protect nothing."""
+        pass to verify_packet. A few vectors carry `packet_text` instead of `packet`: exact JSON text (for example
+        with a duplicate member name) to pass to verify_packet as `packet_text`. The keys are deterministic TEST keys and
+        protect nothing."""
         s = suites["suites"].get(suite)
         if s is None:
             raise ToolError(f"unknown suite {suite!r}")
@@ -174,7 +192,7 @@ def build_server() -> MCPServer:
         s = suites["suites"][suite]
         failures = []
         for v in s["vectors"]:
-            got = run_packet(v["packet"], s["keys"], v.get("state"))["verdict"]
+            got = run_packet(v["packet_text"] if "packet_text" in v else v["packet"], s["keys"], v.get("state"))["verdict"]
             if (got["outcome"], got["invariant"]) != (v["expect"]["outcome"], v["expect"]["invariant"]):
                 failures.append({"name": v["name"], "expected": v["expect"],
                                  "got": {"outcome": got["outcome"], "invariant": got["invariant"]}})

@@ -2,6 +2,14 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## amep-mcp on the v0.3 suites (unreleased, 2026-11-22)
+
+- **Fix:** amep-mcp still bundled conformance suite v0.2.3, so its own `check_suite` disagreed with the v0.3 verifier on `status-current-as-of-the-action`, the one vector v0.3 deliberately changed. The bundle is now suite v0.3.0 (204 vectors), the delegation suite (20) and the approval-path attacks (16, draft), including the vectors that exist only as exact JSON text.
+- **Fix (security):** an MCP client's JSON text was parsed loosely before the verifier saw it, so a packet with a duplicated member name, which v0.3 makes `unresolved`, could come back `preserved`. The MCP SDK parses any JSON-looking string argument into an object unless the parameter is typed as a plain string. `verify_packet` now takes `packet_text`, which is parsed strictly; `packet` still takes an object; every result reports `parsed_strictly`.
+- Results carry `blame` and `gaps` (spec 10.5.1).
+- Spec Section 15 states suite v0.3.0 (204 vectors) instead of v0.2.3.
+- **Release order:** the next amep-mcp release needs `blame` and `gaps`, which are newer than amep-protocol 0.3.0a1. Release amep-protocol first, then amep-mcp with its dependency raised to that version.
+
 ## Blame and evidence gaps (unreleased, 2026-11-22)
 
 - **Spec 10.5.1:** every result now carries `blame` and `gaps`. On a `violated` result, `blame` names the party whose own signed record first departs from authority: `agent`, `delegator`, `host`, `transport` or `server`. On an `unresolved` result, `gaps` names the evidence that would let the evaluation continue (`{need, ref}`, from a fixed set of values). Both are derived from the signed evidence only.

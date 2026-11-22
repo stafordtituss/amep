@@ -1,7 +1,7 @@
 """Bundles the conformance suites into src/amep_mcp/data/suite.json, so the server works without a checkout.
 
 Run from the repository root:  python3 -I packages/mcp/build_suite.py
-Re-run whenever vectors/ or the delegation suite changes; `--check` exits 1 if the bundle is out of date.
+Re-run whenever vectors/ or an interop suite changes; `--check` exits 1 if the bundle is out of date.
 """
 import json
 import os
@@ -10,9 +10,11 @@ import sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT = os.path.join(ROOT, "packages/mcp/src/amep_mcp/data/suite.json")
 SUITES = {
-    "core": ("vectors", "0.2.1", "AMEP conformance suite"),
+    "core": ("vectors", "0.3.0", "AMEP conformance suite"),
     "delegation": ("interop/w3c-agent-identity/delegation-continuity", "0.1",
                    "Delegation continuity across agent hops (W3C Agent Identity Registry Protocol CG)"),
+    "approval-path": ("interop/approval-path-attacks", "draft",
+                      "Approval-path attacks from Kodathala, Pollishetty and Cargill, arXiv:2610.21063 (draft for review)"),
 }
 
 
@@ -24,8 +26,11 @@ def load(d):
             if not f.endswith(".json"):
                 continue
             v = json.load(open(os.path.join(ROOT, d, sub, f), encoding="utf-8"))
-            row = {"name": f[:-5], "description": v.get("name", ""), "expect": v["expect"], "packet": v["packet"]}
-            for extra in ("question", "aria", "state"):
+            row = {"name": f[:-5], "description": v.get("name", ""), "expect": v["expect"]}
+            # a packet_text vector is exact JSON text (duplicate member names, number literals) that a parsed packet
+            # cannot carry; it is kept as text and evaluated with strict parsing
+            row["packet_text" if "packet_text" in v else "packet"] = v["packet_text"] if "packet_text" in v else v["packet"]
+            for extra in ("question", "aria", "state", "attack", "note"):
                 if extra in v:
                     row[extra] = v[extra]
             vectors.append(row)
