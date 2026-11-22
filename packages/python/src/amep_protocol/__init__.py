@@ -12,8 +12,8 @@ from . import sdk
 from .core import (Malformed, Result, approval_digest, canon, digest, evaluate, evaluate_text, is_guardrail,
                    parse_strict, signing_input, to_time, unsafe_number, verdict, verify_sig)
 
-__version__ = "0.2.0a7"
-SPEC_VERSION = "0.2.0-draft.4"
+__version__ = "0.3.0a1"
+SPEC_VERSION = "0.3.0-draft.1"
 
 __all__ = ["Malformed", "Result", "approval_digest", "canon", "digest", "evaluate", "evaluate_text", "is_guardrail",
            "signing_input",

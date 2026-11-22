@@ -2,7 +2,7 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
-## Payment-limit fixes from review amep#10 (unreleased, 2026-11-22)
+## Payment-limit fixes from review amep#10 (packages 0.3.0a1 / 0.3.0-alpha.1, 2026-11-22)
 
 Found by Carlos Vendrell Felici (Zealynx Security) in an independent review of the v0.3 limits, stafordtituss/amep#10, with signed packets checked against both reference verifiers. All fixed in both verifiers; suite now 204 vectors.
 
@@ -14,12 +14,12 @@ Found by Carlos Vendrell Felici (Zealynx Security) in an independent review of t
 - Approval and effect identity digests exclude `value.period_spent` as well as `t`: an approval signed before execution can't know the observer's running total (found while fixing the above).
 - Receipts must name their observer (`unresolved` otherwise), so both verifiers group them identically.
 
-## Conformance tool and verify-by-hand recipe (unreleased, 2026-11-22)
+## Conformance tool and verify-by-hand recipe (packages 0.3.0a1 / 0.3.0-alpha.1, 2026-11-22)
 
 - **`amep-conformance`** (`packages/conformance`, experimental): `verify` runs the core suite and the two interop suites (225 vectors) through any verifier given as a command template, in any language, and writes a JSON result with each suite's SHA-256 and a Markdown summary for an implementation report. Both reference verifiers agree on 225/225; a verifier that accepts everything scores 59/225. `import` is a profile-based adapter from other execution-record formats to AMEP effects, with a gap report of what AMEP needs that the format does not carry; the first profile is AER-1 (draft-zambo-aer1), with that format's own integrity checks. It never invents a mapping, refuses records that fail their own checks, and caps unsigned records at assurance L1.
 - **Verifying by hand** (`spec/verify-by-hand.md`, `tools/verify_by_hand.sh`): check one signed object with jq, xxd, shasum and OpenSSL 3 only: well-formedness, signing input, key and signature encoding (including small-order keys and S ≥ L), role, signature and `invocation_digest`. Agrees with the reference verifier on 971 of the suite's 972 signed objects; the exception is the vector built to catch non-RFC 8785 canonicalizers, which fails to verify rather than verifying falsely.
 
-## v0.3.0-draft.1 and conformance suite v0.3.0 (unreleased, 2026-11-22)
+## v0.3.0-draft.1 and conformance suite v0.3.0 (packages 0.3.0a1 / 0.3.0-alpha.1, 2026-11-22)
 
 Every v0.2 vector keeps its verdict except `status-current-as-of-the-action` (see "Liveness at effect time"). Packets without `amep_version`, or with `"0.2"`, keep v0.2 handling of unknown claim members and version-1 proofs. 189 vectors (50 positive, 139 must-reject); both reference verifiers, the browser verifier and both packaged command-line tools agree on all of them, and mutation analysis (`paper/eval/mutation.py --check`) finds no surviving mutant that is not a documented equivalent.
 
