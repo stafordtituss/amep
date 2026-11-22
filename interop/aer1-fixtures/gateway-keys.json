@@ -1,0 +1,18 @@
+{
+ "principal-1": {
+  "kid": "principal-1",
+  "alg": "Ed25519",
+  "x": "f38b6d13a669f341e8c79992afc7d5d1b3fa0dd7c39639c23ae777b4b3df1c40",
+  "roles": [
+   "issuer"
+  ]
+ },
+ "gateway-1": {
+  "kid": "gateway-1",
+  "alg": "Ed25519",
+  "x": "c90ddcc249f003b14eeeaacaa8c5725ef68ff0ef50fc0c14f839d14572b2b40a",
+  "roles": [
+   "host"
+  ]
+ }
+}

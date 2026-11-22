@@ -1,0 +1,62 @@
+{
+ "amep_version": "0.3",
+ "mandates": [
+  {
+   "id": "m-1",
+   "kind": "mandate",
+   "principal": "user:fixture-caller",
+   "claims": {
+    "actions": [
+     "market.read"
+    ],
+    "resources": [
+     "market:price/*"
+    ],
+    "ceiling": "read",
+    "exp": "2026-12-31T00:00:00Z"
+   },
+   "proof": {
+    "kid": "principal-1",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "a7ad866cb54c4c2dea205e05a86ad513af3d572a8d212dbac79123dbfc666d41bccf02d016987ab77ad6e945d36972ebf686c5e523359f3ddd844b408297440e"
+   }
+  }
+ ],
+ "interpretations": [
+  {
+   "id": "a-1",
+   "kind": "interpretation",
+   "source": "curated",
+   "adapter": "mcp:zambo",
+   "version": "4.1.4",
+   "proof": {
+    "kid": "gateway-1",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "275f5300cb31d07a6830bf43c5ae943deb87ac6a3eb3382d7230f6e771b27eee332701b7ddcc233dbd6770fa4a253f2e77e01c3846143311c597e6916b611200"
+   }
+  }
+ ],
+ "invocations": [
+  {
+   "id": "i-1",
+   "kind": "invocation",
+   "authority_ref": "m-1",
+   "interpretation_ref": "a-1",
+   "t": "2026-11-21T23:55:40Z",
+   "declared": {
+    "action": "market.read",
+    "resource": "market:price/BTC",
+    "effect": "read"
+   },
+   "args_digest": "f4a0911390334f5fb4042fc3ebdec2a0cebc5bb3862bdbb6b2ec0ecb9231be26",
+   "proof": {
+    "kid": "gateway-1",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "94bb474af4f73015f34d63da26982f7d9f0375ef29933c77f81519777276d67e3624b584f113720699babb943c727f708e197cc0aeff2619797b3c8331d6080f"
+   }
+  }
+ ]
+}
