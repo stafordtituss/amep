@@ -161,3 +161,74 @@ test("the verify-by-hand recipe agrees with the reference verifier on a receipt,
   assert.notEqual(forged.status, 0);
   assert.match(forged.stdout, /small order/);
 });
+
+// ---- OpenID DA execution layer action receipts: the AI travel agent of §9.1 ----
+describe("import adapter: OpenID action receipt profile, travel-agent scenario (execution layer §9.1)", () => {
+  const hashRef = s => ({ alg: "sha-256", digest: createHash("sha256").update(s).digest("hex") });
+  const REQUEST = { subject: { id: "agent:travel-agent" }, action: { name: "create" }, resource: { type: "hotel_reservation" } };
+  function receipt({ rs = "https://api.marriott.example", at = "2026-04-23T14:32:18Z", outcome = "success", decision = "permit" } = {}) {
+    return {
+      statement_class: "delegation:action-receipt", audit_id: "ai-9c5d1e3f4a6b",
+      delegation: { relationship: { jti: "rel-1", hash: hashRef("rel") }, authority: { jti: "auth-1", hash: hashRef("auth") },
+        task: { jti: "task-1", hash: hashRef("task") } },
+      decision_attestation: { iss: "https://pdp.travel-co.example", iat: "2026-04-23T14:31:55Z", audit_id: "ai-9c5d1e3f4a6b",
+        request_hash: { alg: "sha-256", digest: sdk.argsDigest(REQUEST) }, decision },
+      action: { rs_identity: rs, verb: "create", resource_type: "hotel_reservation", action_time: at,
+        result: { outcome, rs_identifier: "boston-7842" } },
+      context: { constraint_state: { remaining_count: 4, accumulated_spend_usd: 350.00 } },
+    };
+  }
+  const MAP = { tools: { "create:hotel_reservation": { action: "travel.reservation.create", effect: "financial", released: [],
+    resource: "{action.rs_identity}/reservations/{action.result.rs_identifier}" } } };
+  function taskPacket({ revokedAt } = {}) {
+    // Bob's Task as an AMEP mandate: hotel bookings at Marriott or Hilton, until the end of April
+    const I = Key.generate("bob-1", ["issuer"]), H = Key.generate("travel-co-host", ["host"]);
+    const m = I.sign(sdk.mandate("task-1", "user:bob", sdk.claims(["travel.reservation.create"],
+      ["https://api.marriott.example/*", "https://api.hilton.example/*"], "financial", "2026-04-30T23:59:59Z")), { v: 2 });
+    const a = H.sign(sdk.interpretation("a-1", "da-execution-layer", "v0.2"), { v: 2 });
+    const inv = H.sign(sdk.invocation("ai-9c5d1e3f4a6b", "task-1", "a-1", "2026-04-23T14:32:00Z", "travel.reservation.create",
+      "https://api.marriott.example/reservations/boston-7842", "financial", { actor: "agent:travel-agent", argsDigest: sdk.argsDigest(REQUEST) }), { v: 2 });
+    const objs = [m, a, inv];
+    if (revokedAt) objs.push(I.sign(sdk.revocation("task-1", revokedAt), { v: 2 }));
+    return { packet: sdk.packet(objs, { amepVersion: "0.3" }), keys: keyset(I, H) };
+  }
+  const run = (r, opts = {}) => {
+    const { packet, keys } = taskPacket(opts);
+    const out = importRecord(r, { map: MAP, invocations: packet.invocations, invocationId: "ai-9c5d1e3f4a6b" });
+    return { out, ev: evaluateImported(packet, keys, [out], importer) };
+  };
+  const verdictOf = ({ ev }) => [ev.verdict.outcome, ev.verdict.invariant];
+
+  test("a booking within the Task: preserved, bound to the call by the PDP's request_hash", () => {
+    const res = run(receipt());
+    assert.equal(res.out.profile, "oidf-action-receipt");
+    assert.equal(res.out.mapping.binding, "digest");
+    assert.deepEqual(verdictOf(res), ["preserved", "-"]);
+  });
+  test("a booking at a chain the Task does not allow: violated I2", () => {
+    assert.deepEqual(verdictOf(run(receipt({ rs: "https://api.hyatt.example" }))), ["violated", "I2"]);
+  });
+  test("a booking after the Task expired: violated I2", () => {
+    assert.deepEqual(verdictOf(run(receipt({ at: "2026-05-02T09:00:00Z" }))), ["violated", "I2"]);
+  });
+  test("a booking after the Task was revoked: violated I6", () => {
+    assert.deepEqual(verdictOf(run(receipt(), { revokedAt: "2026-04-23T14:32:10Z" })), ["violated", "I6"]);
+  });
+  test("a network-error outcome establishes nothing: not imported, the call stays unresolved", () => {
+    const res = run(receipt({ outcome: "network-error" }));
+    assert.equal(res.out.effect, null);
+    assert.deepEqual(verdictOf(res), ["unresolved", "I7"]);
+  });
+  test("an action executed under a deny is reported, never imported as authorized", () => {
+    const res = run(receipt({ decision: "deny" }));
+    assert.match(res.out.integrity.verdict, /verification failed/);
+    assert.deepEqual(verdictOf(res), ["unresolved", "I7"]);
+  });
+  test("the gap report names what the receipt cannot show: the PEP signature and the action's amount", () => {
+    const { out } = run(receipt());
+    const amount = out.gaps.find(g => g.need === "the amount of the action");
+    assert.equal(amount.status, "missing");
+    assert.match(amount.detail, /accumulated_spend_usd/);
+    assert.equal(out.effect.assurance, "L1");
+  });
+});

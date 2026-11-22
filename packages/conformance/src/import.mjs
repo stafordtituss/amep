@@ -13,8 +13,9 @@
 import { CEILING, digest, evaluate, verdict } from "@stafordtituss/amep/core";
 import { sigOk } from "@stafordtituss/amep";
 import { aer1 } from "./profiles/aer1.mjs";
+import { oidfActionReceipt } from "./profiles/oidf-action-receipt.mjs";
 
-export const PROFILES = { aer1 };
+export const PROFILES = { aer1, "oidf-action-receipt": oidfActionReceipt };
 
 function lookup(obj, path) {
   return path.split(".").reduce((o, k) => (o && typeof o === "object" ? o[k] : undefined), obj);
@@ -43,6 +44,7 @@ export function importRecord(record, { profile: pid, map = { tools: {} }, expect
   let effect = null, why = null;
 
   if (integrity.verdict !== "pass") why = `record did not pass its own format checks (${integrity.verdict})`;
+  else if (profile.importable?.(info)) why = profile.importable(info);
   else if (!entry) why = `tool ${JSON.stringify(info.tool.name)} is not in the tool map`;
   else if (!CEILING.includes(entry.effect)) why = `tool map gives an unknown effect class ${JSON.stringify(entry.effect)}`;
   else if (CEILING.indexOf(entry.effect) >= CEILING.indexOf("external_send") && !Array.isArray(entry.released))

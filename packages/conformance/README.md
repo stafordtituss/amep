@@ -58,6 +58,7 @@ A profile teaches the adapter one format:
 | Profile | Format | Integrity checks |
 |---|---|---|
 | `aer1` | AER-1 execution receipts (draft-zambo-aer1) | id, `created_at` (including leap seconds and impossible dates), provenance class, canonical base64, strict UTF-8, `output_hash`, `metadata_hash` |
+| `oidf-action-receipt` | OpenID DA execution layer action receipts (`delegation:action-receipt`, v0.2 §6.4; the format AuthZEN #795 names) | statement class, `audit_id`, delegation references, action descriptor, outcome, the decision attestation's `audit_id`, and no executed action under a non-permit decision. Mapping and results: [`interop/oidf-delegated-authorization/MAPPING.md`](../../interop/oidf-delegated-authorization/MAPPING.md) |
 
 Adding a format means adding one profile file to `src/profiles/`. Nothing else changes.
 
