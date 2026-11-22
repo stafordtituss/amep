@@ -543,13 +543,20 @@ def vectors():
     # modelcontextprotocol/agents-ig#31, 21 Nov 2026) showed that without an approval nothing bounded the amount:
     # 840000.00 EUR came out preserved under a budget of 100 points.
     B = Signer("bank-observer-1", ["observer"])
+    PSP = Signer("psp-observer-2", ["observer"])
     keys[B.kid] = B.public()
+    keys[PSP.kid] = PSP.public()
 
     def pay(p, amounts, limits=None, value=True, approve_n=(), deleg_limits=None, unit="iso4217:EUR", spent=None,
-            num_amount=False):
-        """A v0.3 packet: an assistant pays payees under a mandate (and optionally a delegation)."""
+            num_amount=False, one_call=False, observers=None):
+        """A v0.3 packet: an assistant pays payees under a mandate (and optionally a delegation).
+        spent: the bank's signed monthly totals, one per payment; the limits then name the bank in counted_by.
+        one_call: every payment is an effect of one invocation (one tool call that pays several times).
+        observers: per payment, "bank" (default) or "psp", a second payment service."""
         claims = {"actions": ["payments.send"], "resources": ["payee:*"], "ceiling": "financial", "exp": 100}
         if limits is not None:
+            if spent:
+                limits = [{**lim, "counted_by": "service:bank.example"} if "per_period" in lim else lim for lim in limits]
             claims["limits"] = limits
         p.clear()
         p["amep_version"] = "0.3"
@@ -562,21 +569,28 @@ def vectors():
         p["interpretations"] = [H.sign({"id": "a-1", "kind": "interpretation", "source": "curated", "adapter": "bank_api", "version": "v3"}, v=2)]
         p["invocations"], p["effects"], p["approvals"] = [], [], []
         for n, amt in enumerate(amounts, 1):
-            body = {"action": "payments.send", "resource": "payee:city-utility", "effect": "financial", "released": [], "t": 10 * n + 1}
+            body = {"action": "payments.send", "resource": "payee:city-utility", "effect": "financial", "released": [],
+                    "t": 11 + (n - 1 if one_call else 10 * (n - 1))}
             if value:
                 body["value"] = {"amount": float(amt) if num_amount else amt, "unit": unit}
-                if spent:
-                    body["value"]["period_spent"] = spent[n - 1]
-            inv = {"id": f"i-{n}", "kind": "invocation", "authority_ref": auth, "interpretation_ref": "a-1",
-                   "actor": "agent:payments-assistant", "t": 10 * n,
-                   "declared": {"action": "payments.send", "resource": "payee:city-utility", "effect": "financial"}}
-            if n in approve_n:
-                p["approvals"].append(I.sign({"id": f"ap-{n}", "kind": "approval", "effect_digest": approval_digest(body),
-                                              "presence": "webauthn", "expiry": 90}, v=2))
-                inv["approval_ref"] = f"ap-{n}"
-            p["invocations"].append(H.sign(inv, v=2))
-            p["effects"].append(B.sign({"id": f"e-{n}", "kind": "effect", "invocation": f"i-{n}", "observed_by": "service:bank.example",
-                                        "assurance": "L3", "executed": body}, v=2))
+                if spent and spent[n - 1] is not None:
+                    body["value"]["period_spent"] = spent[n - 1] if isinstance(spent[n - 1], dict) else {"2592000": spent[n - 1]}
+            iid = "i-1" if one_call else f"i-{n}"
+            if not one_call or n == 1:
+                inv = {"id": iid, "kind": "invocation", "authority_ref": auth, "interpretation_ref": "a-1",
+                       "actor": "agent:payments-assistant", "t": body["t"] - 1,
+                       "declared": {"action": "payments.send", "resource": "payee:city-utility", "effect": "financial"}}
+                if n in approve_n:
+                    # the approval is signed before execution, so it cannot know the bank's running total
+                    approved = {**body, "value": {k: x for k, x in body["value"].items() if k != "period_spent"}} if value else body
+                    p["approvals"].append(I.sign({"id": f"ap-{n}", "kind": "approval", "effect_digest": approval_digest(approved),
+                                                  "presence": "webauthn", "expiry": 90}, v=2))
+                    inv["approval_ref"] = f"ap-{n}"
+                p["invocations"].append(H.sign(inv, v=2))
+            psp = observers and observers[n - 1] == "psp"
+            p["effects"].append((PSP if psp else B).sign({"id": f"e-{n}", "kind": "effect", "invocation": iid,
+                                                          "observed_by": "service:psp.example" if psp else "service:bank.example",
+                                                          "assurance": "L3", "executed": body}, v=2))
         if not p["approvals"]:
             del p["approvals"]
 
@@ -610,6 +624,48 @@ def vectors():
     _p = {}
     pay(_p, ["100.00"], EUR(per_period="500.00", period=MONTH))
     V[-1] = (V[-1][0], V[-1][1], _p, V[-1][3])
+    # A review of the v0.3 limits by Carlos Vendrell Felici (Zealynx Security), stafordtituss/amep#10, 22 Nov 2026:
+    # identical payments in one call had counted as one, per_call capped one effect rather than the call, one
+    # period_spent stood for every period, observer shares were taken for the principal's total, caip19 amounts were
+    # ambiguous, and limits differing only in actions shared one running total.
+    add("one approval, the approved payment executed twice in one call", ("violated", "I8"), lambda p, *a:
+        pay(p, ["840000.00", "840000.00"], EUR(per_call="500.00"), approve_n=(1,), one_call=True))
+    add("two identical payments in one call count twice toward the period limit", ("violated", "I2"), lambda p, *a:
+        pay(p, ["300.00", "300.00"], EUR(per_period="500.00", period=MONTH), one_call=True))
+    V[-1] = (V[-1][0], V[-1][1], V[-1][2], {"period_totals": {"m-1|iso4217:EUR|2592000|0": "0.00"}})
+    add("per_call caps the whole call, not each effect", ("violated", "I2"), lambda p, *a:
+        pay(p, ["60.00", "60.00"], EUR(per_call="100.00"), one_call=True))
+    add("one effect over the per-effect limit", ("violated", "I2"), lambda p, *a:
+        pay(p, ["60.00", "160.00"], EUR(per_effect="100.00"), one_call=True))
+    add("per_effect caps each effect of a call", ("preserved", "-"), lambda p, *a:
+        pay(p, ["60.00", "60.00"], EUR(per_effect="100.00"), one_call=True))
+    add("observer totals are kept per period: day within, month over", ("violated", "I2"), lambda p, *a:
+        pay(p, ["80.00"], EUR(per_period="100.00", period=86400) + EUR(per_period="1000.00", period=MONTH),
+            spent=[{"86400": "80.00", "2592000": "1030.00"}]))
+    add("observer totals are kept per period: both within", ("preserved", "-"), lambda p, *a:
+        pay(p, ["80.00"], EUR(per_period="100.00", period=86400) + EUR(per_period="1000.00", period=MONTH),
+            spent=[{"86400": "80.00", "2592000": "880.00"}]))
+    add("payments through two services against one cap", ("violated", "I2"), lambda p, *a:
+        pay(p, ["300.00", "300.00"], EUR(per_period="500.00", period=MONTH), spent=["300.00", "300.00"], observers=["bank", "psp"]))
+    add("a total from an observer the limit does not name is not the principal's total", ("unresolved", "I7"), lambda p, *a:
+        pay(p, ["300.00"], EUR(per_period="500.00", period=MONTH), spent=["300.00"], observers=["psp"]))
+    add("a period limit without a counting observer needs earlier state", ("unresolved", "I7"), lambda p, *a: (
+        pay(p, ["300.00"], EUR(per_period="500.00", period=MONTH), spent=["300.00"]),
+        p["mandates"][0]["claims"]["limits"][0].pop("counted_by"),
+        p.update(mandates=[I.sign(p["mandates"][0], v=2)])))
+    add("limits differing only in actions keep separate totals", ("preserved", "-"), lambda p, *a:
+        pay(p, ["200.00"], EUR(per_period="1000.00", period=MONTH, actions=["payments.*"]) +
+            EUR(per_period="300.00", period=MONTH, actions=["payments.send"]), spent=["200.00"]))
+    add("approval still matches when the bank adds its running total", ("preserved", "-"), lambda p, *a:
+        pay(p, ["900.00"], EUR(per_call="500.00", per_period="5000.00", period=MONTH), approve_n=(1,), spent=["900.00"]))
+    add("receipt that names no observer", ("unresolved", "I7"), lambda p, *a: (
+        pay(p, ["84.10"], EUR(per_call="500.00")),
+        p.update(effects=[B.sign({k: x for k, x in p["effects"][0].items() if k != "observed_by"}, v=2)])))
+    USDC = "caip19:eip155:1/erc20:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+    add("caip19 amount in the asset's smallest unit", ("violated", "I2"), lambda p, *a:
+        pay(p, ["100000001"], [{"unit": USDC, "per_call": "100000000"}], unit=USDC))
+    add("caip19 amount with a fractional part", ("unresolved", "I7"), lambda p, *a:
+        pay(p, ["100.5"], [{"unit": USDC, "per_call": "100000000"}], unit=USDC))
     add("delegation raises the per-call limit", ("violated", "I1"), lambda p, *a:
         pay(p, ["84.10"], EUR(per_call="500.00"), deleg_limits=EUR(per_call="5000.00")))
     add("delegation adds a stricter limit", ("preserved", "-"), lambda p, *a:

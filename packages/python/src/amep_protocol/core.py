@@ -224,9 +224,18 @@ def digest(obj) -> str:
     return hashlib.sha256(canon(obj)).hexdigest()
 
 
+def effect_identity(x: dict) -> dict:
+    """The executed-effect body without what only the observer knows at execution: its time `t`, and the observer's
+    own running totals `value.period_spent` (spec 5.10, 7.6). Approvals bind this, so they can be issued in advance."""
+    out = {k: v for k, v in x.items() if k != "t"}
+    if isinstance(out.get("value"), dict) and "period_spent" in out["value"]:
+        out["value"] = {k: v for k, v in out["value"].items() if k != "period_spent"}
+    return out
+
+
 def approval_digest(x: dict) -> str:
-    """Spec 5.10: approvals bind the executed-effect body without its time, so they can be issued in advance."""
-    return digest({k: v for k, v in x.items() if k != "t"})
+    """Spec 5.10: approvals bind the executed-effect body without its time (and without observer totals)."""
+    return digest(effect_identity(x))
 
 
 # ---------------- signatures (spec 12.2) ----------------
@@ -371,15 +380,28 @@ _SCALE = 10 ** 18
 MONEY_UNITS = ("iso4217:", "caip19:")
 CLAIM_MEMBERS = {"actions", "resources", "data", "ceiling", "exp", "nbf", "purpose", "deny_actions", "deny_resources",
                  "depth", "budget", "limits"}
-LIMIT_MEMBERS = {"unit", "per_call", "per_period", "period", "actions"}
+LIMIT_MEMBERS = {"unit", "per_effect", "per_call", "per_period", "period", "actions", "counted_by"}
+INTEGER_AMOUNT = re.compile(r"^(0|[1-9][0-9]{0,38})$")
+PERIOD_KEY = re.compile(r"^[1-9][0-9]{0,15}$")
 
 
-def amount_units(s) -> int:
-    """'1200.50' -> 1200500000000000000000 (units of 10^-18). Rejects signs, exponents, leading zeros, > 18 decimals."""
+def amount_units(s, unit: str | None = None) -> int:
+    """'1200.50' -> 1200500000000000000000 (units of 10^-18). Rejects signs, exponents, leading zeros, > 18 decimals.
+    Amounts in caip19: units are integers in the asset's smallest unit, as the chain records them (spec 5.9.2)."""
     if not isinstance(s, str) or not AMOUNT.match(s):
         raise Malformed(f"malformed amount {s!r} (a decimal string such as \"1200.00\" is required)")
+    if unit is not None and unit.startswith("caip19:") and not INTEGER_AMOUNT.match(s):
+        raise Malformed(f"amount {s!r} in {unit} must be an integer in the asset's smallest unit")
     ip, _, fp = s.partition(".")
     return int(ip) * _SCALE + int((fp + "0" * 18)[:18])
+
+
+def period_spent_of(v: dict, unit: str) -> dict:
+    """value.period_spent: the observer's own totals, keyed by period length in seconds (spec 5.9.2)."""
+    ps = v.get("period_spent", {})
+    if not isinstance(ps, dict) or not all(isinstance(k, str) and PERIOD_KEY.match(k) for k in ps):
+        raise Malformed("period_spent must map period lengths in seconds to amounts, for example {\"2592000\": \"300.00\"}")
+    return {k: amount_units(a, unit) for k, a in ps.items()}
 
 
 def _unit(u) -> str:
@@ -399,13 +421,16 @@ def check_limits(lims) -> list:
     for lim in lims:
         if not isinstance(lim, dict):
             raise Malformed("limit must be an object")
-        _unit(lim.get("unit"))
-        if "per_call" in lim:
-            amount_units(lim["per_call"])
+        unit = _unit(lim.get("unit"))
+        for k in ("per_effect", "per_call"):
+            if k in lim:
+                amount_units(lim[k], unit)
         if ("per_period" in lim) != ("period" in lim):
             raise Malformed("per_period and period go together")
+        if "counted_by" in lim and not (isinstance(lim["counted_by"], str) and lim["counted_by"]):
+            raise Malformed("counted_by must name an observer")
         if "per_period" in lim:
-            amount_units(lim["per_period"])
+            amount_units(lim["per_period"], unit)
             if isinstance(lim["period"], bool) or not isinstance(lim["period"], (int, float)) or lim["period"] != int(lim["period"]) or lim["period"] <= 0:
                 raise Malformed("period must be a positive integer number of seconds")
         if "actions" in lim and not (isinstance(lim["actions"], list) and all(isinstance(p, str) for p in lim["actions"])):
@@ -426,8 +451,9 @@ def limits_narrower(child: dict, parent: dict):
         for cl in child.get("limits", []):
             if cl["unit"] != pl["unit"] or cl.get("actions") != pl.get("actions"):
                 continue
-            if "per_call" in pl and "per_call" in cl and amount_units(cl["per_call"]) > amount_units(pl["per_call"]):
-                return f"per-call limit raised for {pl['unit']}"
+            for k in ("per_effect", "per_call"):
+                if k in pl and k in cl and amount_units(cl[k]) > amount_units(pl[k]):
+                    return f"{k.replace('_', '-')} limit raised for {pl['unit']}"
             if "per_period" in pl and cl.get("period") == pl["period"] and "per_period" in cl and \
                     amount_units(cl["per_period"]) > amount_units(pl["per_period"]):
                 return f"per-period limit raised for {pl['unit']}"
@@ -688,10 +714,11 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
     if intent:
         eff_claims = meet(intent["claims"], eff_claims)
     appr = objs.get(inv.get("approval_ref")) if "approval_ref" in inv else None
-    bodies = {}
-    # 11-15. every receipt for this invocation is checked (spec 10.2); identical bodies are one effect
+    # 11-15. every receipt for this invocation is checked (spec 10.2)
+    by_observer: dict = {}   # observer -> effect identity digest -> its receipts, in packet order
     for e in mine:
         _check(not vsig(e), "unresolved", "I7", "effect receipt unsigned or signer lacks the role")
+        _check(not isinstance(e.get("observed_by"), str), "unresolved", "I7", f"receipt {e.get('id', '?')} names no observer")
         _check("invocation_digest" in e and e["invocation_digest"] != inv_digest, "unresolved", "I7",
                f"receipt {e.get('id', '?')} is bound to a different invocation (invocation_digest mismatch)")
         if high_impact:
@@ -719,10 +746,17 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         if "value" in x:   # validate wherever present, so a malformed amount is never silently ignored
             v = x["value"]
             _check(not isinstance(v, dict), "unresolved", "I7", "value must be an object")
-            amount_units(v.get("amount")); _unit(v.get("unit"))
-            if "period_spent" in v:
-                amount_units(v["period_spent"])
-        bodies.setdefault(approval_digest(x), x)
+            _unit(v.get("unit")); amount_units(v.get("amount"), v["unit"]); period_spent_of(v, v["unit"])
+        by_observer.setdefault(e.get("observed_by"), {}).setdefault(approval_digest(x), []).append(e)
+    # spec 10.2 (v0.3): the same effect recorded by several observers counts once, but within one observer every receipt
+    # is its own effect. An effect therefore occurs as often as the most any one observer recorded it, and is taken from
+    # that observer's receipts. Raised by Carlos Vendrell Felici (stafordtituss/amep#10): two identical payments in one
+    # call had counted as one.
+    effects_of: list = []    # (executed body, identity digest, observer)
+    for d in dict.fromkeys(dd for o in by_observer.values() for dd in o):
+        obs = max(sorted(o for o in by_observer if d in by_observer[o]), key=lambda o: len(by_observer[o][d]))
+        effects_of += [(e["executed"], d, obs) for e in by_observer[obs][d]]
+    bodies = {d: x for x, d, _ in effects_of}
     # every receipt a statement promises must be present, and no more (spec 5.14)
     for c in stmts:
         k = sum(1 for e in mine if e.get("observed_by") == c.get("observed_by"))
@@ -733,6 +767,8 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         for d, x in bodies.items():
             t_x = to_time(x["t"])
             _check(appr["effect_digest"] != d, "violated", "I8", "approval not bound to the executed effect")
+            n_exec = sum(1 for _, dd, _ in effects_of if dd == d)
+            _check(n_exec > 1, "violated", "I8", f"one approval, but the approved effect was executed {n_exec} times")
             _check(bool(appr.get("consumed")), "violated", "I8", "approval already consumed")
             _check("expiry" in appr and to_time(appr["expiry"]) < max(t_inv, t_x), "violated", "I8", "approval expired")
             _check("nbf" in appr and to_time(appr["nbf"]) > t_inv, "violated", "I8", "approval not yet valid")
@@ -740,40 +776,48 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
             _check(first != (rid, d), "violated", "I8", f"approval already used by {first[0]}")
     # 16. quantity limits (spec 7.6, v0.3), on every node of the chain and on the intent. An approval that passed I8
     # authorizes going over a limit; the amount still counts toward the period total.
-    for x in bodies.values():
-        for n in limited:
-            applicable = [lim for lim in n["claims"]["limits"] if limit_applies(lim, x)]
+    for n in limited:
+        call_sum: dict = {}   # limit index -> amount moved by this call so far
+        for x, _d, obs in effects_of:
+            applicable = [(i, lim) for i, lim in enumerate(n["claims"]["limits"]) if limit_applies(lim, x)]
             if not applicable:
                 continue
             v = x.get("value")
             _check(v is None, "unresolved", "I7", f"{n['id']} limits this effect but the receipt records no value")
-            amt, unit = amount_units(v["amount"]), v["unit"]
-            matching = [lim for lim in applicable if lim["unit"] == unit]
+            unit = v["unit"]
+            amt = amount_units(v["amount"], unit)
+            matching = [(i, lim) for i, lim in applicable if lim["unit"] == unit]
             if not matching:
                 money = unit.startswith(MONEY_UNITS) or x["effect"] == "financial"
                 _check(money, "violated", "I2", f"{unit} is not an asset {n['id']} authorizes")
                 _check(True, "unresolved", "I7", f"{n['id']} limits this effect in another unit than {unit}")
-            for lim in matching:
-                _check("per_call" in lim and amt > amount_units(lim["per_call"]) and not appr, "violated", "I2",
-                       f"amount {v['amount']} {unit} exceeds the per-call limit {lim.get('per_call')} of {n['id']}")
+            for i, lim in matching:
+                _check("per_effect" in lim and amt > amount_units(lim.get("per_effect", "0")) and not appr, "violated", "I2",
+                       f"amount {v['amount']} {unit} exceeds the per-effect limit {lim.get('per_effect')} of {n['id']}")
+                call_sum[i] = call_sum.get(i, 0) + amt
+                _check("per_call" in lim and call_sum[i] > amount_units(lim.get("per_call", "0")) and not appr, "violated", "I2",
+                       f"this call moves {_units_str(call_sum[i])} {unit}, over the per-call limit {lim.get('per_call')} of {n['id']}")
                 if "per_period" not in lim:
                     continue
                 anchor = to_time(n["claims"]["nbf"]) if "nbf" in n["claims"] else 0
                 window = int((to_time(x["t"]) - anchor) // lim["period"])
-                key = f"{n['id']}|{unit}|{lim['period']}|{window}"
+                # one running total per limit (amep#10): limits that differ only in their actions are separate caps
+                key = f"{n['id']}|{unit}|{lim['period']}|{window}" + (f"|{','.join(sorted(lim['actions']))}" if "actions" in lim else "")
                 total = ctx["totals"].get(key, 0) + amt
-                if "period_spent" in v:
-                    observed = amount_units(v["period_spent"])
-                    _check(observed < total, "violated", "I7",
-                           f"observer's period total {v['period_spent']} is below the payments recorded for {n['id']}")
-                    total = observed
+                # An observer's total is the principal's total only when that observer sees all of this node's spending
+                # in the unit: the limit names it in counted_by (amep#10). Other observers' totals never count.
+                counted = period_spent_of(v, unit).get(str(int(lim["period"]))) if lim.get("counted_by") == obs else None
+                if counted is not None:
+                    _check(counted < total, "violated", "I7",
+                           f"{obs}'s period total {_units_str(counted)} {unit} is below the payments recorded for {n['id']}")
+                    total = counted
                 _check(total > amount_units(lim["per_period"]) and not appr, "violated", "I2",
                        f"period total {_units_str(total)} {unit} exceeds the per-period limit {lim['per_period']} of {n['id']}")
-                _check("period_spent" not in v and key not in ctx["prior_windows"], "unresolved", "I7",
-                       f"period total for {n['id']} cannot be established: no observer period_spent and no earlier state")
+                _check(counted is None and key not in ctx["prior_windows"], "unresolved", "I7",
+                       f"period total for {n['id']} cannot be established: no total from its counting observer and no earlier state")
                 ctx["totals"][key] = total
     # 17. risk budget: recorded spend must match receipts; over budget needs a bound approval
-    c = sum(cost(x) for x in bodies.values())
+    c = sum(cost(x) for x, _, _ in effects_of)
     _check("budget_spent" in inv and inv["budget_spent"] != c, "violated", "I7", "recorded budget spend does not match receipts")
     over = next((n["id"] for n in chain if "budget" in n["claims"] and spent.get(n["id"], 0) + c > n["claims"]["budget"]), None)
     _check(bool(over) and not appr, "violated", "I2", f"risk budget of {over} exceeded without approval")

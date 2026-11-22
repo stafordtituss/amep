@@ -1,0 +1,118 @@
+{
+ "name": "limits differing only in actions keep separate totals",
+ "expect": {
+  "outcome": "preserved",
+  "invariant": "-"
+ },
+ "packet": {
+  "amep_version": "0.3",
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "payments.send"
+     ],
+     "resources": [
+      "payee:*"
+     ],
+     "ceiling": "financial",
+     "exp": 100,
+     "limits": [
+      {
+       "unit": "iso4217:EUR",
+       "per_period": "1000.00",
+       "period": 2592000,
+       "actions": [
+        "payments.*"
+       ],
+       "counted_by": "service:bank.example"
+      },
+      {
+       "unit": "iso4217:EUR",
+       "per_period": "300.00",
+       "period": 2592000,
+       "actions": [
+        "payments.send"
+       ],
+       "counted_by": "service:bank.example"
+      }
+     ]
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "495e39e466d02b55a009caefb447821ce23227e69aa41165ee75a84c055f8bf598b5520f289395f99e65ccfbc2908e20cd924a08e8e2f64da463365eb55fb00e"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "bank_api",
+    "version": "v3",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "5ef3ab9b00c0c17c6be94a9e2b23ec77097f763f0846dbf0939e36bfc7725c93a6392b0ee8ecc9c67d090be777cbba8877cfc4cdba4ad45cf00edd7e8686390b"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "m-1",
+    "interpretation_ref": "a-1",
+    "actor": "agent:payments-assistant",
+    "t": 10,
+    "declared": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "8c9d3a9937a9442a420e06ecf2a372771f80ecc987bbb5636310b6355e6792c3e215d84d6a5e33283bd5abc0366c7eeb5dd3bd80a11d57bd8807e32481977404"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "service:bank.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial",
+     "released": [],
+     "t": 11,
+     "value": {
+      "amount": "200.00",
+      "unit": "iso4217:EUR",
+      "period_spent": {
+       "2592000": "200.00"
+      }
+     }
+    },
+    "proof": {
+     "kid": "bank-observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "83e2bafad823a9da74ea913f1b0a8402c1912d6e517cb68cded67eac0a6691592eb2a97b33f523611b4ce8db2a6d619168c06b558780f3ae6340ac3a5e93840c"
+    }
+   }
+  ]
+ }
+}

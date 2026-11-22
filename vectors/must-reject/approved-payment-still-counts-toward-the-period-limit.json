@@ -25,7 +25,8 @@
        "unit": "iso4217:EUR",
        "per_call": "1000.00",
        "per_period": "500.00",
-       "period": 2592000
+       "period": 2592000,
+       "counted_by": "service:bank.example"
       }
      ]
     },
@@ -33,7 +34,7 @@
      "kid": "issuer-1",
      "alg": "Ed25519",
      "v": 2,
-     "sig": "365460ba0b7891c22729f71a968ac23e4f89b31c816dd5220e6a4801af4ee31386c6f56538e84e7f2553b035c75c223620e50260a70aa7bf36941420772e6206"
+     "sig": "f9954cf62c9ca07d7147e6d904a78eaf5c949b5a503d473e83fc5d2800b4bf9160e1e916a00f8f12a9bff944eb6de5a307d42b7228eeb0c4ae7cb9ad1ca09e03"
     }
    }
   ],
@@ -109,14 +110,16 @@
      "value": {
       "amount": "900.00",
       "unit": "iso4217:EUR",
-      "period_spent": "900.00"
+      "period_spent": {
+       "2592000": "900.00"
+      }
      }
     },
     "proof": {
      "kid": "bank-observer-1",
      "alg": "Ed25519",
      "v": 2,
-     "sig": "6fdd7efccd2bb3cc62ac78665c354f487e1ff049c04ea2318f8c10cab4f3065c758071868df5dcae819cc01835c34f5fc7265ac702bc2ea921d8ba07db006506"
+     "sig": "24dfa386062d2ca2b56be5cfe746ba5240354dba8968ea2425c51dbf90e0837bc1570a27d34d840ba44cd0995ae72332e582b6686d7b013096248248aba65a02"
     }
    },
    {
@@ -134,14 +137,16 @@
      "value": {
       "amount": "100.00",
       "unit": "iso4217:EUR",
-      "period_spent": "1000.00"
+      "period_spent": {
+       "2592000": "1000.00"
+      }
      }
     },
     "proof": {
      "kid": "bank-observer-1",
      "alg": "Ed25519",
      "v": 2,
-     "sig": "63d15e466f921371a370dc18747b5451853234a59eb9fec38fb16d3a1fd046d7ca33dcda71ed728c7d848fe280af0c6eb6558d4b7415a045506ae5b86bd0f10d"
+     "sig": "62d77fb863fc44130721c38eee1a9edd3364a247a65bd421f9c4516cf1282b214ec5863bb3afab161828c446aba83f3ae4200e977fe52c8280341738c9796507"
     }
    }
   ],
@@ -149,14 +154,14 @@
    {
     "id": "ap-1",
     "kind": "approval",
-    "effect_digest": "c66a0c9ff86ad7a2a9ea81d341b08fe0a5f84661cb7757c3eeddeeb16dfcfba2",
+    "effect_digest": "3f3df16c7895975cb0098b2d886b6f1feb1f01ab7e658de05f8f69bb078dce96",
     "presence": "webauthn",
     "expiry": 90,
     "proof": {
      "kid": "issuer-1",
      "alg": "Ed25519",
      "v": 2,
-     "sig": "fa20c5a93875df5c914ecbd8324df4ccba77b36d35bb00e47ee73e84947fe8a76cfa581e1c1c4193d2e4e42722344e72f5f8b2e87b5b282ff890c64060230e00"
+     "sig": "02f5de22eb038e72e78d42c5573f788fab9e9d156e4e488210abc281296bb441bd2de63b1a7f4d924708c902f1d67b4064743a319b64ee3ca03d4371a0d30609"
     }
    }
   ]

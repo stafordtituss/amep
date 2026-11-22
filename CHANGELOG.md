@@ -2,6 +2,18 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## Payment-limit fixes from review amep#10 (unreleased, 2026-11-22)
+
+Found by Carlos Vendrell Felici (Zealynx Security) in an independent review of the v0.3 limits, stafordtituss/amep#10, with signed packets checked against both reference verifiers. All fixed in both verifiers; suite now 204 vectors.
+
+- **Fix (security):** identical effect bodies were always merged, so one approval for an 840000.00 EUR payment covered the same payment executed twice in one call (`preserved`), and two 300.00 payments in one call counted as one against a 500.00 cap. Receipts are now counted per observer: the same effect seen by several observers counts once, two receipts from one observer are two effects, and an approval used for two effects is `violated` (I8).
+- `per_call` now caps the total of one call; the new `per_effect` caps one effect.
+- `value.period_spent` is keyed by period length (`{"86400": …, "2592000": …}`), and counts only for a limit that names its observer in `counted_by`; another observer's total is only its share.
+- Each limit keeps its own running total, so limits differing only in `actions` no longer double-count.
+- `caip19:` amounts are integers in the asset's smallest unit.
+- Approval and effect identity digests exclude `value.period_spent` as well as `t`: an approval signed before execution can't know the observer's running total (found while fixing the above).
+- Receipts must name their observer (`unresolved` otherwise), so both verifiers group them identically.
+
 ## Conformance tool and verify-by-hand recipe (unreleased, 2026-11-22)
 
 - **`amep-conformance`** (`packages/conformance`, experimental): `verify` runs the core suite and the two interop suites (225 vectors) through any verifier given as a command template, in any language, and writes a JSON result with each suite's SHA-256 and a Markdown summary for an implementation report. Both reference verifiers agree on 225/225; a verifier that accepts everything scores 59/225. `import` is a profile-based adapter from other execution-record formats to AMEP effects, with a gap report of what AMEP needs that the format does not carry; the first profile is AER-1 (draft-zambo-aer1), with that format's own integrity checks. It never invents a mapping, refuses records that fail their own checks, and caps unsigned records at assurance L1.

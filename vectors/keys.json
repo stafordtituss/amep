@@ -47,5 +47,13 @@
   "roles": [
    "observer"
   ]
+ },
+ "psp-observer-2": {
+  "kid": "psp-observer-2",
+  "alg": "Ed25519",
+  "x": "e6ff7d9e5826e0c08edc12e96fe5dac7433c1bba539fab43120c2ca52810067c",
+  "roles": [
+   "observer"
+  ]
  }
 }

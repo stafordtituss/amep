@@ -25,7 +25,8 @@
        "unit": "iso4217:EUR",
        "per_call": "500.00",
        "per_period": "500.00",
-       "period": 2592000
+       "period": 2592000,
+       "counted_by": "service:bank.example"
       }
      ]
     },
@@ -33,7 +34,7 @@
      "kid": "issuer-1",
      "alg": "Ed25519",
      "v": 2,
-     "sig": "782d28d767b0864aaa328384bc11705ba3c88d6f6dd0845c8d6c770801d31075ffbf9e0b829d58b71590d89a520c4646d3006781a76b999fb190c723b0ae9b06"
+     "sig": "44d225de0290a345b595f373a32bc16176678a2dce1dd54d5164c6ca7e5859aac595cde1e1bbd85c19ea2a9ce215d1afb17b3c0f7250e6623e131310d6aeae07"
     }
    }
   ],
@@ -108,14 +109,16 @@
      "value": {
       "amount": "300.00",
       "unit": "iso4217:EUR",
-      "period_spent": "300.00"
+      "period_spent": {
+       "2592000": "300.00"
+      }
      }
     },
     "proof": {
      "kid": "bank-observer-1",
      "alg": "Ed25519",
      "v": 2,
-     "sig": "3272a60809cddc670aaa19fde377f430ba8ecc648104530418383b0b469fda18bd216676cb544f6709c80a231a3720014a8cdd8648b812d2d8b4d452c1971604"
+     "sig": "3a5b43249e72b3c7ff0436ac07db4ab985c474fd0e5b80edc2526aab89e181f32655c5912b97f526b5288dd8b9122897346d714fca5a94585e555f1456b70604"
     }
    },
    {
@@ -133,14 +136,16 @@
      "value": {
       "amount": "150.00",
       "unit": "iso4217:EUR",
-      "period_spent": "450.00"
+      "period_spent": {
+       "2592000": "450.00"
+      }
      }
     },
     "proof": {
      "kid": "bank-observer-1",
      "alg": "Ed25519",
      "v": 2,
-     "sig": "eabab6f0f039e1ac0ec51991c11cf35d1708f447034e1ef5f3875e3d430b6eff2df4be5630410150f8b5f71d2e98ee57157af5a985ac47dcff5af94a064bf106"
+     "sig": "6caa5dad2867a0d206d68025af0d338709ecdee20a9fd15efe7a8f2bf8b0801b7577de7267a17e17a4485274076744e0d9491b1bb6fc36081879c38c061c4e0f"
     }
    }
   ]

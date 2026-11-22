@@ -106,7 +106,14 @@
      "$ref": "#/$defs/unit"
     },
     "period_spent": {
-     "$ref": "#/$defs/amount"
+     "description": "The observer's own totals, keyed by period length in seconds (spec 5.9.2).",
+     "type": "object",
+     "additionalProperties": false,
+     "patternProperties": {
+      "^[1-9][0-9]{0,15}$": {
+       "$ref": "#/$defs/amount"
+      }
+     }
     }
    }
   },
@@ -132,8 +139,16 @@
     "unit": {
      "$ref": "#/$defs/unit"
     },
+    "per_effect": {
+     "$ref": "#/$defs/amount"
+    },
     "per_call": {
      "$ref": "#/$defs/amount"
+    },
+    "counted_by": {
+     "description": "The observer whose period totals cover all of this node's spending in the unit (spec 7.6).",
+     "type": "string",
+     "minLength": 1
     },
     "per_period": {
      "$ref": "#/$defs/amount"

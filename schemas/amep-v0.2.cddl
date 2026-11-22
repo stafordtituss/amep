@@ -34,8 +34,8 @@ proof = { alg: "Ed25519" / "ES256", kid: tstr, sig: tstr, ? timestamp_token: tst
 ; exact decimal string and unit of a quantity (spec 5.9.2, AMEP 0.3)
 amount = tstr .regexp "(0|[1-9][0-9]{0,38})(\\.[0-9]{1,18})?"
 unit = tstr .regexp "[a-z][a-z0-9-]{0,31}:[!-~]{1,128}"
-value = { amount: amount, unit: unit, ? period_spent: amount, * extension-key => any }
-limit = { unit: unit, ? per_call: amount, ? (per_period: amount, period: uint .ge 1), ? actions: [* tstr], * extension-key => any }
+value = { amount: amount, unit: unit, ? period_spent: { * tstr .regexp "[1-9][0-9]{0,15}" => amount }, * extension-key => any }
+limit = { unit: unit, ? per_effect: amount, ? per_call: amount, ? counted_by: tstr, ? (per_period: amount, period: uint .ge 1), ? actions: [* tstr], * extension-key => any }
 
 claims = {
   actions: [+ tstr]

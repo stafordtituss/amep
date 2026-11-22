@@ -1,0 +1,123 @@
+{
+ "name": "approval still matches when the bank adds its running total",
+ "expect": {
+  "outcome": "preserved",
+  "invariant": "-"
+ },
+ "packet": {
+  "amep_version": "0.3",
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "payments.send"
+     ],
+     "resources": [
+      "payee:*"
+     ],
+     "ceiling": "financial",
+     "exp": 100,
+     "limits": [
+      {
+       "unit": "iso4217:EUR",
+       "per_call": "500.00",
+       "per_period": "5000.00",
+       "period": 2592000,
+       "counted_by": "service:bank.example"
+      }
+     ]
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "c3b9921994f60b286bc8c9cf8837b5adeac494650941725ea5b1ba12cfbe7fd8ec625235122773914c8aec0741dc658747515031bc8aff45002a363bc2dc760f"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "bank_api",
+    "version": "v3",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "5ef3ab9b00c0c17c6be94a9e2b23ec77097f763f0846dbf0939e36bfc7725c93a6392b0ee8ecc9c67d090be777cbba8877cfc4cdba4ad45cf00edd7e8686390b"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "m-1",
+    "interpretation_ref": "a-1",
+    "actor": "agent:payments-assistant",
+    "t": 10,
+    "declared": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial"
+    },
+    "approval_ref": "ap-1",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "4cb8dccc278ae7635b828522a0057c243e7adef2737d88df0b76fee8f2e4f51c1c2782479b942fd05ca77b73e6d412f4509ea1de1940d4182ff46eff5469ce06"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "service:bank.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial",
+     "released": [],
+     "t": 11,
+     "value": {
+      "amount": "900.00",
+      "unit": "iso4217:EUR",
+      "period_spent": {
+       "2592000": "900.00"
+      }
+     }
+    },
+    "proof": {
+     "kid": "bank-observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "24dfa386062d2ca2b56be5cfe746ba5240354dba8968ea2425c51dbf90e0837bc1570a27d34d840ba44cd0995ae72332e582b6686d7b013096248248aba65a02"
+    }
+   }
+  ],
+  "approvals": [
+   {
+    "id": "ap-1",
+    "kind": "approval",
+    "effect_digest": "3f3df16c7895975cb0098b2d886b6f1feb1f01ab7e658de05f8f69bb078dce96",
+    "presence": "webauthn",
+    "expiry": 90,
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "02f5de22eb038e72e78d42c5573f788fab9e9d156e4e488210abc281296bb441bd2de63b1a7f4d924708c902f1d67b4064743a319b64ee3ca03d4371a0d30609"
+    }
+   }
+  ]
+ }
+}

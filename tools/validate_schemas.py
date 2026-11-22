@@ -23,7 +23,8 @@ EXPECTED_INVALID = {"must-reject/malformed-timestamp.json",
                     "must-reject/amep-0-3-limit-member-the-verifier-does-not-understand.json",
                     "must-reject/value-given-as-a-string-instead-of-an-object.json",
                     "must-reject/call-statement-with-an-unknown-disposition.json",
-                    "must-reject/call-statement-with-a-negative-effect-count.json"}
+                    "must-reject/call-statement-with-a-negative-effect-count.json",
+                    "must-reject/receipt-that-names-no-observer.json"}
 
 def _no_dups(pairs):
     if len({k for k, _ in pairs}) != len(pairs):

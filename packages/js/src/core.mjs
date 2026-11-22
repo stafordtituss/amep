@@ -208,7 +208,15 @@ export function sha256Hex(str) {
 }
 export const digest = o => sha256Hex(canon(o));
 // spec 5.10: approvals bind the executed body without its time
-export const approvalDigest = x => digest(Object.fromEntries(Object.entries(x).filter(([k]) => k !== "t")));
+// The executed-effect body without what only the observer knows at execution: its time `t`, and the observer's own
+// running totals `value.period_spent` (spec 5.10, 7.6). Approvals bind this, so they can be issued in advance.
+export function effectIdentity(x) {
+  const out = Object.fromEntries(Object.entries(x).filter(([k]) => k !== "t"));
+  if (out.value && typeof out.value === "object" && !Array.isArray(out.value) && "period_spent" in out.value)
+    out.value = Object.fromEntries(Object.entries(out.value).filter(([k]) => k !== "period_spent"));
+  return out;
+}
+export const approvalDigest = x => digest(effectIdentity(x));
 
 // ---- claim algebra (spec 6.3, 7) ----
 const patMatch = (v, p) => p === "*" || v === p || (p.endsWith("*") && v.startsWith(p.slice(0, -1)));
@@ -266,11 +274,22 @@ const AMOUNT = /^(0|[1-9][0-9]{0,38})(\.[0-9]{1,18})?$/, UNIT = /^[a-z][a-z0-9-]
 const SCALE = 10n ** 18n;
 const MONEY_UNITS = ["iso4217:", "caip19:"];
 export const CLAIM_MEMBERS = new Set(["actions", "resources", "data", "ceiling", "exp", "nbf", "purpose", "deny_actions", "deny_resources", "depth", "budget", "limits"]);
-const LIMIT_MEMBERS = new Set(["unit", "per_call", "per_period", "period", "actions"]);
-export function amountUnits(s) {
+const LIMIT_MEMBERS = new Set(["unit", "per_effect", "per_call", "per_period", "period", "actions", "counted_by"]);
+const INTEGER_AMOUNT = /^(0|[1-9][0-9]{0,38})$/, PERIOD_KEY = /^[1-9][0-9]{0,15}$/;
+// Amounts in caip19: units are integers in the asset's smallest unit, as the chain records them (spec 5.9.2).
+export function amountUnits(s, unit) {
   if (typeof s !== "string" || !AMOUNT.test(s)) throw new Malformed(`malformed amount ${JSON.stringify(s)} (a decimal string such as "1200.00" is required)`);
+  if (unit !== undefined && unit.startsWith("caip19:") && !INTEGER_AMOUNT.test(s))
+    throw new Malformed(`amount ${JSON.stringify(s)} in ${unit} must be an integer in the asset's smallest unit`);
   const [ip, fp = ""] = s.split(".");
   return BigInt(ip) * SCALE + BigInt((fp + "0".repeat(18)).slice(0, 18));
+}
+// value.period_spent: the observer's own totals, keyed by period length in seconds (spec 5.9.2)
+function periodSpentOf(v, unit) {
+  const ps = "period_spent" in v ? v.period_spent : {};
+  if (!ps || typeof ps !== "object" || Array.isArray(ps) || !Object.keys(ps).every(k => PERIOD_KEY.test(k)))
+    throw new Malformed('period_spent must map period lengths in seconds to amounts, for example {"2592000": "300.00"}');
+  return new Map(Object.entries(ps).map(([k, a]) => [k, amountUnits(a, unit)]));
 }
 const unitOf = u => { if (typeof u !== "string" || !UNIT.test(u)) throw new Malformed(`malformed unit ${JSON.stringify(u)}`); return u; };
 const unitsStr = u => { const ip = u / SCALE, fp = (u % SCALE).toString().padStart(18, "0").replace(/0+$/, ""); return fp ? `${ip}.${fp}` : `${ip}`; };
@@ -279,11 +298,12 @@ function checkLimits(lims) {
   if (!Array.isArray(lims) || !lims.length) throw new Malformed("limits must be a non-empty array");
   for (const lim of lims) {
     if (!lim || typeof lim !== "object" || Array.isArray(lim)) throw new Malformed("limit must be an object");
-    unitOf(lim.unit);
-    if ("per_call" in lim) amountUnits(lim.per_call);
+    const unit = unitOf(lim.unit);
+    for (const k of ["per_effect", "per_call"]) if (k in lim) amountUnits(lim[k], unit);
     if (("per_period" in lim) !== ("period" in lim)) throw new Malformed("per_period and period go together");
+    if ("counted_by" in lim && !(typeof lim.counted_by === "string" && lim.counted_by)) throw new Malformed("counted_by must name an observer");
     if ("per_period" in lim) {
-      amountUnits(lim.per_period);
+      amountUnits(lim.per_period, unit);
       if (!Number.isInteger(lim.period) || lim.period <= 0) throw new Malformed("period must be a positive integer number of seconds");
     }
     if ("actions" in lim && !(Array.isArray(lim.actions) && lim.actions.every(p => typeof p === "string")))
@@ -297,7 +317,8 @@ const limitApplies = (lim, x) => ("actions" in lim) ? lim.actions.some(p => patM
 function limitsNarrower(c, p) {
   for (const pl of p.limits || []) for (const cl of c.limits || []) {
     if (cl.unit !== pl.unit || JSON.stringify(cl.actions) !== JSON.stringify(pl.actions)) continue;
-    if ("per_call" in pl && "per_call" in cl && amountUnits(cl.per_call) > amountUnits(pl.per_call)) return `per-call limit raised for ${pl.unit}`;
+    for (const k of ["per_effect", "per_call"])
+      if (k in pl && k in cl && amountUnits(cl[k]) > amountUnits(pl[k])) return `${k.replace("_", "-")} limit raised for ${pl.unit}`;
     if ("per_period" in pl && cl.period === pl.period && "per_period" in cl && amountUnits(cl.per_period) > amountUnits(pl.per_period))
       return `per-period limit raised for ${pl.unit}`;
   }
@@ -480,9 +501,10 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     let claims = chain[0].claims; for (const c of chain.slice(1)) claims = meet(c.claims, claims);
     if (intent) claims = meet(intent.claims, claims);
     const ap = "approval_ref" in inv ? objs[inv.approval_ref] : undefined;
-    const bodies = new Map();
+    const byObserver = new Map();   // observer -> effect identity digest -> its receipts, in packet order
     for (const e of mine) {
       check(!verify(e), "unresolved", "I7", "effect receipt unsigned or signer lacks the role");
+      check(typeof e.observed_by !== "string", "unresolved", "I7", `receipt ${e.id ?? "?"} names no observer`);
       check("invocation_digest" in e && e.invocation_digest !== invDigest, "unresolved", "I7", `receipt ${e.id ?? "?"} is bound to a different invocation (invocation_digest mismatch)`);
       if (highImpact) {
         check(!inv.actor, "unresolved", "I10", "actor not recorded; observer independence cannot be shown");
@@ -508,11 +530,24 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       if ("value" in x) { // validate wherever present, so a malformed amount is never silently ignored
         const v = x.value;
         check(!v || typeof v !== "object" || Array.isArray(v), "unresolved", "I7", "value must be an object");
-        amountUnits(v.amount); unitOf(v.unit);
-        if ("period_spent" in v) amountUnits(v.period_spent);
+        unitOf(v.unit); amountUnits(v.amount, v.unit); periodSpentOf(v, v.unit);
       }
-      const d = approvalDigest(x); if (!bodies.has(d)) bodies.set(d, x);
+      const d = approvalDigest(x);
+      if (!byObserver.has(e.observed_by)) byObserver.set(e.observed_by, new Map());
+      const m = byObserver.get(e.observed_by); if (!m.has(d)) m.set(d, []); m.get(d).push(e);
     }
+    // spec 10.2 (v0.3): the same effect recorded by several observers counts once, but within one observer every receipt
+    // is its own effect. An effect occurs as often as the most any one observer recorded it, taken from that observer's
+    // receipts. Raised by Carlos Vendrell Felici (stafordtituss/amep#10): two identical payments in one call counted as one.
+    const effectsOf = [];   // [executed body, identity digest, observer]
+    const digests = [...new Set([...byObserver.values()].flatMap(m => [...m.keys()]))];
+    for (const d of digests) {
+      const holders = [...byObserver.keys()].filter(o => byObserver.get(o).has(d)).sort();
+      let obs = holders[0];
+      for (const o of holders) if (byObserver.get(o).get(d).length > byObserver.get(obs).get(d).length) obs = o;
+      for (const e of byObserver.get(obs).get(d)) effectsOf.push([e.executed, d, obs]);
+    }
+    const bodies = new Map(effectsOf.map(([x, d]) => [d, x]));
     // every receipt a statement promises must be present, and no more (spec 5.14)
     for (const c of stmts) {
       const k = mine.filter(e => e.observed_by === c.observed_by).length;
@@ -523,6 +558,8 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       check(!ap || !verify(ap), "unresolved", "I7", "approval missing, unsigned or not signed by an approver");
       for (const [d, x] of bodies) {
         check(ap.effect_digest !== d, "violated", "I8", "approval not bound to the executed effect");
+        const nExec = effectsOf.filter(([, dd]) => dd === d).length;
+        check(nExec > 1, "violated", "I8", `one approval, but the approved effect was executed ${nExec} times`);
         check(!!ap.consumed, "violated", "I8", "approval already consumed");
         check("expiry" in ap && toTime(ap.expiry) < Math.max(tInv, toTime(x.t)), "violated", "I8", "approval expired");
         check("nbf" in ap && toTime(ap.nbf) > tInv, "violated", "I8", "approval not yet valid");
@@ -532,39 +569,48 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     }
     // quantity limits (spec 7.6, v0.3), on every node of the chain and on the intent. An approval that passed I8
     // authorizes going over a limit; the amount still counts toward the period total.
-    for (const x of bodies.values()) for (const node of limited) {
-      const applicable = node.claims.limits.filter(lim => limitApplies(lim, x));
-      if (!applicable.length) continue;
-      const v = x.value;
-      check(v === undefined, "unresolved", "I7", `${node.id} limits this effect but the receipt records no value`);
-      const amt = amountUnits(v.amount), unit = v.unit;
-      const matching = applicable.filter(lim => lim.unit === unit);
-      if (!matching.length) {
-        const money = MONEY_UNITS.some(m => unit.startsWith(m)) || x.effect === "financial";
-        check(money, "violated", "I2", `${unit} is not an asset ${node.id} authorizes`);
-        check(true, "unresolved", "I7", `${node.id} limits this effect in another unit than ${unit}`);
-      }
-      for (const lim of matching) {
-        check("per_call" in lim && amt > amountUnits(lim.per_call) && !ap, "violated", "I2",
-          `amount ${v.amount} ${unit} exceeds the per-call limit ${lim.per_call} of ${node.id}`);
-        if (!("per_period" in lim)) continue;
-        const anchor = "nbf" in node.claims ? toTime(node.claims.nbf) : 0;
-        const window = Math.floor((toTime(x.t) - anchor) / lim.period);
-        const key = `${node.id}|${unit}|${lim.period}|${window}`;
-        let total = (totals.get(key) ?? 0n) + amt;
-        if ("period_spent" in v) {
-          const observed = amountUnits(v.period_spent);
-          check(observed < total, "violated", "I7", `observer's period total ${v.period_spent} is below the payments recorded for ${node.id}`);
-          total = observed;
+    for (const node of limited) {
+      const callSum = new Map();   // limit index -> amount moved by this call so far
+      for (const [x, , obs] of effectsOf) {
+        const applicable = node.claims.limits.map((lim, i) => [i, lim]).filter(([, lim]) => limitApplies(lim, x));
+        if (!applicable.length) continue;
+        const v = x.value;
+        check(v === undefined, "unresolved", "I7", `${node.id} limits this effect but the receipt records no value`);
+        const unit = v.unit, amt = amountUnits(v.amount, unit);
+        const matching = applicable.filter(([, lim]) => lim.unit === unit);
+        if (!matching.length) {
+          const money = MONEY_UNITS.some(m => unit.startsWith(m)) || x.effect === "financial";
+          check(money, "violated", "I2", `${unit} is not an asset ${node.id} authorizes`);
+          check(true, "unresolved", "I7", `${node.id} limits this effect in another unit than ${unit}`);
         }
-        check(total > amountUnits(lim.per_period) && !ap, "violated", "I2",
-          `period total ${unitsStr(total)} ${unit} exceeds the per-period limit ${lim.per_period} of ${node.id}`);
-        check(!("period_spent" in v) && !priorWindows.has(key), "unresolved", "I7",
-          `period total for ${node.id} cannot be established: no observer period_spent and no earlier state`);
-        totals.set(key, total);
+        for (const [i, lim] of matching) {
+          check("per_effect" in lim && amt > amountUnits(lim.per_effect) && !ap, "violated", "I2",
+            `amount ${v.amount} ${unit} exceeds the per-effect limit ${lim.per_effect} of ${node.id}`);
+          callSum.set(i, (callSum.get(i) ?? 0n) + amt);
+          check("per_call" in lim && callSum.get(i) > amountUnits(lim.per_call) && !ap, "violated", "I2",
+            `this call moves ${unitsStr(callSum.get(i))} ${unit}, over the per-call limit ${lim.per_call} of ${node.id}`);
+          if (!("per_period" in lim)) continue;
+          const anchor = "nbf" in node.claims ? toTime(node.claims.nbf) : 0;
+          const window = Math.floor((toTime(x.t) - anchor) / lim.period);
+          // one running total per limit (amep#10): limits that differ only in their actions are separate caps
+          const key = `${node.id}|${unit}|${lim.period}|${window}` + ("actions" in lim ? `|${[...lim.actions].sort().join(",")}` : "");
+          let total = (totals.get(key) ?? 0n) + amt;
+          // An observer's total is the principal's total only when that observer sees all of this node's spending in
+          // the unit: the limit names it in counted_by (amep#10). Other observers' totals never count.
+          const counted = lim.counted_by === obs ? periodSpentOf(v, unit).get(String(lim.period)) : undefined;
+          if (counted !== undefined) {
+            check(counted < total, "violated", "I7", `${obs}'s period total ${unitsStr(counted)} ${unit} is below the payments recorded for ${node.id}`);
+            total = counted;
+          }
+          check(total > amountUnits(lim.per_period) && !ap, "violated", "I2",
+            `period total ${unitsStr(total)} ${unit} exceeds the per-period limit ${lim.per_period} of ${node.id}`);
+          check(counted === undefined && !priorWindows.has(key), "unresolved", "I7",
+            `period total for ${node.id} cannot be established: no total from its counting observer and no earlier state`);
+          totals.set(key, total);
+        }
       }
     }
-    const c = [...bodies.values()].reduce((s, x) => s + cost(x), 0);
+    const c = effectsOf.reduce((s, [x]) => s + cost(x), 0);
     check("budget_spent" in inv && inv.budget_spent !== c, "violated", "I7", "recorded budget spend does not match receipts");
     const over = chain.find(n => "budget" in n.claims && (spent[n.id] || 0) + c > n.claims.budget);
     check(!!over && !ap, "violated", "I2", `risk budget of ${over && over.id} exceeded without approval`);

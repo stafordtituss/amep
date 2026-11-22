@@ -48,4 +48,4 @@ Entries are added only with the person's agreement and link to the public record
 
 | Date | Reviewer | Relationship to author | Where | Summary | Link |
 |---|---|---|---|---|---|
-| | *None yet* | | | | |
+| 2026-11-22 | Carlos Vendrell Felici, Zealynx Security | None (no prior collaboration, employment or financial relationship), as stated in the review | Independent review issue | Payments review of the v0.3 quantity limits, with 17 signed packets checked against both reference verifiers. Found that identical payments in one call counted as one (so one approval covered a payment executed twice), that one `period_spent` stood for several periods, that one observer's share was taken as the principal's total, that `caip19:` amounts were ambiguous, and that limits differing only in `actions` shared one total. All fixed in both verifiers (see CHANGELOG). The reviewer disclosed that the review was written with an AI tool. | [stafordtituss/amep#10](https://github.com/stafordtituss/amep/issues/10) |
