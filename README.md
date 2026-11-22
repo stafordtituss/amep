@@ -49,6 +49,8 @@ See `packages/python/README.md` and `packages/js/README.md`. Published at [amep-
 | `verifier/python/` | Conformance-vector generator (uses the Python package) |
 | `verifier/typescript/` | Repository CLI for the JavaScript verifier |
 | `verifier/browser/` | The JavaScript verifier as an offline web page |
+| `packages/conformance/` | `amep-conformance`: runs the suites against any verifier, and imports other receipt formats (AER-1, OpenID action receipts, Provared books) with a gap report |
+| `interop/` | Mappings and runs against other work. [`interop/COVERAGE.md`](interop/COVERAGE.md) shows which parts of AMEP's question each receipt format can settle |
 | `tools/` | Schema builder and validators, Appendix B generator, attribution check |
 
 ## Check everything

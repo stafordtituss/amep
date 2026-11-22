@@ -2,6 +2,10 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## Coverage matrix (unreleased, 2026-11-22)
+
+- **`interop/COVERAGE.md`:** for each format AMEP can import (AER-1, OpenID DA action receipts, Provared) and for AMEP's own evidence, which parts of the question (I1 to I11, binding to the call, confirmed non-execution) the format's records can settle. Each cell is based on the import profile's code, its gap report and its tests. The format authors are invited to correct their rows.
+
 ## Provared import; comparison with the Provared checker (unreleased, 2026-11-22)
 
 - **`amep-conformance import-book`**, with a profile for Provared books (draft-izmaylov-agent-permission-receipts). Every record is checked by the format's own rules first: the envelope, labels, canonical form, both hybrid signatures (Ed25519 and ML-DSA-87), the passkey (WebAuthn) signatures, fingerprints, the chain, and countersignature and approval binding. The verified records are then re-expressed as AMEP evidence (slip → mandate, stubs → invocations, countersigned stubs → service-observed effects at L1, one-sided stubs → the agent's own report at L0, approvals → approvals). Limits AMEP can't express exactly are reported as gaps.
