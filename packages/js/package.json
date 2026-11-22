@@ -7,7 +7,8 @@
     ".": "./src/index.mjs",
     "./core": "./src/core.mjs",
     "./sdk": "./src/sdk.mjs",
-    "./node": "./src/node.mjs"
+    "./node": "./src/node.mjs",
+    "./verdict": "./src/verdict.mjs"
   },
   "bin": {
     "amep-protocol": "bin/amep-protocol.mjs"

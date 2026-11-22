@@ -13,6 +13,7 @@ import { parseArgs } from "node:util";
 import { evaluate, evaluateText, verdict, approvalDigest, parseStrict } from "../src/core.mjs";
 import { sigOk, Key, ROLES } from "../src/node.mjs";
 import { VERSION, SPEC_VERSION } from "../src/index.mjs";
+import { statement, signEnvelope } from "../src/verdict.mjs";
 
 const EXIT = { preserved: 0, violated: 1, unresolved: 2 };
 const load = p => parseStrict(readFileSync(p === "-" ? 0 : p, "utf8"));   // spec 12.1: strict number literals
@@ -23,15 +24,22 @@ function run(argv) {
   const { values: o, positionals: pos } = parseArgs({ args: rest, allowPositionals: true, options: {
     keys: { type: "string" }, state: { type: "string" }, "state-out": { type: "string" },
     protected: { type: "string", multiple: true }, json: { type: "boolean" },
-    kid: { type: "string" }, roles: { type: "string" }, out: { type: "string" }, key: { type: "string" } } });
+    kid: { type: "string" }, roles: { type: "string" }, out: { type: "string" }, key: { type: "string" },
+    "verdict-out": { type: "string" }, "sign-with": { type: "string" }, "sign-kid": { type: "string" } } });
   switch (cmd) {
     case "verify": {
       if (!pos[0] || !o.keys) throw new Error("usage: amep-protocol verify PACKET --keys KEYS");
       const state = o.state ? load(o.state) : {};
       // the packet is parsed strictly inside evaluateText, so malformed text yields unresolved (I7) instead of an exception
-      const results = evaluateText(readFileSync(pos[0] === "-" ? 0 : pos[0], "utf8"), load(o.keys), sigOk, o.protected || [], state);
+      const bytes = readFileSync(pos[0] === "-" ? 0 : pos[0]), keySet = load(o.keys);
+      const results = evaluateText(bytes.toString("utf8"), keySet, sigOk, o.protected || [], state);
       const v = verdict(results);
       if (o["state-out"]) writeFileSync(o["state-out"], JSON.stringify(state, null, 1));
+      if (o["verdict-out"]) { // spec 10.8: an in-toto statement of this verdict, signed in a DSSE envelope with --sign-with
+        let stmt = statement(bytes, keySet, results, { name: "@stafordtituss/amep", version: VERSION });
+        if (o["sign-with"]) { const k = Key.fromPem(readFileSync(o["sign-with"]), o["sign-kid"] || "verifier", ["observer"]); stmt = signEnvelope(stmt, k.keyObject, k.kid); }
+        writeFileSync(o["verdict-out"], JSON.stringify(stmt, null, 1));
+      }
       if (o.json) console.log(JSON.stringify({ verdict: v, results }, null, 1));
       else { for (const r of results) console.log(`${r.id}\t${r.outcome}\t${r.invariant}\t${r.reason}`); console.log(`verdict: ${v.outcome} ${v.invariant}`); }
       return EXIT[v.outcome];

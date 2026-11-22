@@ -1,0 +1,39 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "amep-packet",
+      "digest": {
+        "sha256": "b0b46388661ff3e4dd396d31c0172bc3c82f123e109592552d4dfff596c0d5d0"
+      }
+    }
+  ],
+  "predicateType": "https://github.com/stafordtituss/amep/verdict/v0.3",
+  "predicate": {
+    "packet": {
+      "sha256": "b0b46388661ff3e4dd396d31c0172bc3c82f123e109592552d4dfff596c0d5d0"
+    },
+    "keyset": {
+      "sha256": "3a98b7d84f2d5d484f243191a33450b5481cdb3b7e1cc78afdc81a167c92c232"
+    },
+    "verdict": {
+      "outcome": "violated",
+      "invariant": "I2",
+      "blame": "agent",
+      "gaps": []
+    },
+    "results": [
+      {
+        "id": "i-1",
+        "outcome": "violated",
+        "invariant": "I2",
+        "blame": "agent",
+        "gaps": []
+      }
+    ],
+    "verifier": {
+      "name": "amep-protocol",
+      "version": "0.3.0a1"
+    }
+  }
+}

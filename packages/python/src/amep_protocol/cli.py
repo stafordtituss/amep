@@ -30,14 +30,24 @@ def _load(path):
 def cmd_verify(a):
     keys = _load(a.keys)
     state = _load(a.state) if a.state else {}
-    with (sys.stdin if a.packet == "-" else open(a.packet, encoding="utf-8")) as f:
-        text = f.read()
+    with (sys.stdin.buffer if a.packet == "-" else open(a.packet, "rb")) as f:
+        data = f.read()
+    text = data.decode("utf-8", "surrogatepass")
     # parsed strictly inside evaluate_text, so malformed text yields unresolved (I7) instead of an exception
     results = evaluate_text(text, keys, extra_protected=tuple(a.protected or ()), state=state)
     v = verdict(results)
     if a.state_out:
         with open(a.state_out, "w", encoding="utf-8") as f:
             json.dump(state, f, indent=1)
+    if a.verdict_out:   # spec 10.8: an in-toto statement of this verdict, signed in a DSSE envelope with --sign-with
+        from . import __version__
+        from .verdicts import sign_envelope, statement
+        stmt = statement(data, keys, results, {"name": "amep-protocol", "version": __version__})
+        if a.sign_with:
+            signer = sdk.Key.from_pem(open(a.sign_with, "rb").read(), a.sign_kid or "verifier", ["observer"])
+            stmt = sign_envelope(stmt, signer._key, signer.kid)
+        with open(a.verdict_out, "w", encoding="utf-8") as f:
+            json.dump(stmt, f, indent=1)
     if a.json:
         print(json.dumps({"verdict": {"outcome": v.outcome, "invariant": v.invariant, "reason": v.reason},
                           "results": [r.__dict__ for r in results]}, indent=1))
@@ -102,6 +112,9 @@ def main(argv=None) -> int:
     v.add_argument("--state-out", help="write the updated state here")
     v.add_argument("--protected", action="append", help="extra protected path marker (spec 8.1); repeatable")
     v.add_argument("--json", action="store_true", help="print results as JSON")
+    v.add_argument("--verdict-out", help="write the verdict as an in-toto statement (spec 10.8)")
+    v.add_argument("--sign-with", help="Ed25519 key file (PKCS#8) to sign the statement in a DSSE envelope")
+    v.add_argument("--sign-kid", help="key id to record in the DSSE signature")
     v.set_defaults(fn=cmd_verify)
     c = sub.add_parser("check-suite", help="run a conformance suite directory")
     c.add_argument("dir")

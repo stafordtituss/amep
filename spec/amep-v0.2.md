@@ -899,6 +899,36 @@ Approval single use (I8) and risk budgets (Section 9) span more than one packet 
 
 State is the verifier's own bookkeeping, not evidence. A third party that wants to reproduce a result needs the same state, so verifiers that rely on it SHOULD publish it alongside their results, signed with their own key. A conformance vector MAY include a `state` member, which a verifier passes in before evaluating that vector's packet.
 
+### 10.8 Verdict records *(v0.3)*
+
+A verifier MAY publish what it concluded as a **verdict record**: a statement that names the exact packet and key set it evaluated and gives, for the packet and for each result, the outcome, the deciding invariant, `blame` and `gaps` (Section 10.5.1). A party that has the packet and the key set can re-run any conforming verifier and get the same record, so a record can be checked without trusting its signer. A party that does not have them can still rely on the signer's word, as it would on any attestation.
+
+The record is the predicate of an in-toto Statement v1 [IN-TOTO], with predicate type `https://github.com/stafordtituss/amep/verdict/v0.3`:
+
+```json
+{ "_type": "https://in-toto.io/Statement/v1",
+  "subject": [ { "name": "amep-packet", "digest": { "sha256": "<SHA-256 of the packet bytes>" } } ],
+  "predicateType": "https://github.com/stafordtituss/amep/verdict/v0.3",
+  "predicate": {
+    "packet":   { "sha256": "<SHA-256 of the packet bytes>" },
+    "keyset":   { "sha256": "<SHA-256 of the JCS form of the key set>" },
+    "verdict":  { "outcome": "violated", "invariant": "I2", "blame": "agent", "gaps": [] },
+    "results":  [ { "id": "<invocation id>", "outcome": "violated", "invariant": "I2", "blame": "agent", "gaps": [] } ],
+    "verifier": { "name": "<implementation>", "version": "<version>" } } }
+```
+
+- `packet.sha256` is computed over the exact bytes the verifier evaluated, before parsing, so a record also covers packets that are not well formed (Section 12.1).
+- `keyset.sha256` is computed over the JCS form (Section 12.1) of the key set as the verifier received it.
+- `verdict` is the packet verdict of Section 10.5. `blame` is `null` unless the outcome is `violated`; `gaps` is empty unless it is `unresolved`.
+- `results` lists every result in evaluation order, with the same members, plus the invocation `id` (`"-"` for a packet-level result, such as a packet that does not parse).
+- Reasons are free text and differ between implementations, so they are not part of the record.
+- `verifier` is OPTIONAL and names the implementation. It is the only member that two conforming verifiers MAY fill differently: with `verifier` removed, the JCS forms of their records for the same inputs MUST be identical.
+- When a verifier uses state across packets (Section 10.7), the record does not cover the state; the verifier SHOULD publish the state it used alongside the record.
+
+A signed record is the statement's JCS form carried in a DSSE envelope [DSSE] with payload type `application/vnd.in-toto+json`, signed with Ed25519 over the DSSE pre-authentication encoding. The strict acceptance rule of Section 12.2 applies to its signatures. A verifier of an envelope MUST check the signature before parsing the payload, and MUST parse the payload under the rules of Section 12.1.
+
+A verdict record is a statement by its signer, not evidence of what the agent did. It does not take the place of the packet in a dispute: the packet is the evidence and the record is one verifier's reading of it.
+
 ---
 
 ## 11. Decision modes and enforcement
@@ -1239,6 +1269,8 @@ The file names in Appendix B, without extension, are stable identifiers.
 - **[MCP]** Model Context Protocol specification.
 - **[A2A]** Agent2Agent protocol. **[AP2]** Agent Payments Protocol.
 - **[VC-DM-2]** W3C Verifiable Credentials Data Model 2.0.
+- **[IN-TOTO]** in-toto Attestation Framework, Statement v1.
+- **[DSSE]** Dead Simple Signing Envelope, v1.
 
 ---
 

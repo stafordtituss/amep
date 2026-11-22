@@ -6,6 +6,11 @@ Specification drafts, conformance-suite versions and package versions are listed
 
 - **Spec 10.5.1:** every result now carries `blame` and `gaps`. On a `violated` result, `blame` names the party whose own signed record first departs from authority: `agent`, `delegator`, `host`, `transport` or `server`. On an `unresolved` result, `gaps` names the evidence that would let the evaluation continue (`{need, ref}`, from a fixed set of values). Both are derived from the signed evidence only.
 - **`tools/compare_verifiers.py`:** a differential check that both reference verifiers return the same outcome, invariant, blame and gaps for every result of every vector, not only the same verdict. It agrees on all 258 results of the 240 vectors in the three suites.
+- **Spec 10.8, verdict records:** a verifier can publish what it concluded as an in-toto Statement v1 (predicate type `https://github.com/stafordtituss/amep/verdict/v0.3`), naming the SHA-256 of the exact packet bytes and of the key set, and the outcome, invariant, blame and gaps of the packet and of every result. Apart from the optional `verifier` member, two conforming verifiers produce byte-identical records, so anyone holding the packet can check a record by re-running a verifier. Records are signed in DSSE envelopes under the strict Ed25519 rule (12.2).
+  - Python `amep_protocol.verdicts` and JavaScript `@stafordtituss/amep/verdict`: `statement`, `sign_envelope`/`signEnvelope`, `verify_envelope`/`verifyEnvelope`.
+  - Both CLIs: `verify --verdict-out FILE` writes the statement; with `--sign-with KEY --sign-kid KID` it writes a signed envelope.
+  - `tools/compare_verifiers.py` now also checks byte-identical statements (240/240 vectors); `tools/verdict_roundtrip.py` signs with each CLI and checks each envelope with the other language.
+  - `interop/in-toto/PREDICATE.md`: the predicate written up for a proposal to in-toto/attestation, with a generated example.
 - **`amep-conformance import`:** a profile for OpenID DA execution layer action receipts (`oidf-action-receipt`), with the execution layer's §9.1 travel-agent scenario as tests.
 
 ## Payment-limit fixes from review amep#10 (packages 0.3.0a1 / 0.3.0-alpha.1, 2026-11-22)

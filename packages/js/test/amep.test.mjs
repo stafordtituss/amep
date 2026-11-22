@@ -1,12 +1,13 @@
 // Tests for the amep npm package. Run: node --test packages/js/test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, writeFileSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync, statSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
-import { verifyPacket, Key, keyset, sdk, canon, parseStrict, evaluate, verdict, sigOk } from "../src/index.mjs";
+import { verifyPacket, Key, keyset, sdk, canon, parseStrict, evaluate, verdict, sigOk, verdicts } from "../src/index.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const VECTORS = join(here, "..", "..", "..", "vectors");
@@ -92,4 +93,35 @@ test("I-JSON number rules (spec 12.1)", () => {
   assert.equal(v.outcome, "unresolved");
   assert.equal(v.invariant, "I7");
   assert.match(v.reason, /I-JSON range/);
+});
+
+// Spec 10.8: verdict records as in-toto statements in DSSE envelopes.
+test("verdict statement: names the packet, verdict and blame; envelope round-trips; tampering fails", (t) => {
+  const f = join(VECTORS, "must-reject", "payment-over-the-per-call-limit-without-approval.json");
+  if (!existsSync(f)) return t.skip("conformance vectors not present");
+  const v = JSON.parse(readFileSync(f, "utf8"));
+  const keys = JSON.parse(readFileSync(join(VECTORS, "keys.json"), "utf8"));
+  const bytes = Buffer.from(JSON.stringify(v.packet), "utf8");
+  const st = verdicts.statement(bytes, keys, evaluate(JSON.parse(bytes.toString()), keys, sigOk));
+  assert.equal(st._type, "https://in-toto.io/Statement/v1");
+  assert.equal(st.predicateType, verdicts.PREDICATE_TYPE);
+  assert.equal(st.subject[0].digest.sha256, createHash("sha256").update(bytes).digest("hex"));
+  assert.deepEqual(st.predicate.verdict, { outcome: "violated", invariant: "I2", blame: "agent", gaps: [] });
+
+  const k = Key.generate("verifier-1", ["observer"]);
+  const env = verdicts.signEnvelope(st, k.keyObject, k.kid);
+  const pub = { [k.kid]: k.publicEntry().x };
+  assert.equal(verdicts.verifyEnvelope(env, pub).predicate.verdict.outcome, "violated");
+  const bad = { ...env, payload: Buffer.from(Buffer.from(env.payload, "base64").toString().replace("violated", "preserved")).toString("base64") };
+  assert.throws(() => verdicts.verifyEnvelope(bad, pub));
+  assert.throws(() => verdicts.verifyEnvelope(env, { [k.kid]: Key.generate("x", ["observer"]).publicEntry().x }));
+
+  // the Python implementation verifies the JavaScript signature
+  const py = spawnSync("python3", ["--version"]);
+  if (py.status !== 0) return;
+  const d = mkdtempSync(join(tmpdir(), "amep-env-"));
+  writeFileSync(join(d, "env.json"), JSON.stringify(env)); writeFileSync(join(d, "pub.json"), JSON.stringify(pub));
+  const r = spawnSync("python3", [join(here, "..", "..", "..", "tools", "verify_verdict.py"), join(d, "env.json"), join(d, "pub.json")], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /verified: violated I2/);
 });
