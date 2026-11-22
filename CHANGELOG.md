@@ -4,6 +4,8 @@ Specification drafts, conformance-suite versions and package versions are listed
 
 ## Coverage matrix (unreleased, 2026-11-22)
 
+- **AER-1 profile, binding gap wording:** the report now says what `input_hash_layout` means. Under `rfc8785-jcs-utf8-v1`, `input_hash` *is* AMEP's `args_digest`. Under another layout, it equals `args_digest` only for arguments that serialize identically under both. The report also says whether a binding was made. This is wording only; binding stays by digest. It was noted before the blind fixture run in amep#11 and fixed after it, so the run used the code the expectations were written against.
+
 - **`interop/COVERAGE.md`:** for each format AMEP can import (AER-1, OpenID DA action receipts, Provared) and for AMEP's own evidence, which parts of the question (I1 to I11, binding to the call, confirmed non-execution) the format's records can settle. Each cell is based on the import profile's code, its gap report and its tests. The format authors are invited to correct their rows.
 
 ## Provared import; comparison with the Provared checker (unreleased, 2026-11-22)

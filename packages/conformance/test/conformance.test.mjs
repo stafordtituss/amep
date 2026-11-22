@@ -143,6 +143,18 @@ describe("import adapter: AER-1 profile", () => {
     assert.match(out.not_imported, /declared release/);
   });
 
+  test("the binding gap's wording follows input_hash_layout (wording only; binding is by digest either way)", () => {
+    const { packet } = gatewayPacket();
+    const inv = packet.invocations[0];
+    const gap = r => importRecord(r, { map: MAP, invocations: packet.invocations }).gaps.find(g => g.need.startsWith("binding")).detail;
+    const rfc = aer1Receipt({ inputHash: "sha256:" + inv.args_digest }); rfc.input_hash_layout = "rfc8785-jcs-utf8-v1";
+    assert.match(gap(rfc), /^input_hash uses the RFC 8785 layout .* so the record is bound to that call$/);
+    const other = aer1Receipt({ inputHash: "sha256:" + inv.args_digest }); other.input_hash_layout = "zambo-json-sorted-keys-utf8-v1";
+    assert.match(gap(other), /not RFC 8785: .* bound to that call\. The rfc8785-jcs-utf8-v1 layout makes it hold/);
+    const unbound = aer1Receipt({ inputHash: "sha256:" + "0".repeat(64) }); unbound.input_hash_layout = "rfc8785-jcs-utf8-v1";
+    assert.match(gap(unbound), /not bound to a call$/);
+  });
+
   test("a refused call (committed output says executed: false) produces no effect; uncommitted fields are ignored", () => {
     // the shape of a live gateway refusal record (Zambo, stafordtituss/amep#11): the refusal is inside canonical_bytes
     const refusal = JSON.stringify({ status: "payment_required", tool: "live_price", executed: false, reason: "daily_quota_exhausted" });

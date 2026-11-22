@@ -51,6 +51,18 @@ function strictBase64(s) {
 const versionAtLeast = (v, min) => { const a = String(v).split(".").map(Number), b = min.split(".").map(Number);
   for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (a[i] ?? 0) - (b[i] ?? 0); if (d) return d > 0; } return true; };
 
+// The binding gap's wording depends on the layout of input_hash: under the RFC 8785 layout it is AMEP's args_digest by
+// definition; under another layout it equals args_digest only where the two serializations happen to coincide.
+const RFC8785_LAYOUT = "rfc8785-jcs-utf8-v1";
+function bindingDetail(info, mapped) {
+  if (!info.input_hash) return "no input_hash";
+  const bound = mapped.binding === "digest" ? "it equals the given invocation's args_digest, so the record is bound to that call"
+    : "no invocation with this args_digest was given, so the record is not bound to a call";
+  if (info.input_hash_layout === RFC8785_LAYOUT)
+    return `input_hash uses the RFC 8785 layout (${RFC8785_LAYOUT}), so it is the AMEP args_digest of the call's arguments; ${bound}`;
+  return `input_hash uses layout "${info.input_hash_layout ?? "none named"}", not RFC 8785: it equals AMEP's args_digest only for arguments that serialize identically under both; ${bound}. The ${RFC8785_LAYOUT} layout makes it hold for any arguments`;
+}
+
 export const aer1 = {
   id: "aer1",
   title: "AER-1 execution receipt (draft-zambo-aer1)",
@@ -135,7 +147,7 @@ export const aer1 = {
       { need: "canonical action, resource and effect class", status: mapped.mappedFrom,
         detail: mapped.mappedFrom === "map" ? "taken from the deployment's published tool map" : "no tool map entry: cannot be derived" },
       { need: "binding to the authorizing call (AMEP invocation)", status: mapped.binding,
-        detail: info.input_hash ? `input_hash uses layout "${info.input_hash_layout}"; AMEP binds with SHA-256 of RFC 8785 arguments (args_digest). With that layout, input_hash would equal args_digest.` : "no input_hash" },
+        detail: bindingDetail(info, mapped) },
       { need: "quantities (amounts, record counts)", status: "missing", detail: "no quantity member in AER-1; limits cannot be evaluated" },
       { need: "data classes released", status: mapped.released ? "map" : "missing",
         detail: mapped.released ? "declared by the deployment's tool map" : "no data-flow labels; the adapter refuses to import effects of class external_send or above without a declared release" },
