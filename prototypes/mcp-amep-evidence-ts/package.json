@@ -18,7 +18,7 @@
   "dependencies": {
     "@modelcontextprotocol/client": "2.4.0",
     "@modelcontextprotocol/server": "2.4.0",
-    "@stafordtituss/amep": "0.2.0-alpha.7",
+    "@stafordtituss/amep": "file:../../packages/js",
     "zod": "4.6.7"
   },
   "license": "Apache-2.0",

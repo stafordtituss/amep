@@ -119,11 +119,11 @@
    {
     "kind": "status",
     "target": "m-1",
-    "as_of": 10,
+    "as_of": 11,
     "proof": {
      "kid": "issuer-1",
      "alg": "Ed25519",
-     "sig": "6d2343c0c5c978b204c63f01897aaa70308407975820ca902a941ee46d29192a461ccdd2c3f0a6611724458ffd429bc0ec9b89879a2cd6bd1e8afe8759c8ea04"
+     "sig": "f797a66221f8fb2d2591598ef036349dcf472ae52d82512fde900dd9d722e14aaf245f00efed218ed35159a9e11d1d4fed926d92d3efa1088ee1c8b4d6e75702"
     }
    }
   ]

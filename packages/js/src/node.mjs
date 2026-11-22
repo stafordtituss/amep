@@ -2,7 +2,7 @@
 // Browsers use the same core (./core.mjs) with WebCrypto instead; see verifier/browser in the repository.
 import { createPublicKey, createPrivateKey, generateKeyPairSync, sign as edSign, verify as edVerify } from "node:crypto";
 import { writeFileSync, existsSync } from "node:fs";
-import { canon, stripProof, evaluate, verdict, SIGNER_ROLES } from "./core.mjs";
+import { canon, stripProof, signingInput, evaluate, verdict, SIGNER_ROLES } from "./core.mjs";
 
 export const ROLES = ["issuer", "host", "observer", "approver"];
 const SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex"); // DER prefix of an Ed25519 public key
@@ -10,7 +10,7 @@ const SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex"); // DER prefi
 /** Signature check for core.evaluate: true when obj's proof verifies under key (a key-set entry). */
 export function sigOk(obj, key) {
   const pub = createPublicKey({ key: Buffer.concat([SPKI_PREFIX, Buffer.from(key.x, "hex")]), format: "der", type: "spki" });
-  return edVerify(null, Buffer.from(canon(stripProof(obj)), "utf8"), pub, Buffer.from(obj.proof.sig, "hex"));
+  return edVerify(null, Buffer.from(signingInput(obj), "utf8"), pub, Buffer.from(obj.proof.sig, "hex"));
 }
 
 /** Evaluate a packet with node:crypto signature checks. Returns { results, verdict }. */
@@ -50,14 +50,16 @@ export class Key {
     return { kid: this.kid, alg: "Ed25519", x: der.subarray(SPKI_PREFIX.length).toString("hex"), roles: [...this.roles] };
   }
 
-  /** A copy of obj with a proof over its JCS form. Refuses kinds this key's roles may not sign. */
-  sign(obj) {
+  /** A copy of obj with a proof. v: 1 signs the JCS form (AMEP v0.2); v: 2 signs the domain-separated input of
+   * spec 12.2 (AMEP v0.3). Refuses kinds this key's roles may not sign. */
+  sign(obj, { v = 1 } = {}) {
     const allowed = SIGNER_ROLES[obj.kind];
     if (allowed && !this.roles.some(r => allowed.includes(r)))
       throw new Error(`key ${this.kid} (roles ${this.roles.join(", ")}) may not sign a ${obj.kind}; needs one of ${allowed.join(", ")}`);
     const body = stripProof(obj);
-    const sig = edSign(null, Buffer.from(canon(body), "utf8"), this.keyObject).toString("hex");
-    return { ...body, proof: { kid: this.kid, alg: "Ed25519", sig } };
+    const proof = v === 2 ? { kid: this.kid, alg: "Ed25519", v: 2 } : { kid: this.kid, alg: "Ed25519" };
+    const sig = edSign(null, Buffer.from(signingInput({ ...body, proof }), "utf8"), this.keyObject).toString("hex");
+    return { ...body, proof: { ...proof, sig } };
   }
 }
 

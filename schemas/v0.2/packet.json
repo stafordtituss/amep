@@ -75,6 +75,12 @@
     "$ref": "decision.json"
    }
   },
+  "call_statements": {
+   "type": "array",
+   "items": {
+    "$ref": "call_statement.json"
+   }
+  },
   "pinned_adapters": {
    "type": "object",
    "additionalProperties": {

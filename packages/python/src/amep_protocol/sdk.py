@@ -15,7 +15,7 @@ import stat
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from .core import CEILING, SIGNER_ROLES, approval_digest, canon
+from .core import CEILING, DISPOSITIONS, SIGNER_ROLES, approval_digest, canon, digest, signing_input
 
 ROLES = ("issuer", "host", "observer", "approver")
 ASSURANCE = ("L0", "L1", "L2", "L3")
@@ -71,13 +71,17 @@ class Key:
         raw = self._key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
         return {"kid": self.kid, "alg": "Ed25519", "x": raw.hex(), "roles": list(self.roles)}
 
-    def sign(self, obj: dict) -> dict:
-        """Return a copy of obj with a proof over its JCS form. Refuses kinds this key's roles may not sign."""
+    def sign(self, obj: dict, v: int = 1) -> dict:
+        """Return a copy of obj with a proof. v=1 signs the JCS form (AMEP v0.2); v=2 signs the domain-separated
+        input of spec 12.2 (AMEP v0.3). Refuses kinds this key's roles may not sign."""
         kind = obj.get("kind")
         if kind in SIGNER_ROLES and not set(self.roles) & SIGNER_ROLES[kind]:
             raise ValueError(f"key {self.kid} (roles {self.roles}) may not sign a {kind}; "
                              f"needs one of {sorted(SIGNER_ROLES[kind])}")
-        body = {k: v for k, v in obj.items() if k != "proof"}
+        body = {k: x for k, x in obj.items() if k != "proof"}
+        if v == 2:
+            proof = {"kid": self.kid, "alg": "Ed25519", "v": 2}
+            return {**body, "proof": {**proof, "sig": self._key.sign(signing_input({**body, "proof": proof})).hex()}}
         return {**body, "proof": {"kid": self.kid, "alg": "Ed25519", "sig": self._key.sign(canon(body)).hex()}}
 
 
@@ -121,17 +125,25 @@ def interpretation(id, adapter, version, *, source="curated", integrity_hash=Non
 
 
 def effect_body(action, resource, effect, t, *, released=None, reversible=None, accessed=None,
-                recipient=None) -> dict:
+                recipient=None, value=None) -> dict:
     """The executed-effect body (spec 5.9), also used for invocation.mediated and approvals."""
     _one_of("effect", effect, CEILING)
     return _clean({"action": action, "resource": resource, "effect": effect,
                    "released": list(released) if released is not None else [], "reversible": reversible,
-                   "accessed": list(accessed) if accessed is not None else None, "recipient": recipient, "t": t})
+                   "accessed": list(accessed) if accessed is not None else None, "recipient": recipient,
+                   "value": value, "t": t})
+
+
+def value(amount: str, unit: str, *, period_spent: str | None = None) -> dict:
+    """A quantity (spec 5.9.2): amounts are exact decimal strings, for example value("1200.00", "iso4217:EUR")."""
+    if not isinstance(amount, str):
+        raise ValueError('amount must be a decimal string, for example "1200.00"')
+    return _clean({"amount": amount, "unit": unit, "period_spent": period_spent})
 
 
 def invocation(id, authority_ref, interpretation_ref, t, action, resource, effect, *, actor=None,
                intent_ref=None, approval_ref=None, mediated=None, influenced_by=None, principal_confirmed=None,
-               derived_from=None, budget_spent=None, correlation=None) -> dict:
+               derived_from=None, budget_spent=None, correlation=None, args_digest=None) -> dict:
     _one_of("effect", effect, CEILING)
     if CEILING.index(effect) >= CEILING.index("write_shared") and not actor:
         raise ValueError("actor is required for effects of class write_shared and above (spec 5.8, I10)")
@@ -139,13 +151,31 @@ def invocation(id, authority_ref, interpretation_ref, t, action, resource, effec
                    "interpretation_ref": interpretation_ref, "intent_ref": intent_ref, "approval_ref": approval_ref,
                    "t": t, "actor": actor, "declared": {"action": action, "resource": resource, "effect": effect},
                    "mediated": mediated, "influenced_by": influenced_by, "principal_confirmed": principal_confirmed,
-                   "derived_from": derived_from, "budget_spent": budget_spent, "correlation": correlation})
+                   "derived_from": derived_from, "budget_spent": budget_spent, "correlation": correlation,
+                   "args_digest": args_digest})
 
 
-def effect(id, invocation, observed_by, assurance, executed, *, backend_receipt=None) -> dict:
+def effect(id, invocation, observed_by, assurance, executed, *, backend_receipt=None, invocation_digest=None) -> dict:
     _one_of("assurance", assurance, ASSURANCE)
     return _clean({"id": id, "kind": "effect", "invocation": invocation, "observed_by": observed_by,
-                   "assurance": assurance, "executed": executed, "backend_receipt": backend_receipt})
+                   "assurance": assurance, "executed": executed, "backend_receipt": backend_receipt,
+                   "invocation_digest": invocation_digest})
+
+
+def call_statement(id, invocation, observed_by, disposition, effect_count, t, *, invocation_digest=None,
+                   args_digest=None) -> dict:
+    """The observer's signed account of one tool call (spec 5.14)."""
+    _one_of("disposition", disposition, DISPOSITIONS)
+    if disposition == "not_executed" and effect_count != 0:
+        raise ValueError("a not_executed call has no effects")
+    return _clean({"id": id, "kind": "call_statement", "invocation": invocation, "observed_by": observed_by,
+                   "disposition": disposition, "effect_count": effect_count, "t": t,
+                   "invocation_digest": invocation_digest, "args_digest": args_digest})
+
+
+def args_digest(arguments) -> str:
+    """SHA-256 of the JCS form of a tool call's arguments (spec 5.14), as sent by the host or received by the server."""
+    return digest(arguments if arguments is not None else {})
 
 
 def approval(id, body, presence, *, expiry=None, nbf=None, approver=None, resource_version=None,
@@ -196,13 +226,13 @@ _PACKET_MEMBERS = ("mandates", "delegations", "intents", "interpretations", "inv
                    "revocations", "statuses", "findings", "decisions")
 
 
-def packet(*objects, pinned_adapters=None) -> dict:
+def packet(*objects, pinned_adapters=None, amep_version="0.2") -> dict:
     """Group objects into a packet (spec 5.2) by kind, keeping their order."""
     member = {"mandate": "mandates", "delegation": "delegations", "intent": "intents",
               "interpretation": "interpretations", "invocation": "invocations", "effect": "effects",
               "approval": "approvals", "revocation": "revocations", "status": "statuses", "finding": "findings",
-              "decision": "decisions"}
-    out: dict = {"amep_version": "0.2"}
+              "decision": "decisions", "call_statement": "call_statements"}
+    out: dict = {"amep_version": amep_version}
     for o in objects:
         m = member.get(o.get("kind"))
         if not m:

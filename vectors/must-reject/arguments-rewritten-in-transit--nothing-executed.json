@@ -1,0 +1,121 @@
+{
+ "name": "arguments rewritten in transit, nothing executed",
+ "expect": {
+  "outcome": "unresolved",
+  "invariant": "I7"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "fs.*",
+      "process.exec"
+     ],
+     "resources": [
+      "repo:app/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 100,
+     "depth": 2
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "71a1c45384cea9f9903c7a93ce5a8b27af9bd96ad5f52fe6b02bcf9e97951fc417f4e2e532b3926490b6fa7f2c38ea4cd916693bc4d8f275ba75556d580daa06"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "fs.write"
+     ],
+     "resources": [
+      "repo:app/src/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 90,
+     "depth": 1
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "957c8193fb37d4e3a104139fa1df83d17357076aec57015ae4de7e1d32b9da0cc61f3e84a75853d9e288193baefb4122d3ad6c1c60e35cf2542935d7a364c20f"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "host_shell",
+    "version": "r9",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "39a6a8663dcd45b7c212805d517d108e3864048bd5b8146837d1d638a4138dca2ed75e828946f9e33e507e9c2efc26a71c216a2e698d868963db309d5523380c"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "write_local"
+    },
+    "args_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "5990f8b8858903dff356c14e62a4dfbc1a54e953f48fb703eaf1eec9aada23be77a89eacb3b4e19796ee32ba5d496cbca6b4bd0414b5dcb8dbd05a8f145c3302"
+    }
+   }
+  ],
+  "effects": [],
+  "amep_version": "0.3",
+  "call_statements": [
+   {
+    "id": "c-1",
+    "kind": "call_statement",
+    "invocation": "i-1",
+    "observed_by": "hook:host",
+    "disposition": "not_executed",
+    "effect_count": 0,
+    "t": 12,
+    "invocation_digest": "0f012bfb5d9100c6ea6cb24b11aac0900fc7f4f831b068f72777739c6587ac85",
+    "args_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "9950e17fcc77dd681baa65c1001f8663175bc95c1f6964b76948c1df4add0665efe5b613bb8fcc666328b26c1c8fe3a926feacdd50ac8f0fdf511337fe4e6909"
+    }
+   }
+  ]
+ }
+}

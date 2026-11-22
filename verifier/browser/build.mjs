@@ -82,7 +82,7 @@ code { font:12.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
 <div class="summary" id="packet-summary" aria-live="polite"></div>
 <div class="table-wrap"><table id="packet-table" hidden><thead><tr><th>Object</th><th>Outcome</th><th>Invariant</th><th>Reason</th></tr></thead><tbody></tbody></table></div>
 </section>
-<p class="note">AMEP v0.2.0-draft.4 · evaluation code generated from <code>packages/js/src/core.mjs</code> · suite of ${suite.length} vectors.</p>
+<p class="note">AMEP v0.3.0-draft.1 · evaluation code generated from <code>packages/js/src/core.mjs</code> · suite of ${suite.length} vectors.</p>
 </main>
 <script id="amep-data" type="application/json">${embed}</script>
 <script>
@@ -100,7 +100,7 @@ async function precompute(packet, keys) {
     if (!k || k.alg !== "Ed25519" || o.proof.alg !== "Ed25519") { cache.set(o, false); continue; }
     try {
       imported[k.kid] ??= await crypto.subtle.importKey("raw", hex(k.x), { name: "Ed25519" }, false, ["verify"]);
-      cache.set(o, await crypto.subtle.verify({ name: "Ed25519" }, imported[k.kid], hex(o.proof.sig), enc.encode(canon(stripProof(o)))));
+      cache.set(o, await crypto.subtle.verify({ name: "Ed25519" }, imported[k.kid], hex(o.proof.sig), enc.encode(signingInput(o))));
     } catch { cache.set(o, false); }
   }
   return (o) => cache.get(o) === true;
@@ -116,7 +116,9 @@ async function ed25519Supported() {
 document.getElementById("run-suite").onclick = async () => {
   const body = document.querySelector("#suite-table tbody"); body.innerHTML = ""; let ok = 0;
   for (const v of DATA.suite) {
-    const r = verdict(await run(v.packet, DATA.keys, v.state));
+    let pk = v.packet, r;
+    if (v.packet_text !== undefined) { try { pk = parseStrict(v.packet_text); } catch (e) { r = { outcome: "unresolved", invariant: "I7", reason: "malformed packet text: " + e.message }; } }
+    r ??= verdict(await run(pk, DATA.keys, v.state));
     const pass = r.outcome === v.expect.outcome && r.invariant === v.expect.invariant; ok += pass;
     body.insertAdjacentHTML("beforeend", "<tr><td><code>" + esc(v.file) + "</code></td><td>" + pill(v.expect.outcome) + " " + esc(v.expect.invariant) +
       "</td><td>" + pill(r.outcome) + " " + esc(r.invariant) + (pass ? "" : " ✗") + "</td><td>" + esc(r.reason) + "</td></tr>");
@@ -126,7 +128,7 @@ document.getElementById("run-suite").onclick = async () => {
 };
 
 document.getElementById("load-example").onclick = () => {
-  const v = DATA.suite.find(v => v.file.includes("revoked-root-with-live-child") || v.file.includes("root-revoked-before-action")) || DATA.suite[0];
+  const v = DATA.suite.find(v => v.file.includes("revoked-root-with-live-child") || v.file.includes("root-revoked-before-action")) || DATA.suite.find(v => v.packet);
   document.getElementById("packet").value = JSON.stringify(v.packet, null, 2);
   document.getElementById("keys").value = JSON.stringify(DATA.keys, null, 2);
 };
@@ -134,8 +136,11 @@ document.getElementById("load-example").onclick = () => {
 document.getElementById("run-packet").onclick = async () => {
   const summary = document.getElementById("packet-summary"), table = document.getElementById("packet-table");
   let packet, keys;
-  try { packet = JSON.parse(document.getElementById("packet").value); keys = JSON.parse(document.getElementById("keys").value); }
-  catch (e) { summary.textContent = "Not valid JSON: " + e.message; table.hidden = true; return; }
+  try { keys = JSON.parse(document.getElementById("keys").value); }
+  catch (e) { summary.textContent = "Keys are not valid JSON: " + e.message; table.hidden = true; return; }
+  // the packet is parsed strictly (spec 12.1): duplicate member names and inexact number literals are malformed
+  try { packet = parseStrict(document.getElementById("packet").value); }
+  catch (e) { summary.innerHTML = "Packet verdict: " + pill("unresolved") + " I7 (malformed packet text: " + esc(e.message) + ")"; table.hidden = true; return; }
   const res = await run(packet, keys), v = verdict(res);
   table.querySelector("tbody").innerHTML = res.map(r => "<tr><td><code>" + esc(r.id) + "</code></td><td>" + pill(r.outcome) + "</td><td>" + esc(r.invariant) + "</td><td>" + esc(r.reason) + "</td></tr>").join("");
   table.hidden = false;

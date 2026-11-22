@@ -50,8 +50,9 @@ def run(mod, suite):
     fails = []
     for f, v, keys in suite:
         try:
-            r = mod.verdict(mod.evaluate(v["packet"], keys, state=json.loads(json.dumps(v.get("state")))
-                                         if v.get("state") is not None else None))
+            st = json.loads(json.dumps(v.get("state"))) if v.get("state") is not None else None
+            r = mod.verdict(mod.evaluate_text(v["packet_text"], keys, state=st) if "packet_text" in v
+                            else mod.evaluate(v["packet"], keys, state=st))
             got = (r.outcome, r.invariant)
         except Exception as e:  # a crash is a detected difference
             got = ("crash", type(e).__name__)
@@ -96,9 +97,12 @@ def mutants(src):
     for i, l in enumerate(lines, 1):
         if not (in_fn(i, "narrower", "effect_ok", *eval_fns)):
             continue
-        if not re.search(r"to_time|CEILING\.index|depth|budget", l):
+        if not re.search(r"to_time|CEILING\.index|depth|budget|amount_units|r_t", l):
             continue
-        toks = [t for t in tokenize.generate_tokens(io.StringIO(l.lstrip()).readline) if t.type == tokenize.OP and t.string in flip]
+        try:
+            toks = [t for t in tokenize.generate_tokens(io.StringIO(l.lstrip()).readline) if t.type == tokenize.OP and t.string in flip]
+        except tokenize.TokenError:   # a line inside a docstring or a bracketed continuation: no comparison to flip
+            continue
         indent = len(l) - len(l.lstrip())
         for t in toks:
             c = indent + t.start[1]
@@ -163,6 +167,10 @@ EQUIVALENT = {
     # Depths are non-negative integers (schemas/v0.2/common.json), so a child of a depth-0 parent always fails the
     # strictly-decreasing rule that follows; deleting this rule changes no verdict on valid evidence.
     'if parent["depth"] == 0: return False, "parent may not be delegated (depth 0)"',
+    # v0.3: without these two explicit checks the next statement indexes the missing or non-object value and raises,
+    # which evaluate() turns into the same unresolved (I7). Kept for clear reasons; vectors cover both paths.
+    '_check(not isinstance(v, dict), "unresolved", "I7", "value must be an object")',
+    '_check(v is None, "unresolved", "I7", f"{n[\'id\']} limits this effect but the receipt records no value")',
 }
 
 

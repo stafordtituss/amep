@@ -11,7 +11,8 @@ import tempfile
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 SCHEMA = os.path.join(ROOT, "schemas", "amep-v0.2.cddl")
-EXPECTED_INVALID = {"must-reject/malformed-timestamp.json"}
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
+from validate_schemas import EXPECTED_INVALID  # noqa: E402  (one list: both schema languages must agree)
 
 
 def find_tool():
@@ -44,9 +45,13 @@ def main():
                     continue
                 n += 1
                 name = f"{sub}/{f}"
+                doc = json.load(open(os.path.join(ROOT, "vectors", sub, f), encoding="utf-8"))
+                if "packet_text" in doc:   # text vectors test the parser, not the data model
+                    n -= 1
+                    continue
                 packet = os.path.join(tmp, "packet.json")
                 with open(packet, "w", encoding="utf-8") as out:
-                    json.dump(json.load(open(os.path.join(ROOT, "vectors", sub, f), encoding="utf-8"))["packet"], out, ensure_ascii=False)
+                    json.dump(doc["packet"], out, ensure_ascii=False)
                 ok, msg = valid(tool, SCHEMA, packet)
                 if name in EXPECTED_INVALID:
                     if ok:

@@ -1,36 +1,48 @@
-// The MCP extension `io.github.stafordtituss/amep-evidence` on the official MCP TypeScript SDK (v2).
+// The MCP extension `io.github.stafordtituss/amep-evidence` (revision 0.3) on the official MCP TypeScript SDK (v2).
 //
 // Server side: `AmepEvidenceExtension` advertises the extension in the server's capabilities and wraps tool handlers.
-// Tools report what they actually executed with `recordEffect(...)`; after the tool returns, the wrapper signs those
-// effects as AMEP ExecutedEffectReceipts (spec section 5.9) and attaches them to the result's `_meta`, but only when
-// the client asked for receipts and sent an invocation id.
+// Tools report what they actually executed with `recordEffect(...)`, on the execution path, as it happens. When the
+// handler returns, and before the result leaves the server, the wrapper:
+//   1. signs each recorded effect as an AMEP ExecutedEffectReceipt (spec 5.9), bound to the exact signed invocation
+//      the gateway sent (invocation_digest);
+//   2. signs one call statement (spec 5.14) saying whether anything was executed, how many receipts belong to the
+//      call, and the digest of the arguments the server received;
+//   3. stores both (write-ahead), so a client whose response was lost can fetch them with resources/read on
+//      amep-receipt://{invocation-id};
+//   4. attaches them to the result's `_meta`.
+// It does so only when the client opted in and sent an invocation id.
 //
 // Client side: `clientCapabilities()` advertises the extension with `wantsReceipts`, and `receiptSettings()` /
 // `supportsReceipts()` let a client discover, before calling any tool, whether a server signs receipts.
 //
 // Works on both protocol eras the SDK serves: 2025-era sessions (capabilities exchanged in `initialize`) and
 // 2026-07-28 per-request sessions (client capabilities in each request's `_meta` envelope, server capabilities in
-// `server/discover`). See proposals/mcp-sep-amep-evidence.md in the AMEP repository.
+// `server/discover`).
 import { AsyncLocalStorage } from "node:async_hooks";
+import { ResourceTemplate } from "@modelcontextprotocol/server";
 import { sdk } from "@stafordtituss/amep";
 
 export const EXTENSION_ID = "io.github.stafordtituss/amep-evidence";
 export const INVOCATION_ID_KEY = "io.github.stafordtituss/amep-invocation-id";
+export const INVOCATION_DIGEST_KEY = "io.github.stafordtituss/amep-invocation-digest";
 export const MANDATE_REF_KEY = "io.github.stafordtituss/amep-mandate-ref";
 export const RECEIPT_KEY = "io.github.stafordtituss/amep-effect-receipt";
-export const REVISION = "0.2";
+export const CALL_STATEMENT_KEY = "io.github.stafordtituss/amep-call-statement";
+export const RECEIPT_SCHEME = "amep-receipt";
+export const REVISION = "0.3";
 
 const CLIENT_CAPABILITIES_KEY = "io.modelcontextprotocol/clientCapabilities";
 const MAX_ID_LENGTH = 256;
+const HEX64 = /^[0-9a-f]{64}$/;
 
 // Effects recorded by the tool call currently running. AsyncLocalStorage keeps concurrent tool calls apart.
 const recording = new AsyncLocalStorage();
 
 /** Called by a tool to report an effect it actually executed (AMEP spec 5.9). Outside a receipted tool it does nothing. */
-export function recordEffect(action, resource, effect, { released = [], reversible, accessed, recipient } = {}) {
+export function recordEffect(action, resource, effect, { released = [], reversible, accessed, recipient, value } = {}) {
   const effects = recording.getStore();
   if (effects) effects.push(sdk.effectBody(action, resource, effect, Math.floor(Date.now() / 1000),
-    { released, reversible, accessed, recipient }));
+    { released, reversible, accessed, recipient, value }));
 }
 
 /**
@@ -49,6 +61,21 @@ function wantsReceipts(ctx, server) {
   return !!(s && typeof s === "object" && s.wantsReceipts === true);
 }
 
+/**
+ * Where a server keeps the evidence of recent calls, so a client whose response was lost can fetch it. The default
+ * keeps the most recent `max` calls in memory; a production server supplies a durable store with the same interface.
+ */
+export class MemoryReceiptStore {
+  #m = new Map();
+  constructor({ max = 10_000 } = {}) { this.max = max; }
+  async put(invocationId, evidence) {
+    this.#m.delete(invocationId);
+    this.#m.set(invocationId, evidence);
+    while (this.#m.size > this.max) this.#m.delete(this.#m.keys().next().value);
+  }
+  async get(invocationId) { return this.#m.get(invocationId); }
+}
+
 export class AmepEvidenceExtension {
   id = EXTENSION_ID;
   #attached = new WeakSet();
@@ -59,24 +86,35 @@ export class AmepEvidenceExtension {
    * @param {import("@stafordtituss/amep").Key} o.observerKey  this server's signing key; its roles must include `observer`
    * @param {string} o.observedBy  identifier of this server, for example `server:tickets.example`
    * @param {string} o.keysUrl     HTTPS URL where this server publishes its AMEP key set
-   * @param {string} [o.assurance] L0-L3 (spec 5.1.4); L3 when the server itself executes the effect
+   * @param {string} [o.assurance] L0-L3 (spec 5.1.4); L3 only when this server itself executes the effect
+   * @param {object} [o.store]     receipt store with async put(id, evidence) / get(id); in memory by default
    */
-  constructor({ observerKey, observedBy, keysUrl, assurance = "L3" }) {
+  constructor({ observerKey, observedBy, keysUrl, assurance = "L3", store = new MemoryReceiptStore() }) {
     if (!observerKey?.roles?.includes("observer")) throw new Error("observerKey must hold the observer role (spec 12.5)");
     if (!/^https:\/\//.test(keysUrl ?? "")) throw new Error("keysUrl must be an HTTPS URL");
     if (!sdk.ASSURANCE.includes(assurance)) throw new Error(`unknown assurance level ${assurance}`);
-    Object.assign(this, { observerKey, observedBy, keysUrl, assurance });
+    Object.assign(this, { observerKey, observedBy, keysUrl, assurance, store });
   }
 
   settings() {
-    return { revision: REVISION, effectReceipts: true, keys: this.keysUrl };
+    return { revision: REVISION, effectReceipts: true, callStatements: true,
+      receiptRecovery: `${RECEIPT_SCHEME}://{invocation}`, keys: this.keysUrl };
   }
 
-  /** Advertise the extension on an McpServer. Call before connecting, once per server instance. */
+  /** Advertise the extension on an McpServer and register receipt recovery. Call before connecting, once per server. */
   attach(mcp) {
     if (this.#attached.has(mcp)) return this;
     if (mcp.isConnected()) throw new Error("attach the amep-evidence extension before connecting the server");
     mcp.server.registerCapabilities({ extensions: { [EXTENSION_ID]: this.settings() } });
+    // Receipt recovery through the existing resources/read method: no new protocol method. Invocation ids are
+    // unguessable (at least 128 random bits), are never listed, and receipts carry identifiers, not payloads.
+    mcp.registerResource("amep-receipt", new ResourceTemplate(`${RECEIPT_SCHEME}://{invocation}`, { list: undefined }),
+      { title: "AMEP evidence for one tool call", mimeType: "application/json" },
+      async (uri, { invocation }) => {
+        const evidence = await this.store.get(decodeURIComponent(String(invocation)));
+        if (!evidence) throw new Error(`no AMEP evidence for ${uri.href}`);
+        return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(evidence) }] };
+      });
     this.#attached.add(mcp);
     return this;
   }
@@ -86,20 +124,43 @@ export class AmepEvidenceExtension {
     return mcp.registerTool(name, config, this.wrap(mcp, handler));
   }
 
-  /** Wrap a tool handler for `mcp` so that its recorded effects come back as signed receipts. */
+  /** Wrap a tool handler for `mcp` so that its recorded effects come back as signed evidence. */
   wrap(mcp, handler) {
     this.attach(mcp);
     return async (...args) => {
       const ctx = args.at(-1);
+      // SDK 2.4.0 gives handlers the arguments after schema validation, not the raw request. The digest therefore
+      // covers what the tool received; a schema that strips or defaults fields makes it differ from what the host
+      // sent. The ctx.use('tools/call') middleware of typescript-sdk#2820 sees the raw request and removes this limit.
+      const received = args.length > 1 ? args[0] : {};
       const recorded = [];
-      const result = await recording.run(recorded, () => handler(...args));
-      const invocationId = ctx?.mcpReq?._meta?.[INVOCATION_ID_KEY];
-      // SEP: receipts only when the client opted in and sent an invocation id; never when nothing was executed.
-      if (typeof invocationId !== "string" || !invocationId || invocationId.length > MAX_ID_LENGTH) return result;
-      if (recorded.length === 0 || !wantsReceipts(ctx, mcp.server)) return result;
-      const receipts = recorded.map(body => this.observerKey.sign(
-        sdk.effect(`${this.observedBy}:e-${++this.#counter}`, invocationId, this.observedBy, this.assurance, body)));
-      return { ...result, _meta: { ...(result?._meta ?? {}), [RECEIPT_KEY]: receipts.length === 1 ? receipts[0] : receipts } };
+      let result, failure;
+      try {
+        result = await recording.run(recorded, () => handler(...args));
+      } catch (e) {
+        failure = e;
+      }
+      const meta = ctx?.mcpReq?._meta ?? {};
+      const invocationId = meta[INVOCATION_ID_KEY];
+      const invocationDigest = HEX64.test(meta[INVOCATION_DIGEST_KEY] ?? "") ? meta[INVOCATION_DIGEST_KEY] : undefined;
+      const optedIn = typeof invocationId === "string" && invocationId.length > 0 && invocationId.length <= MAX_ID_LENGTH &&
+        wantsReceipts(ctx, mcp.server);
+      if (!optedIn) {
+        if (failure) throw failure;
+        return result;
+      }
+      const now = Math.floor(Date.now() / 1000);
+      const receipts = recorded.map(body => this.observerKey.sign(sdk.effect(`${this.observedBy}:e-${++this.#counter}`,
+        invocationId, this.observedBy, this.assurance, body, { invocationDigest }), { v: 2 }));
+      const failed = !!failure || result?.isError === true;
+      const disposition = receipts.length === 0 ? "not_executed" : failed ? "failed_after_effects" : "completed";
+      const statement = this.observerKey.sign(sdk.callStatement(`${this.observedBy}:c-${++this.#counter}`, invocationId,
+        this.observedBy, disposition, receipts.length, now, { invocationDigest, argsDigest: sdk.argsDigest(received) }), { v: 2 });
+      await this.store.put(invocationId, { call_statement: statement, receipts });   // write-ahead, before returning
+      const evidence = { [CALL_STATEMENT_KEY]: statement };
+      if (receipts.length) evidence[RECEIPT_KEY] = receipts.length === 1 ? receipts[0] : receipts;
+      if (failure) return { content: [{ type: "text", text: String(failure?.message ?? failure) }], isError: true, _meta: evidence };
+      return { ...result, _meta: { ...(result?._meta ?? {}), ...evidence } };
     };
   }
 }

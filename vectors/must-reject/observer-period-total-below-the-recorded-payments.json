@@ -1,0 +1,147 @@
+{
+ "name": "observer period total below the recorded payments",
+ "expect": {
+  "outcome": "violated",
+  "invariant": "I7"
+ },
+ "packet": {
+  "amep_version": "0.3",
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "payments.send"
+     ],
+     "resources": [
+      "payee:*"
+     ],
+     "ceiling": "financial",
+     "exp": 100,
+     "limits": [
+      {
+       "unit": "iso4217:EUR",
+       "per_period": "5000.00",
+       "period": 2592000
+      }
+     ]
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "16f804ce31c193d9cb550e54865d2ce3e5e6fc40179c6636e77724c8af516820503dcf47f3367051a507126824cc6a6f74cb0d64bdac45f9bf3c82ef979ff10d"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "bank_api",
+    "version": "v3",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "5ef3ab9b00c0c17c6be94a9e2b23ec77097f763f0846dbf0939e36bfc7725c93a6392b0ee8ecc9c67d090be777cbba8877cfc4cdba4ad45cf00edd7e8686390b"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "m-1",
+    "interpretation_ref": "a-1",
+    "actor": "agent:payments-assistant",
+    "t": 10,
+    "declared": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "8c9d3a9937a9442a420e06ecf2a372771f80ecc987bbb5636310b6355e6792c3e215d84d6a5e33283bd5abc0366c7eeb5dd3bd80a11d57bd8807e32481977404"
+    }
+   },
+   {
+    "id": "i-2",
+    "kind": "invocation",
+    "authority_ref": "m-1",
+    "interpretation_ref": "a-1",
+    "actor": "agent:payments-assistant",
+    "t": 20,
+    "declared": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "8c111931f79bfe1bc51d5dc2c478879fcfde6b2cd7eb3bd861e82aeae34446baa2f93784898dc6ac7ba36e4fbcffe49b471742905ca56044e7e1bfbd0399fa07"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "service:bank.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial",
+     "released": [],
+     "t": 11,
+     "value": {
+      "amount": "300.00",
+      "unit": "iso4217:EUR",
+      "period_spent": "300.00"
+     }
+    },
+    "proof": {
+     "kid": "bank-observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "3272a60809cddc670aaa19fde377f430ba8ecc648104530418383b0b469fda18bd216676cb544f6709c80a231a3720014a8cdd8648b812d2d8b4d452c1971604"
+    }
+   },
+   {
+    "id": "e-2",
+    "kind": "effect",
+    "invocation": "i-2",
+    "observed_by": "service:bank.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial",
+     "released": [],
+     "t": 21,
+     "value": {
+      "amount": "300.00",
+      "unit": "iso4217:EUR",
+      "period_spent": "300.00"
+     }
+    },
+    "proof": {
+     "kid": "bank-observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "30e62a32c8f601f96cfc4f7dc5c4126149d8f58e8e55dd47c4e54145e16b1cef1152e1841e771cc2ac9dfc1f09a5f5c688db697d55d2e09628f4da074fcb400a"
+    }
+   }
+  ]
+ }
+}

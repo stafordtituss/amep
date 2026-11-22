@@ -1,7 +1,7 @@
 // AMEP object builders (spec/amep-v0.2.md, section 5). Each returns a plain object with the spec's member
 // names, checks enumerated values, and omits members that are undefined. Sign the result with a Key holding a
 // role permitted for its kind (spec 12.5); see ./node.mjs.
-import { CEILING, approvalDigest } from "./core.mjs";
+import { CEILING, approvalDigest, digest } from "./core.mjs";
 
 const oneOf = (name, value, allowed) => {
   if (!allowed.includes(value)) throw new Error(`${name} must be one of ${allowed.join(", ")}; got ${JSON.stringify(value)}`);
@@ -40,27 +40,45 @@ export function interpretation(id, adapter, version, { source = "curated", integ
 }
 
 /** The executed-effect body (spec 5.9), also used for invocation.mediated and approvals. */
-export function effectBody(action, resource, effect, t, { released = [], reversible, accessed, recipient } = {}) {
+export function effectBody(action, resource, effect, t, { released = [], reversible, accessed, recipient, value } = {}) {
   oneOf("effect", effect, CEILING);
-  return clean({ action, resource, effect, released: [...released], reversible, accessed, recipient, t });
+  return clean({ action, resource, effect, released: [...released], reversible, accessed, recipient, value, t });
+}
+
+/** A quantity (spec 5.9.2): amounts are exact decimal strings, for example value("1200.00", "iso4217:EUR"). */
+export function value(amount, unit, { periodSpent } = {}) {
+  if (typeof amount !== "string") throw new Error('amount must be a decimal string, for example "1200.00"');
+  return clean({ amount, unit, period_spent: periodSpent });
 }
 
 export function invocation(id, authorityRef, interpretationRef, t, action, resource, effect,
-  { actor, intentRef, approvalRef, mediated, influencedBy, principalConfirmed, derivedFrom, budgetSpent, correlation } = {}) {
+  { actor, intentRef, approvalRef, mediated, influencedBy, principalConfirmed, derivedFrom, budgetSpent, correlation, argsDigest } = {}) {
   oneOf("effect", effect, CEILING);
   if (CEILING.indexOf(effect) >= CEILING.indexOf("write_shared") && !actor)
     throw new Error("actor is required for effects of class write_shared and above (spec 5.8, I10)");
   return clean({ id, kind: "invocation", authority_ref: authorityRef, interpretation_ref: interpretationRef,
     intent_ref: intentRef, approval_ref: approvalRef, t, actor, declared: { action, resource, effect }, mediated,
     influenced_by: influencedBy, principal_confirmed: principalConfirmed, derived_from: derivedFrom,
-    budget_spent: budgetSpent, correlation });
+    budget_spent: budgetSpent, correlation, args_digest: argsDigest });
 }
 
-export function effect(id, invocationId, observedBy, assurance, executed, { backendReceipt } = {}) {
+export function effect(id, invocationId, observedBy, assurance, executed, { backendReceipt, invocationDigest } = {}) {
   oneOf("assurance", assurance, ASSURANCE);
   return clean({ id, kind: "effect", invocation: invocationId, observed_by: observedBy, assurance, executed,
-    backend_receipt: backendReceipt });
+    backend_receipt: backendReceipt, invocation_digest: invocationDigest });
 }
+
+export const DISPOSITIONS = ["completed", "not_executed", "failed_after_effects"];
+/** The observer's signed account of one tool call (spec 5.14). */
+export function callStatement(id, invocationId, observedBy, disposition, effectCount, t, { invocationDigest, argsDigest } = {}) {
+  oneOf("disposition", disposition, DISPOSITIONS);
+  if (disposition === "not_executed" && effectCount !== 0) throw new Error("a not_executed call has no effects");
+  return clean({ id, kind: "call_statement", invocation: invocationId, observed_by: observedBy, disposition,
+    effect_count: effectCount, t, invocation_digest: invocationDigest, args_digest: argsDigest });
+}
+
+/** SHA-256 of the JCS form of a tool call's arguments (spec 5.14), as sent by the host or received by the server. */
+export const argsDigest = args => digest(args ?? {});
 
 /** An approval bound to an effect body; the digest is computed without the body's t (spec 5.10). */
 export function approval(id, body, presence, { expiry, nbf, approver, resourceVersion, consumed } = {}) {
@@ -93,11 +111,11 @@ export function decision(invocationId, outcome, mode, phase,
 
 const MEMBER = { mandate: "mandates", delegation: "delegations", intent: "intents", interpretation: "interpretations",
   invocation: "invocations", effect: "effects", approval: "approvals", revocation: "revocations", status: "statuses",
-  finding: "findings", decision: "decisions" };
+  finding: "findings", decision: "decisions", call_statement: "call_statements" };
 
 /** Group objects into a packet (spec 5.2) by kind, keeping their order. */
-export function packet(objects, { pinnedAdapters } = {}) {
-  const out = { amep_version: "0.2" };
+export function packet(objects, { pinnedAdapters, amepVersion = "0.2" } = {}) {
+  const out = { amep_version: amepVersion };
   for (const o of objects) {
     const m = MEMBER[o.kind];
     if (!m) throw new Error(`unknown object kind ${JSON.stringify(o.kind)}`);

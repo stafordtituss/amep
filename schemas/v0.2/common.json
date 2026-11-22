@@ -67,6 +67,86 @@
     },
     "timestamp_token": {
      "type": "string"
+    },
+    "v": {
+     "description": "Proof version (spec 12.2). Absent or 1: signs canon(object); 2: the domain-separated input. AMEP 0.3 packets require 2.",
+     "enum": [
+      1,
+      2
+     ]
+    }
+   }
+  },
+  "amount": {
+   "description": "Exact decimal string (spec 5.9.2): no sign, exponent or leading zeros; at most 18 decimals.",
+   "type": "string",
+   "pattern": "^(0|[1-9][0-9]{0,38})(\\.[0-9]{1,18})?$"
+  },
+  "unit": {
+   "description": "Unit of a quantity: iso4217:EUR, caip19:<CAIP-19 id>, count:records, bytes:... (spec 5.9.2).",
+   "type": "string",
+   "pattern": "^[a-z][a-z0-9-]{0,31}:[!-~]{1,128}$"
+  },
+  "value": {
+   "type": "object",
+   "required": [
+    "amount",
+    "unit"
+   ],
+   "additionalProperties": false,
+   "patternProperties": {
+    "^x-": {},
+    "\\.": {}
+   },
+   "properties": {
+    "amount": {
+     "$ref": "#/$defs/amount"
+    },
+    "unit": {
+     "$ref": "#/$defs/unit"
+    },
+    "period_spent": {
+     "$ref": "#/$defs/amount"
+    }
+   }
+  },
+  "limit": {
+   "type": "object",
+   "required": [
+    "unit"
+   ],
+   "additionalProperties": false,
+   "patternProperties": {
+    "^x-": {},
+    "\\.": {}
+   },
+   "dependentRequired": {
+    "per_period": [
+     "period"
+    ],
+    "period": [
+     "per_period"
+    ]
+   },
+   "properties": {
+    "unit": {
+     "$ref": "#/$defs/unit"
+    },
+    "per_call": {
+     "$ref": "#/$defs/amount"
+    },
+    "per_period": {
+     "$ref": "#/$defs/amount"
+    },
+    "period": {
+     "type": "integer",
+     "minimum": 1
+    },
+    "actions": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
     }
    }
   },
@@ -135,6 +215,13 @@
     "budget": {
      "type": "integer",
      "minimum": 0
+    },
+    "limits": {
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "$ref": "#/$defs/limit"
+     }
     }
    }
   },
@@ -203,6 +290,9 @@
     "recipient": {
      "type": "string",
      "pattern": "^[a-z_]+$"
+    },
+    "value": {
+     "$ref": "#/$defs/value"
     }
    }
   },

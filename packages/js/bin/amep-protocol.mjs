@@ -10,7 +10,7 @@
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { evaluate, verdict, approvalDigest, parseStrict } from "../src/core.mjs";
+import { evaluate, evaluateText, verdict, approvalDigest, parseStrict } from "../src/core.mjs";
 import { sigOk, Key, ROLES } from "../src/node.mjs";
 import { VERSION, SPEC_VERSION } from "../src/index.mjs";
 
@@ -28,7 +28,8 @@ function run(argv) {
     case "verify": {
       if (!pos[0] || !o.keys) throw new Error("usage: amep-protocol verify PACKET --keys KEYS");
       const state = o.state ? load(o.state) : {};
-      const results = evaluate(load(pos[0]), load(o.keys), sigOk, o.protected || [], state);
+      // the packet is parsed strictly inside evaluateText, so malformed text yields unresolved (I7) instead of an exception
+      const results = evaluateText(readFileSync(pos[0] === "-" ? 0 : pos[0], "utf8"), load(o.keys), sigOk, o.protected || [], state);
       const v = verdict(results);
       if (o["state-out"]) writeFileSync(o["state-out"], JSON.stringify(state, null, 1));
       if (o.json) console.log(JSON.stringify({ verdict: v, results }, null, 1));
@@ -38,7 +39,8 @@ function run(argv) {
     case "check-suite": {
       const dir = pos[0]; const keys = load(join(dir, "keys.json")); let n = 0, ok = 0;
       for (const sub of ["positive", "must-reject"]) for (const f of readdirSync(join(dir, sub)).filter(f => f.endsWith(".json")).sort()) {
-        const v = load(join(dir, sub, f)); const r = verdict(evaluate(v.packet, keys, sigOk, [], v.state ? structuredClone(v.state) : {}));
+        const v = load(join(dir, sub, f)); const st = v.state ? structuredClone(v.state) : {};
+        const r = verdict(v.packet_text !== undefined ? evaluateText(v.packet_text, keys, sigOk, [], st) : evaluate(v.packet, keys, sigOk, [], st));
         n++; if (r.outcome === v.expect.outcome && r.invariant === v.expect.invariant) ok++; else console.log(`FAIL ${sub}/${f}: got ${r.outcome}/${r.invariant} (${r.reason})`);
       }
       console.log(`amep ${VERSION} agrees with expected outcomes on ${ok}/${n} vectors`);

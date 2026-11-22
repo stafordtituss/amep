@@ -17,7 +17,7 @@ import os
 import sys
 
 from . import SPEC_VERSION, __version__, sdk
-from .core import approval_digest, evaluate, parse_strict, verdict
+from .core import approval_digest, evaluate, evaluate_text, parse_strict, verdict
 
 EXIT = {"preserved": 0, "violated": 1, "unresolved": 2}
 
@@ -28,9 +28,12 @@ def _load(path):
 
 
 def cmd_verify(a):
-    packet, keys = _load(a.packet), _load(a.keys)
+    keys = _load(a.keys)
     state = _load(a.state) if a.state else {}
-    results = evaluate(packet, keys, extra_protected=tuple(a.protected or ()), state=state)
+    with (sys.stdin if a.packet == "-" else open(a.packet, encoding="utf-8")) as f:
+        text = f.read()
+    # parsed strictly inside evaluate_text, so malformed text yields unresolved (I7) instead of an exception
+    results = evaluate_text(text, keys, extra_protected=tuple(a.protected or ()), state=state)
     v = verdict(results)
     if a.state_out:
         with open(a.state_out, "w", encoding="utf-8") as f:
@@ -53,7 +56,8 @@ def cmd_check_suite(a):
             if not f.endswith(".json"):
                 continue
             v = _load(os.path.join(a.dir, sub, f))
-            r = verdict(evaluate(v["packet"], keys, state=v.get("state")))
+            r = verdict(evaluate_text(v["packet_text"], keys, state=v.get("state")) if "packet_text" in v
+                        else evaluate(v["packet"], keys, state=v.get("state")))
             n += 1
             if (r.outcome, r.invariant) == (v["expect"]["outcome"], v["expect"]["invariant"]):
                 ok += 1

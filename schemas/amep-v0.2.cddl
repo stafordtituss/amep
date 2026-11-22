@@ -16,6 +16,7 @@ amep-packet = {
   ? statuses: [* revocation-status]
   ? findings: [* content-finding]
   ? decisions: [* continuity-decision]
+  ? call_statements: [* call-statement]        ; spec 5.14 (AMEP 0.3)
   ? pinned_adapters: { * tstr => tstr }         ; adapter id => approved version
   * extension-key => any
 }
@@ -28,7 +29,13 @@ effect-class = "read" / "write_local" / "write_shared" / "external_send" / "dest
 assurance = "L0" / "L1" / "L2" / "L3"
 data-flow = tstr .regexp "[a-z_]+->[a-z_]+"     ; data_class->recipient_class
 extension-key = tstr .regexp "x-.*|.*\\..*"      ; x- prefix or reverse-DNS (spec 16)
-proof = { alg: "Ed25519" / "ES256", kid: tstr, sig: tstr, ? timestamp_token: tstr }
+proof = { alg: "Ed25519" / "ES256", kid: tstr, sig: tstr, ? timestamp_token: tstr, ? v: 1 / 2 }   ; v 2: domain-separated (spec 12.2)
+
+; exact decimal string and unit of a quantity (spec 5.9.2, AMEP 0.3)
+amount = tstr .regexp "(0|[1-9][0-9]{0,38})(\\.[0-9]{1,18})?"
+unit = tstr .regexp "[a-z][a-z0-9-]{0,31}:[!-~]{1,128}"
+value = { amount: amount, unit: unit, ? period_spent: amount, * extension-key => any }
+limit = { unit: unit, ? per_call: amount, ? (per_period: amount, period: uint .ge 1), ? actions: [* tstr], * extension-key => any }
 
 claims = {
   actions: [+ tstr]
@@ -42,6 +49,7 @@ claims = {
   ? deny_resources: [* tstr]
   ? depth: uint
   ? budget: uint
+  ? limits: [+ limit]                          ; quantity limits (spec 7.6)
   * extension-key => any
 }
 
@@ -63,6 +71,7 @@ executed-body = {
   ? reversible: bool
   ? accessed: [* tstr .regexp "[a-z_]+"]       ; data classes this effect read (spec 5.9.1)
   ? recipient: tstr .regexp "[a-z_]+"          ; recipient class of what this effect sent or wrote
+  ? value: value                               ; quantity moved or touched (spec 5.9.2)
   t: amep-time
   * extension-key => any
 }
@@ -73,7 +82,7 @@ principal-mandate = {                          ; [issuer]
   ? issuer: tstr
   ? subject_agent: tstr
   claims: claims
-  ? revocation: { status_ref: tstr }
+  ? revocation: { ? status_ref: tstr, ? window: uint / float }   ; window: propagation window in seconds (spec 5.12.1)
   ? token: source-token
   ? proof: proof
   * extension-key => any
@@ -122,6 +131,7 @@ invocation = {                                 ; [host]
   ? principal_confirmed: bool
   ? derived_from: [* ref]                      ; earlier invocations whose outputs fed this one (spec 5.9.1)
   ? budget_spent: uint
+  ? args_digest: hex-digest                    ; SHA-256 of JCS(arguments sent) (spec 5.14)
   ? correlation: { ? session_ref: tstr, ? prompt_ref: tstr, ? tool_use_ref: tstr, ? traceparent: tstr }
   ? proof: proof
   * extension-key => any
@@ -134,6 +144,22 @@ executed-effect = {                            ; [observer]
   assurance: assurance
   executed: executed-body
   ? backend_receipt: any
+  ? invocation_digest: hex-digest              ; SHA-256 of JCS(the signed invocation) (spec 5.14)
+  ? proof: proof
+  * extension-key => any
+}
+
+hex-digest = tstr .regexp "[0-9a-f]{64}"
+
+call-statement = {                             ; [observer] (spec 5.14, AMEP 0.3)
+  ? id: ref, kind: "call_statement"
+  invocation: ref
+  observed_by: tstr
+  disposition: "completed" / "not_executed" / "failed_after_effects"
+  effect_count: uint
+  t: amep-time
+  ? invocation_digest: hex-digest
+  ? args_digest: hex-digest
   ? proof: proof
   * extension-key => any
 }

@@ -8,6 +8,7 @@ import json
 import os
 import re
 import sys
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -29,7 +30,9 @@ SIGNER_ROLES = {
     "delegation": {"issuer", "host"}, "intent": {"issuer", "host"},
     "interpretation": {"host"}, "invocation": {"host"}, "decision": {"host"},
     "effect": {"observer"}, "approval": {"approver"}, "finding": {"host", "observer"},
+    "call_statement": {"observer"},
 }
+DISPOSITIONS = ("completed", "not_executed", "failed_after_effects")
 
 COST_BASE = {"read": 0, "write_local": 1, "write_shared": 3, "external_send": 5, "destructive": 10, "financial": 20}
 DATA_MULT = {"public": 1, "internal": 1, "source": 1, "confidential": 2, "secret": 5, "phi": 5, "pci": 5}
@@ -138,11 +141,83 @@ def _reject_constant(s: str):
     raise Malformed(f"{s} is not JSON")
 
 
+def _unique_members(pairs):
+    """I-JSON (RFC 7493 2.3): member names MUST be unique. Parsers disagree on duplicates (first wins, last wins,
+    error), so a packet with `"amount":"10.00", "amount":"840000.00"` could verify as one value and be displayed as
+    another. Spec 12.1 makes such text malformed."""
+    out = {}
+    for k, v in pairs:
+        if k in out:
+            raise Malformed(f"duplicate member name {k!r}")
+        out[k] = v
+    return out
+
+
 def parse_strict(text: str):
     """Parse JSON text for evaluation (spec 12.1). A non-integer number literal must equal, as a decimal, the
     double it denotes, so two distinct literals can never share one canonical form or approval digest.
-    Integers are kept exact and checked against the I-JSON range by evaluate()."""
-    return json.loads(text, parse_float=_strict_float, parse_constant=_reject_constant)
+    Duplicate member names are rejected. Integers are kept exact and checked against the I-JSON range by evaluate()."""
+    return json.loads(text, parse_float=_strict_float, parse_constant=_reject_constant, object_pairs_hook=_unique_members)
+
+
+# ---------------- well-formedness (spec 12.1, v0.3) ----------------
+# Bounds keep a hostile packet from exhausting a verifier; every verifier applies the same ones, so a packet is
+# either malformed everywhere or nowhere. String sizes are counted in UTF-8 bytes, which all languages agree on.
+MAX_DEPTH, MAX_ARRAY, MAX_STRING, MAX_NAME = 32, 4096, 8192, 256
+_IDENT_FIELDS = ("action", "resource")
+
+
+def _bad_char(s: str):
+    for ch in s:
+        c = ord(ch)
+        if 0xD800 <= c <= 0xDFFF:
+            return "a lone surrogate"
+        if 0xFDD0 <= c <= 0xFDEF or (c & 0xFFFE) == 0xFFFE:
+            return "a noncharacter"
+    return None
+
+
+def _ident_problem(s) -> str | None:
+    """Canonical identifiers (spec 6.2, v0.3): already in NFC, and no control characters, so two identifiers that
+    look the same always compare the same. The verifier never normalizes silently."""
+    if not isinstance(s, str):
+        return None
+    if any(ord(ch) < 0x20 or 0x7F <= ord(ch) <= 0x9F for ch in s):
+        return "a control character"
+    if unicodedata.normalize("NFC", s) != s:
+        return "a form that is not NFC"
+    return None
+
+
+def malformed_reason(v, path: str = "$", depth: int = 0):
+    """Reason the packet is not well-formed I-JSON within AMEP's bounds, or None."""
+    if depth > MAX_DEPTH:
+        return f"nesting deeper than {MAX_DEPTH} at {path}"
+    if isinstance(v, str):
+        if len(v.encode("utf-8", "surrogatepass")) > MAX_STRING:
+            return f"string longer than {MAX_STRING} bytes at {path}"
+        bad = _bad_char(v)
+        return f"{bad} at {path}" if bad else None
+    if isinstance(v, list):
+        if len(v) > MAX_ARRAY:
+            return f"array longer than {MAX_ARRAY} at {path}"
+        return next((r for i, x in enumerate(v) if (r := malformed_reason(x, f"{path}[{i}]", depth + 1))), None)
+    if isinstance(v, dict):
+        for k, x in v.items():
+            if len(k.encode("utf-8", "surrogatepass")) > MAX_NAME:
+                return f"member name longer than {MAX_NAME} bytes at {path}"
+            bad = _bad_char(k)
+            if bad:
+                return f"{bad} in a member name at {path}"
+            if k in _IDENT_FIELDS and (p := _ident_problem(x)):
+                return f"identifier with {p} at {path}.{k}"
+            if k in ("actions", "resources", "deny_actions", "deny_resources") and isinstance(x, list):
+                if (p := next((q for q in map(_ident_problem, x) if q), None)):
+                    return f"identifier pattern with {p} at {path}.{k}"
+            r = malformed_reason(x, f"{path}.{k}", depth + 1)
+            if r:
+                return r
+    return None
 
 
 def digest(obj) -> str:
@@ -154,20 +229,69 @@ def approval_digest(x: dict) -> str:
     return digest({k: v for k, v in x.items() if k != "t"})
 
 
-def verify_sig(obj, keys: dict) -> bool:
+# ---------------- signatures (spec 12.2) ----------------
+# One exact Ed25519 acceptance rule (v0.3), applied before the library check, because libraries disagree on edge
+# cases (Chalkias et al., "Taming the many EdDSAs", 2020). Measured: with OpenSSL 3.6 the identity public key
+# accepts the signature (R = identity, S = 0) for EVERY message, while OpenSSL 4.1 rejects it, so two verifiers
+# disagreed on the same packet. AMEP rejects:
+#   - S >= L (malleable signatures);
+#   - a public key A or commitment R whose encoding is non-canonical (y >= p) or a point of small order.
+_P = 2 ** 255 - 19
+_L = 2 ** 252 + 27742317777372353535851937790883648493
+_SMALL_ORDER_Y = frozenset({0, 1, _P - 1} | {int.from_bytes(bytes.fromhex(h), "little") for h in (
+    "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
+    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a")})
+
+
+def _point_ok(b: bytes) -> bool:
+    if len(b) != 32:
+        return False
+    y = int.from_bytes(b, "little") & ((1 << 255) - 1)
+    return y < _P and y not in _SMALL_ORDER_Y
+
+
+def ed25519_strict_ok(pub: bytes, sig: bytes) -> bool:
+    """The encoding checks of spec 12.2 (v0.3): canonical, non-small-order A and R, and S < L."""
+    return len(sig) == 64 and _point_ok(pub) and _point_ok(sig[:32]) and int.from_bytes(sig[32:], "little") < _L
+
+
+SIG_CONTEXT = b"AMEP-v0.3"
+HEX64, HEX128 = re.compile(r"^[0-9a-f]{64}$"), re.compile(r"^[0-9a-f]{128}$")
+
+
+def signing_input(obj: dict) -> bytes:
+    """Spec 12.2. A version-2 proof signs a domain-separated input, so a signature made by the same key for
+    another object kind, or for another system entirely, can never be presented as this AMEP object:
+        "AMEP-v0.3" 0x00 kind 0x00 canon(object without proof)
+    A proof without "v" (version 1, AMEP v0.2) signs canon(object without proof), exactly as before."""
+    body = canon({k: v for k, v in obj.items() if k != "proof"})
+    pv = (obj.get("proof") or {}).get("v")
+    if pv == 2 and not isinstance(pv, bool):
+        return SIG_CONTEXT + b"\x00" + str(obj.get("kind", "")).encode("utf-8") + b"\x00" + body
+    return body
+
+
+def verify_sig(obj, keys: dict, require_v2: bool = False) -> bool:
     if not isinstance(obj, dict):
         return False
     proof = obj.get("proof") or {}
     k = keys.get(proof.get("kid"))
     if not k or proof.get("alg") != "Ed25519" or k.get("alg") != "Ed25519":
         return False
+    pv = proof.get("v", 1)
+    if isinstance(pv, bool) or pv not in (1, 2) or (require_v2 and pv != 2):
+        return False  # AMEP v0.3 packets must use domain-separated proofs (spec 16)
+    if not isinstance(k.get("x"), str) or not HEX64.match(k["x"]) or not isinstance(proof.get("sig"), str) or not HEX128.match(proof["sig"]):
+        return False  # spec 12.2: lowercase hex of exactly 32 and 64 bytes; no whitespace or other forms
     if not set(k.get("roles", [])) & SIGNER_ROLES.get(obj.get("kind"), set()):
         return False  # valid key, wrong role: e.g. a host key minting a mandate or approving its own action
     try:
-        Ed25519PublicKey.from_public_bytes(bytes.fromhex(k["x"])).verify(
-            bytes.fromhex(proof["sig"]), canon({kk: vv for kk, vv in obj.items() if kk != "proof"}))
+        pub, sig = bytes.fromhex(k["x"]), bytes.fromhex(proof["sig"])
+        if not ed25519_strict_ok(pub, sig):
+            return False
+        Ed25519PublicKey.from_public_bytes(pub).verify(sig, signing_input(obj))
         return True
-    except (InvalidSignature, ValueError, KeyError, TypeError):
+    except (InvalidSignature, ValueError, KeyError, TypeError, Malformed):
         return False
 
 
@@ -237,6 +361,79 @@ def cost(x: dict) -> int:
     return COST_BASE[x["effect"]] * mult * rev
 
 
+# ---------------- quantities and limits (spec 5.9, 7.6, v0.3) ----------------
+# An executed effect may carry value = {amount, unit}: an exact decimal string and a unit such as "iso4217:EUR",
+# a CAIP-19 asset id, "count:records" or "bytes". Claims may carry limits that cap it per call and per period.
+# Amounts are compared as exact decimals (scaled integers), never as floats. Points (spec 9) still apply too.
+AMOUNT = re.compile(r"^(0|[1-9][0-9]{0,38})(\.[0-9]{1,18})?$")
+UNIT = re.compile(r"^[a-z][a-z0-9-]{0,31}:[!-~]{1,128}$")
+_SCALE = 10 ** 18
+MONEY_UNITS = ("iso4217:", "caip19:")
+CLAIM_MEMBERS = {"actions", "resources", "data", "ceiling", "exp", "nbf", "purpose", "deny_actions", "deny_resources",
+                 "depth", "budget", "limits"}
+LIMIT_MEMBERS = {"unit", "per_call", "per_period", "period", "actions"}
+
+
+def amount_units(s) -> int:
+    """'1200.50' -> 1200500000000000000000 (units of 10^-18). Rejects signs, exponents, leading zeros, > 18 decimals."""
+    if not isinstance(s, str) or not AMOUNT.match(s):
+        raise Malformed(f"malformed amount {s!r} (a decimal string such as \"1200.00\" is required)")
+    ip, _, fp = s.partition(".")
+    return int(ip) * _SCALE + int((fp + "0" * 18)[:18])
+
+
+def _unit(u) -> str:
+    if not isinstance(u, str) or not UNIT.match(u):
+        raise Malformed(f"malformed unit {u!r}")
+    return u
+
+
+def is_extension_member(name: str) -> bool:
+    """Spec 16: extension members start with x- or are reverse-DNS names. They never change an outcome."""
+    return name.startswith("x-") or "." in name
+
+
+def check_limits(lims) -> list:
+    if not isinstance(lims, list) or not lims:
+        raise Malformed("limits must be a non-empty array")
+    for lim in lims:
+        if not isinstance(lim, dict):
+            raise Malformed("limit must be an object")
+        _unit(lim.get("unit"))
+        if "per_call" in lim:
+            amount_units(lim["per_call"])
+        if ("per_period" in lim) != ("period" in lim):
+            raise Malformed("per_period and period go together")
+        if "per_period" in lim:
+            amount_units(lim["per_period"])
+            if isinstance(lim["period"], bool) or not isinstance(lim["period"], (int, float)) or lim["period"] != int(lim["period"]) or lim["period"] <= 0:
+                raise Malformed("period must be a positive integer number of seconds")
+        if "actions" in lim and not (isinstance(lim["actions"], list) and all(isinstance(p, str) for p in lim["actions"])):
+            raise Malformed("limit actions must be an array of action patterns")
+    return lims
+
+
+def limit_applies(lim: dict, x: dict) -> bool:
+    """A limit with `actions` applies to effects whose action matches; without, to every financial effect."""
+    if "actions" in lim:
+        return any(pat_match(x["action"], p) for p in lim["actions"])
+    return x["effect"] == "financial"
+
+
+def limits_narrower(child: dict, parent: dict):
+    """I1 for limits: a child may add limits, but never raise one the parent sets for the same unit and period."""
+    for pl in parent.get("limits", []):
+        for cl in child.get("limits", []):
+            if cl["unit"] != pl["unit"] or cl.get("actions") != pl.get("actions"):
+                continue
+            if "per_call" in pl and "per_call" in cl and amount_units(cl["per_call"]) > amount_units(pl["per_call"]):
+                return f"per-call limit raised for {pl['unit']}"
+            if "per_period" in pl and cl.get("period") == pl["period"] and "per_period" in cl and \
+                    amount_units(cl["per_period"]) > amount_units(pl["per_period"]):
+                return f"per-period limit raised for {pl['unit']}"
+    return None
+
+
 # ---------------- evaluation (spec 10) ----------------
 @dataclass
 class Result:
@@ -256,12 +453,40 @@ def _check(cond, outcome, invariant, reason):
         raise Stop(outcome, invariant, reason)
 
 
+SUPPORTED_VERSIONS = (None, "0.2", "0.3")
+
+
+def _all_unresolved(packet, reason):
+    ids = [i.get("id", "?") if isinstance(i, dict) else "?" for i in packet.get("invocations", [])] or ["-"]
+    return [Result(i, "unresolved", "I7", reason) for i in ids]
+
+
 def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = None) -> list[Result]:
-    """state (spec 10.6): carries approval use and risk-budget spending across packets. Read on entry, updated on exit."""
+    """state (spec 10.6): carries approval use, risk-budget spending and per-period limit totals across packets.
+    Read on entry, updated on exit."""
+    if not isinstance(packet, dict):
+        return [Result("-", "unresolved", "I7", "packet is not a JSON object")]
     bad = unsafe_number(packet)
     if bad:   # spec 12.1: such a packet cannot be canonicalized the same way by every verifier
-        ids = [i.get("id", "?") if isinstance(i, dict) else "?" for i in packet.get("invocations", [])] or ["-"]
-        return [Result(i, "unresolved", "I7", f"number outside the I-JSON range at {bad}") for i in ids]
+        return _all_unresolved(packet, f"number outside the I-JSON range at {bad}")
+    bad = malformed_reason(packet)
+    if bad:   # spec 12.1 (v0.3): not well-formed I-JSON within AMEP's bounds
+        return _all_unresolved(packet, f"malformed packet: {bad}")
+    version = packet.get("amep_version")
+    if version not in SUPPORTED_VERSIONS:   # spec 16: never evaluate rules this verifier does not implement
+        return _all_unresolved(packet, f"unsupported amep_version {version!r}")
+    v03 = version == "0.3"
+    vsig = lambda o: verify_sig(o, keys, require_v2=v03)   # noqa: E731
+    # Object ids are unique within a packet (spec 5.2, v0.3): two objects with one id would let a receipt or a
+    # statement be read as evidence for the wrong one.
+    seen_ids = set()
+    for kind in ("mandates", "delegations", "intents", "interpretations", "invocations", "effects", "approvals",
+                 "findings", "call_statements"):
+        for o in packet.get(kind, []):
+            if isinstance(o, dict) and "id" in o:
+                if o["id"] in seen_ids:
+                    return _all_unresolved(packet, f"malformed packet: duplicate object id {o['id']!r}")
+                seen_ids.add(o["id"])
     objs = {o["id"]: o for kind in ("mandates", "delegations", "intents", "interpretations", "invocations",
                                     "effects", "approvals", "findings")
             for o in packet.get(kind, []) if isinstance(o, dict) and "id" in o}
@@ -269,6 +494,8 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
     effects = packet.get("effects", [])
     state = {} if state is None else state
     spent: dict[str, int] = dict(state.get("spent", {}))
+    totals: dict[str, int] = {k: amount_units(v) for k, v in state.get("period_totals", {}).items()}
+    prior_windows = set(totals)
     # approval id -> (invocation id, body digest) of its first use, including uses in earlier packets
     approval_use: dict[str, tuple] = {k: tuple(v) for k, v in state.get("approvals_used", {}).items()}
     out: list[Result] = []
@@ -282,19 +509,20 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
             if order.get(j, n) < n:
                 own |= taint.get(j, set())
         taint[i.get("id")] = own
-    decisions = [d for d in packet.get("decisions", []) if verify_sig(d, keys)]
+    decisions = [d for d in packet.get("decisions", []) if vsig(d)]
     # spec 5.13: a verified pre-execution quarantine withholds findings from every LATER invocation
     quarantined: dict[str, int] = {}
     for d in decisions:
         if d.get("mode") == "quarantine" and d.get("phase") == "pre_execution" and d.get("invocation") in order:
             for f in d.get("quarantined", []):
                 quarantined[f] = min(quarantined.get(f, len(invocations)), order[d["invocation"]])
+    ctx = {"v03": v03, "totals": totals, "prior_windows": prior_windows}
     for n, inv in enumerate(invocations):
         rid = inv.get("id", "?")
         try:
             leaked = [f for f in inv.get("influenced_by", []) if f in quarantined and n > quarantined[f]]
             _check(bool(leaked) and not inv.get("principal_confirmed"), "violated", "I4", f"quarantined content reached the agent ({', '.join(leaked)})")
-            _evaluate_invocation(inv, packet, objs, keys, revocations, statuses, effects, spent, approval_use, extra_protected, order, taint)
+            _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects, spent, approval_use, extra_protected, order, taint, ctx)
             out.append(Result(rid, "preserved", "-", "continuity preserved"))
         except Stop as s:
             out.append(Result(rid, *s.r))
@@ -321,10 +549,35 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
             out.append(Result(e.get("id", "?"), "violated", "I11", "effect without any authorized invocation (bypass)"))
     state["spent"] = spent
     state["approvals_used"] = {k: list(v) for k, v in approval_use.items()}
+    if totals:
+        state["period_totals"] = {k: _units_str(v) for k, v in totals.items()}
     return out
 
 
-def _evaluate_invocation(inv, packet, objs, keys, revocations, statuses, effects, spent, approval_use, extra_protected, order, taint):
+def evaluate_text(text: str, keys: dict, extra_protected=(), state: dict | None = None) -> list[Result]:
+    """Evaluate a packet given as JSON text: parsed strictly (spec 12.1), so duplicate member names and inexact
+    number literals make every invocation unresolved (I7)."""
+    try:
+        packet = parse_strict(text)
+    except (Malformed, ValueError) as e:
+        return [Result("-", "unresolved", "I7", f"malformed packet text: {e}")]
+    return evaluate(packet, keys, extra_protected, state)
+
+
+def _units_str(u: int) -> str:
+    ip, fp = divmod(u, _SCALE)
+    fp_s = str(fp).rjust(18, "0").rstrip("0")
+    return f"{ip}.{fp_s}" if fp_s else str(ip)
+
+
+def _revocation_window(node) -> float:
+    w = (node.get("revocation") or {}).get("window", 0)
+    if isinstance(w, bool) or not isinstance(w, (int, float)) or w < 0:
+        raise Malformed("revocation window must be a non-negative number of seconds")
+    return w
+
+
+def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects, spent, approval_use, extra_protected, order, taint, ctx):
     rid, t_inv = inv["id"], to_time(inv["t"])
     # 1. chain
     chain, node, seen = [], objs.get(inv.get("authority_ref")), set()
@@ -335,13 +588,26 @@ def _evaluate_invocation(inv, packet, objs, keys, revocations, statuses, effects
     # 2. signatures (and signer roles) on everything the decision rests on
     interp = objs.get(inv.get("interpretation_ref"))
     needed = chain + [inv] + ([interp] if interp else [])
+    intent = None
     if "intent_ref" in inv:
         intent = objs.get(inv["intent_ref"])
         _check(not intent or intent.get("kind") != "intent", "unresolved", "I7", "cited intent not found")
         needed.append(intent)
-    _check(any(not verify_sig(o, keys) for o in needed), "unresolved", "I7", "missing or invalid signature, or signer lacks the role")
+    _check(any(not vsig(o) for o in needed), "unresolved", "I7", "missing or invalid signature, or signer lacks the role")
     _check(any(order.get(j, order[rid]) >= order[rid] for j in inv.get("derived_from", [])),
            "unresolved", "I7", "lineage reference not found among earlier invocations")
+    # claim members (spec 16, v0.3): an unknown claim member may be a constraint this verifier cannot enforce, so
+    # it is never ignored. Limits are validated wherever they appear.
+    limited = [n for n in chain + ([intent] if intent else []) if "limits" in n["claims"]]
+    for n in limited:
+        check_limits(n["claims"]["limits"])
+    if ctx["v03"]:
+        for n in chain + ([intent] if intent else []):
+            unknown = sorted(k for k in n["claims"] if k not in CLAIM_MEMBERS and not is_extension_member(k))
+            _check(bool(unknown), "unresolved", "I7", f"{n['id']}: claim member not understood ({', '.join(unknown)})")
+            for lim in n["claims"].get("limits", []):
+                unknown = sorted(k for k in lim if k not in LIMIT_MEMBERS and not is_extension_member(k))
+                _check(bool(unknown), "unresolved", "I7", f"{n['id']}: limit member not understood ({', '.join(unknown)})")
     # 3-4. interpretation
     _check(not interp or interp.get("source") not in ("curated", "customer"), "unresolved", "I3", "no approved interpretation")
     pinned = packet.get("pinned_adapters", {})
@@ -350,42 +616,92 @@ def _evaluate_invocation(inv, packet, objs, keys, revocations, statuses, effects
     for p, c in zip(chain, chain[1:]):
         ok, why = narrower(c["claims"], p["claims"])
         _check(not ok, "violated", "I1", f"{c['id']}: {why}")
-    # 6. liveness: signed revocations and signed status assertions (spec 5.12)
+        why = limits_narrower(c["claims"], p["claims"])
+        _check(bool(why), "violated", "I1", f"{c['id']}: {why}")
+    # 6. liveness at the invocation: signed revocations and signed status assertions (spec 5.12). A revocation
+    # still inside the revoked node's declared propagation window is unresolved, not violated (spec 5.12.1, v0.3).
     ids = {n["id"] for n in chain}
+    by_id = {n["id"]: n for n in chain}
     revs = [r for r in revocations if r.get("target") in ids]
-    _check(any(verify_sig(r, keys) and to_time(r["t"]) <= t_inv for r in revs), "violated", "I6", "ancestor revoked before invocation")
-    sts = [s for s in statuses if s.get("target") in ids and verify_sig(s, keys)]
-    _check(any(s.get("revoked_at") is not None and to_time(s["revoked_at"]) <= t_inv for s in sts), "violated", "I6", "status shows ancestor revoked before invocation")
-    _check(any(not verify_sig(r, keys) for r in revs), "unresolved", "I7", "unverifiable revocation on the chain")
-    for n in chain:
-        if (n.get("revocation") or {}).get("status_ref"):
-            fresh = [s for s in sts if s["target"] == n["id"] and to_time(s["as_of"]) >= t_inv]
-            _check(not fresh, "unresolved", "I7", f"no signed revocation status for {n['id']} as of the invocation")
+    sts = [s for s in statuses if s.get("target") in ids and vsig(s)]
+    revoked_at = [(to_time(r["t"]), r["target"], "ancestor revoked") for r in revs if vsig(r)] + \
+                 [(to_time(s["revoked_at"]), s["target"], "status shows ancestor revoked") for s in sts if s.get("revoked_at") is not None]
+
+    def liveness(t, what):
+        for r_t, target, why in sorted(revoked_at):
+            if r_t <= t:
+                w = _revocation_window(by_id[target])
+                _check(t < r_t + w, "unresolved", "I6", f"{why} {t - r_t:g}s before {what}, inside its {w:g}s propagation window")
+                _check(True, "violated", "I6", f"{why} before {what}")
+
+    def fresh_status(t, what):
+        for n in chain:
+            if (n.get("revocation") or {}).get("status_ref"):
+                fresh = [s for s in sts if s["target"] == n["id"] and to_time(s["as_of"]) >= t]
+                _check(not fresh, "unresolved", "I7", f"no signed revocation status for {n['id']} as of {what}")
+
+    liveness(t_inv, "invocation")
+    _check(any(not vsig(r) for r in revs), "unresolved", "I7", "unverifiable revocation on the chain")
+    fresh_status(t_inv, "the invocation")
     # 7. self-protection on the declared target
     _check(is_guardrail(inv["declared"]["resource"], extra_protected), "violated", "I9", "targets guardrail/evidence store")
     # 8-9. influence: a finding counts as trusted only if it exists, is signed and is labelled trusted (spec 5.11)
     mine = [e for e in effects if e.get("invocation") == rid]
     untrusted = [f for f in inv.get("influenced_by", [])
-                 if not (objs.get(f) and verify_sig(objs[f], keys) and objs[f].get("integrity_label") == "trusted")]
+                 if not (objs.get(f) and vsig(objs[f]) and objs[f].get("integrity_label") == "trusted")]
     _check(bool(untrusted) and inv["declared"]["effect"] != "read" and not inv.get("principal_confirmed"),
            "violated" if mine else "unresolved", "I4", "mutation shaped by untrusted content")
-    # 10. effect receipts
+    # 10. call statements (spec 5.14, v0.3): the observer's signed account of the whole call. It binds the call to
+    # this exact signed invocation and to the arguments the server received, says whether anything was executed,
+    # and how many receipts to expect, so that "no receipt" is no longer ambiguous.
+    inv_digest = digest(inv)
+    stmts = [c for c in packet.get("call_statements", []) if isinstance(c, dict) and c.get("invocation") == rid]
+    for c in stmts:
+        _check(not vsig(c), "unresolved", "I7", "call statement unsigned or signer lacks the role")
+        _check(c.get("disposition") not in DISPOSITIONS, "unresolved", "I7", "call statement with an unknown disposition")
+        n_eff = c.get("effect_count")
+        _check(isinstance(n_eff, bool) or not isinstance(n_eff, (int, float)) or n_eff != int(n_eff) or n_eff < 0,
+               "unresolved", "I7", "call statement effect_count must be a non-negative integer")
+        _check(c["disposition"] == "not_executed" and n_eff != 0, "unresolved", "I7", "call statement says not executed but counts effects")
+        _check("invocation_digest" in c and c["invocation_digest"] != inv_digest, "unresolved", "I7",
+               "call statement is bound to a different invocation (invocation_digest mismatch)")
+    not_executed = any(c["disposition"] == "not_executed" for c in stmts)
+    sent_args = inv.get("args_digest")
+    rewritten = [c for c in stmts if sent_args is not None and "args_digest" in c and c["args_digest"] != sent_args]
+    _check(bool(rewritten) and not not_executed, "violated", "I2",
+           "the arguments the server received differ from those the host signed (changed in transit)")
+    _check(bool(rewritten), "unresolved", "I7", "the arguments were changed in transit; the server executed nothing")
+    _check(not_executed and bool(mine), "violated", "I11", "effect receipts contradict a signed not_executed statement")
+    if not mine and not_executed:
+        # provably nothing was executed, so the call cannot have exceeded its authority; for a high-impact call the
+        # statement must come from a party other than the actor (I10)
+        hi = CEILING.index(inv["declared"]["effect"]) >= CEILING.index("write_shared")
+        _check(hi and all(c.get("observed_by") == inv.get("actor") for c in stmts if c["disposition"] == "not_executed"),
+               "unresolved", "I10", "high-impact call reported not executed only by the actor itself")
+        return
+    # 11. effect receipts
     _check(not mine, "unresolved", "I7", "no executed-effect receipt")
     high_impact = CEILING.index(inv["declared"]["effect"]) >= CEILING.index("write_shared")
     eff_claims = chain[0]["claims"]
     for n in chain[1:]:
         eff_claims = meet(n["claims"], eff_claims)
-    if "intent_ref" in inv:
-        eff_claims = meet(objs[inv["intent_ref"]]["claims"], eff_claims)
+    if intent:
+        eff_claims = meet(intent["claims"], eff_claims)
     appr = objs.get(inv.get("approval_ref")) if "approval_ref" in inv else None
     bodies = {}
     # 11-15. every receipt for this invocation is checked (spec 10.2); identical bodies are one effect
     for e in mine:
-        _check(not verify_sig(e, keys), "unresolved", "I7", "effect receipt unsigned or signer lacks the role")
+        _check(not vsig(e), "unresolved", "I7", "effect receipt unsigned or signer lacks the role")
+        _check("invocation_digest" in e and e["invocation_digest"] != inv_digest, "unresolved", "I7",
+               f"receipt {e.get('id', '?')} is bound to a different invocation (invocation_digest mismatch)")
         if high_impact:
             _check(not inv.get("actor"), "unresolved", "I10", "actor not recorded; observer independence cannot be shown")
             _check(e.get("observed_by") == inv["actor"] or e.get("assurance") == "L0", "unresolved", "I10", "high-impact effect only self-reported")
         x = e["executed"]
+        # liveness at each effect's own time (spec 8 I6, v0.3): authority must still be in force when the effect
+        # occurs, not only when it was invoked. Proposed by Cliff Singletary on audit@ietf.org, 19 Nov 2026.
+        liveness(to_time(x["t"]), f"effect {e.get('id', '?')}")
+        fresh_status(to_time(x["t"]), f"effect {e.get('id', '?')}")
         if "mediated" in inv:
             _check(canon(x) != canon(inv["mediated"]), "violated", "I2", "executed differs from mediated effect")
         else:
@@ -400,9 +716,20 @@ def _evaluate_invocation(inv, packet, objs, keys, revocations, statuses, effects
                 inherited |= taint.get(j, set())
             leaked = sorted(f"{d}->{x['recipient']}" for d in inherited if f"{d}->{x['recipient']}" not in eff_claims.get("data", []))
             _check(bool(leaked), "violated", "I5", f"derived data released: {', '.join(leaked)}")
+        if "value" in x:   # validate wherever present, so a malformed amount is never silently ignored
+            v = x["value"]
+            _check(not isinstance(v, dict), "unresolved", "I7", "value must be an object")
+            amount_units(v.get("amount")); _unit(v.get("unit"))
+            if "period_spent" in v:
+                amount_units(v["period_spent"])
         bodies.setdefault(approval_digest(x), x)
+    # every receipt a statement promises must be present, and no more (spec 5.14)
+    for c in stmts:
+        k = sum(1 for e in mine if e.get("observed_by") == c.get("observed_by"))
+        _check(k > c["effect_count"], "violated", "I7", f"{k} receipts from {c.get('observed_by')} but its call statement counts {c['effect_count']}")
+        _check(k < c["effect_count"], "unresolved", "I7", f"call statement promises {c['effect_count']} receipts from {c.get('observed_by')}, {k} present (lost or withheld)")
     if "approval_ref" in inv:
-        _check(not appr or not verify_sig(appr, keys), "unresolved", "I7", "approval missing, unsigned or not signed by an approver")
+        _check(not appr or not vsig(appr), "unresolved", "I7", "approval missing, unsigned or not signed by an approver")
         for d, x in bodies.items():
             t_x = to_time(x["t"])
             _check(appr["effect_digest"] != d, "violated", "I8", "approval not bound to the executed effect")
@@ -411,7 +738,41 @@ def _evaluate_invocation(inv, packet, objs, keys, revocations, statuses, effects
             _check("nbf" in appr and to_time(appr["nbf"]) > t_inv, "violated", "I8", "approval not yet valid")
             first = approval_use.setdefault(appr["id"], (rid, d))
             _check(first != (rid, d), "violated", "I8", f"approval already used by {first[0]}")
-    # 16. risk budget: recorded spend must match receipts; over budget needs a bound approval
+    # 16. quantity limits (spec 7.6, v0.3), on every node of the chain and on the intent. An approval that passed I8
+    # authorizes going over a limit; the amount still counts toward the period total.
+    for x in bodies.values():
+        for n in limited:
+            applicable = [lim for lim in n["claims"]["limits"] if limit_applies(lim, x)]
+            if not applicable:
+                continue
+            v = x.get("value")
+            _check(v is None, "unresolved", "I7", f"{n['id']} limits this effect but the receipt records no value")
+            amt, unit = amount_units(v["amount"]), v["unit"]
+            matching = [lim for lim in applicable if lim["unit"] == unit]
+            if not matching:
+                money = unit.startswith(MONEY_UNITS) or x["effect"] == "financial"
+                _check(money, "violated", "I2", f"{unit} is not an asset {n['id']} authorizes")
+                _check(True, "unresolved", "I7", f"{n['id']} limits this effect in another unit than {unit}")
+            for lim in matching:
+                _check("per_call" in lim and amt > amount_units(lim["per_call"]) and not appr, "violated", "I2",
+                       f"amount {v['amount']} {unit} exceeds the per-call limit {lim.get('per_call')} of {n['id']}")
+                if "per_period" not in lim:
+                    continue
+                anchor = to_time(n["claims"]["nbf"]) if "nbf" in n["claims"] else 0
+                window = int((to_time(x["t"]) - anchor) // lim["period"])
+                key = f"{n['id']}|{unit}|{lim['period']}|{window}"
+                total = ctx["totals"].get(key, 0) + amt
+                if "period_spent" in v:
+                    observed = amount_units(v["period_spent"])
+                    _check(observed < total, "violated", "I7",
+                           f"observer's period total {v['period_spent']} is below the payments recorded for {n['id']}")
+                    total = observed
+                _check(total > amount_units(lim["per_period"]) and not appr, "violated", "I2",
+                       f"period total {_units_str(total)} {unit} exceeds the per-period limit {lim['per_period']} of {n['id']}")
+                _check("period_spent" not in v and key not in ctx["prior_windows"], "unresolved", "I7",
+                       f"period total for {n['id']} cannot be established: no observer period_spent and no earlier state")
+                ctx["totals"][key] = total
+    # 17. risk budget: recorded spend must match receipts; over budget needs a bound approval
     c = sum(cost(x) for x in bodies.values())
     _check("budget_spent" in inv and inv["budget_spent"] != c, "violated", "I7", "recorded budget spend does not match receipts")
     over = next((n["id"] for n in chain if "budget" in n["claims"] and spent.get(n["id"], 0) + c > n["claims"]["budget"]), None)

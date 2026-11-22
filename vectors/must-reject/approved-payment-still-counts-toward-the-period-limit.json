@@ -1,0 +1,164 @@
+{
+ "name": "approved payment still counts toward the period limit",
+ "expect": {
+  "outcome": "violated",
+  "invariant": "I2"
+ },
+ "packet": {
+  "amep_version": "0.3",
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "payments.send"
+     ],
+     "resources": [
+      "payee:*"
+     ],
+     "ceiling": "financial",
+     "exp": 100,
+     "limits": [
+      {
+       "unit": "iso4217:EUR",
+       "per_call": "1000.00",
+       "per_period": "500.00",
+       "period": 2592000
+      }
+     ]
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "365460ba0b7891c22729f71a968ac23e4f89b31c816dd5220e6a4801af4ee31386c6f56538e84e7f2553b035c75c223620e50260a70aa7bf36941420772e6206"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "bank_api",
+    "version": "v3",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "5ef3ab9b00c0c17c6be94a9e2b23ec77097f763f0846dbf0939e36bfc7725c93a6392b0ee8ecc9c67d090be777cbba8877cfc4cdba4ad45cf00edd7e8686390b"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "m-1",
+    "interpretation_ref": "a-1",
+    "actor": "agent:payments-assistant",
+    "t": 10,
+    "declared": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial"
+    },
+    "approval_ref": "ap-1",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "4cb8dccc278ae7635b828522a0057c243e7adef2737d88df0b76fee8f2e4f51c1c2782479b942fd05ca77b73e6d412f4509ea1de1940d4182ff46eff5469ce06"
+    }
+   },
+   {
+    "id": "i-2",
+    "kind": "invocation",
+    "authority_ref": "m-1",
+    "interpretation_ref": "a-1",
+    "actor": "agent:payments-assistant",
+    "t": 20,
+    "declared": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "8c111931f79bfe1bc51d5dc2c478879fcfde6b2cd7eb3bd861e82aeae34446baa2f93784898dc6ac7ba36e4fbcffe49b471742905ca56044e7e1bfbd0399fa07"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "service:bank.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial",
+     "released": [],
+     "t": 11,
+     "value": {
+      "amount": "900.00",
+      "unit": "iso4217:EUR",
+      "period_spent": "900.00"
+     }
+    },
+    "proof": {
+     "kid": "bank-observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "6fdd7efccd2bb3cc62ac78665c354f487e1ff049c04ea2318f8c10cab4f3065c758071868df5dcae819cc01835c34f5fc7265ac702bc2ea921d8ba07db006506"
+    }
+   },
+   {
+    "id": "e-2",
+    "kind": "effect",
+    "invocation": "i-2",
+    "observed_by": "service:bank.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial",
+     "released": [],
+     "t": 21,
+     "value": {
+      "amount": "100.00",
+      "unit": "iso4217:EUR",
+      "period_spent": "1000.00"
+     }
+    },
+    "proof": {
+     "kid": "bank-observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "63d15e466f921371a370dc18747b5451853234a59eb9fec38fb16d3a1fd046d7ca33dcda71ed728c7d848fe280af0c6eb6558d4b7415a045506ae5b86bd0f10d"
+    }
+   }
+  ],
+  "approvals": [
+   {
+    "id": "ap-1",
+    "kind": "approval",
+    "effect_digest": "c66a0c9ff86ad7a2a9ea81d341b08fe0a5f84661cb7757c3eeddeeb16dfcfba2",
+    "presence": "webauthn",
+    "expiry": 90,
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "fa20c5a93875df5c914ecbd8324df4ccba77b36d35bb00e47ee73e84947fe8a76cfa581e1c1c4193d2e4e42722344e72f5f8b2e87b5b282ff890c64060230e00"
+    }
+   }
+  ]
+ }
+}

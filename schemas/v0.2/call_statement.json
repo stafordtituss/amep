@@ -1,0 +1,59 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://amep.example/schemas/v0.2/call_statement.json",
+ "title": "call_statement",
+ "description": "CallStatement (spec 5.14). Signed by role observer: the observer's account of one tool call.",
+ "type": "object",
+ "required": [
+  "kind",
+  "invocation",
+  "observed_by",
+  "disposition",
+  "effect_count",
+  "t"
+ ],
+ "properties": {
+  "kind": {
+   "const": "call_statement"
+  },
+  "id": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "invocation": {
+   "$ref": "common.json#/$defs/ref"
+  },
+  "observed_by": {
+   "type": "string"
+  },
+  "disposition": {
+   "enum": [
+    "completed",
+    "not_executed",
+    "failed_after_effects"
+   ]
+  },
+  "effect_count": {
+   "type": "integer",
+   "minimum": 0
+  },
+  "t": {
+   "$ref": "common.json#/$defs/time"
+  },
+  "invocation_digest": {
+   "type": "string",
+   "pattern": "^[0-9a-f]{64}$"
+  },
+  "args_digest": {
+   "type": "string",
+   "pattern": "^[0-9a-f]{64}$"
+  },
+  "proof": {
+   "$ref": "common.json#/$defs/proof"
+  }
+ },
+ "patternProperties": {
+  "^x-": {},
+  "\\.": {}
+ },
+ "additionalProperties": false
+}

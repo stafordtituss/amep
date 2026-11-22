@@ -1,4 +1,4 @@
-// AMEP v0.2 evaluation core (spec/amep-v0.2.md section 10). Pure JavaScript, no I/O and no platform crypto:
+// AMEP v0.3 evaluation core (spec/amep-v0.2.md section 10). Pure JavaScript, no I/O and no platform crypto:
 // signature checks are injected (`sigOk(obj, key) -> boolean`), so the Node CLI and the in-browser verifier
 // share this exact code. Independent of the Python reference verifier.
 
@@ -10,7 +10,9 @@ export const SIGNER_ROLES = {
   delegation: ["issuer", "host"], intent: ["issuer", "host"],
   interpretation: ["host"], invocation: ["host"], decision: ["host"],
   effect: ["observer"], approval: ["approver"], finding: ["host", "observer"],
+  call_statement: ["observer"],
 };
+const DISPOSITIONS = ["completed", "not_executed", "failed_after_effects"];
 const COST_BASE = { read: 0, write_local: 1, write_shared: 3, external_send: 5, destructive: 10, financial: 20 };
 const DATA_MULT = { public: 1, internal: 1, source: 1, confidential: 2, secret: 5, phi: 5, pci: 5 };
 
@@ -67,15 +69,35 @@ function normDec(s) {
 }
 
 // Parse JSON text for evaluation (spec 12.1). A non-integer number literal must equal, as a decimal, the double it
-// denotes, so two distinct literals can never share one canonical form or approval digest. Integers are checked
-// against the I-JSON range by evaluate(). The literals are read from the text itself (after JSON.parse has
-// accepted it, so it is valid JSON), which works on every engine, without JSON.parse source-text access.
+// denotes, so two distinct literals can never share one canonical form or approval digest. Duplicate member names
+// are rejected (I-JSON, RFC 7493 2.3): parsers disagree on them (first wins, last wins, error), so a packet with
+// `"amount":"10.00", "amount":"840000.00"` could verify as one value and be displayed as another. Integers are
+// checked against the I-JSON range by evaluate(). The text is scanned after JSON.parse has accepted it, so it is
+// valid JSON, which works on every engine without JSON.parse source-text access.
 const NUMBER = /-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
 export function parseStrict(text) {
   const value = JSON.parse(text);
+  const stack = []; // one entry per open container: { keys: Set } for objects, null for arrays
+  let expectKey = false;
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
-    if (c === '"') { for (i++; i < text.length && text[i] !== '"'; i++) if (text[i] === "\\") i++; continue; }
+    if (c === '"') {
+      const start = i;
+      for (i++; i < text.length && text[i] !== '"'; i++) if (text[i] === "\\") i++;
+      const top = stack[stack.length - 1];
+      if (top && expectKey) {
+        const name = JSON.parse(text.slice(start, i + 1)); // decoded, so "a" and "a" are the same name
+        if (top.keys.has(name)) throw new Malformed(`duplicate member name ${JSON.stringify(name)}`);
+        top.keys.add(name);
+        expectKey = false;
+      }
+      continue;
+    }
+    if (c === "{") { stack.push({ keys: new Set() }); expectKey = true; continue; }
+    if (c === "[") { stack.push(null); expectKey = false; continue; }
+    if (c === "}" || c === "]") { stack.pop(); expectKey = false; continue; }
+    if (c === ",") { expectKey = !!stack[stack.length - 1]; continue; }
+    if (c === ":") { expectKey = false; continue; }
     if (c !== "-" && (c < "0" || c > "9")) continue;
     NUMBER.lastIndex = i;
     const lit = NUMBER.exec(text)[0];
@@ -84,6 +106,77 @@ export function parseStrict(text) {
       throw new Malformed(`number literal ${lit} is not exactly representable as an IEEE 754 double`);
   }
   return value;
+}
+
+// ---- well-formedness (spec 12.1, v0.3). Bounds keep a hostile packet from exhausting a verifier; every verifier
+// applies the same ones. String sizes are counted in UTF-8 bytes, which all languages agree on. ----
+export const MAX_DEPTH = 32, MAX_ARRAY = 4096, MAX_STRING = 8192, MAX_NAME = 256;
+const utf8Len = s => new TextEncoder().encode(s).length;
+function badChar(s) {
+  for (const ch of s) {
+    const c = ch.codePointAt(0);
+    if (c >= 0xD800 && c <= 0xDFFF) return "a lone surrogate";
+    if ((c >= 0xFDD0 && c <= 0xFDEF) || (c & 0xFFFE) === 0xFFFE) return "a noncharacter";
+  }
+  return null;
+}
+// Canonical identifiers (spec 6.2, v0.3): already in NFC and without control characters, so two identifiers that
+// look the same always compare the same. The verifier never normalizes silently.
+function identProblem(s) {
+  if (typeof s !== "string") return null;
+  for (const ch of s) { const c = ch.codePointAt(0); if (c < 0x20 || (c >= 0x7F && c <= 0x9F)) return "a control character"; }
+  if (s.normalize("NFC") !== s) return "a form that is not NFC";
+  return null;
+}
+export function malformedReason(v, path = "$", depth = 0) {
+  if (depth > MAX_DEPTH) return `nesting deeper than ${MAX_DEPTH} at ${path}`;
+  if (typeof v === "string") {
+    if (utf8Len(v) > MAX_STRING) return `string longer than ${MAX_STRING} bytes at ${path}`;
+    const bad = badChar(v); return bad ? `${bad} at ${path}` : null;
+  }
+  if (Array.isArray(v)) {
+    if (v.length > MAX_ARRAY) return `array longer than ${MAX_ARRAY} at ${path}`;
+    for (let i = 0; i < v.length; i++) { const r = malformedReason(v[i], `${path}[${i}]`, depth + 1); if (r) return r; }
+    return null;
+  }
+  if (v && typeof v === "object") {
+    for (const [k, x] of Object.entries(v)) {
+      if (utf8Len(k) > MAX_NAME) return `member name longer than ${MAX_NAME} bytes at ${path}`;
+      const bad = badChar(k); if (bad) return `${bad} in a member name at ${path}`;
+      if ((k === "action" || k === "resource")) { const p = identProblem(x); if (p) return `identifier with ${p} at ${path}.${k}`; }
+      if (["actions", "resources", "deny_actions", "deny_resources"].includes(k) && Array.isArray(x)) {
+        const p = x.map(identProblem).find(Boolean); if (p) return `identifier pattern with ${p} at ${path}.${k}`;
+      }
+      const r = malformedReason(x, `${path}.${k}`, depth + 1); if (r) return r;
+    }
+  }
+  return null;
+}
+
+// ---- signatures (spec 12.2). One exact Ed25519 acceptance rule (v0.3), applied before the platform check, because
+// libraries disagree on edge cases (Chalkias et al., "Taming the many EdDSAs", 2020). Measured: OpenSSL 3.6 accepts
+// the signature (R = identity, S = 0) for EVERY message under the identity public key; OpenSSL 4.1 rejects it.
+// AMEP rejects S >= L, and a public key A or commitment R that is non-canonical (y >= p) or of small order. ----
+const P25519 = (1n << 255n) - 19n;
+const L25519 = (1n << 252n) + 27742317777372353535851937790883648493n;
+const leInt = b => { let n = 0n; for (let i = b.length - 1; i >= 0; i--) n = (n << 8n) | BigInt(b[i]); return n; };
+const fromHex = h => Uint8Array.from(h.match(/../g) || [], x => parseInt(x, 16));
+const SMALL_ORDER_Y = new Set([0n, 1n, P25519 - 1n,
+  ...["26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05", "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a"].map(h => leInt(fromHex(h)))]);
+const pointOk = b => { if (b.length !== 32) return false; const y = leInt(b) & ((1n << 255n) - 1n); return y < P25519 && !SMALL_ORDER_Y.has(y); };
+export const HEX64 = /^[0-9a-f]{64}$/, HEX128 = /^[0-9a-f]{128}$/;
+export function ed25519StrictOk(xHex, sigHex) {
+  if (typeof xHex !== "string" || typeof sigHex !== "string" || !HEX64.test(xHex) || !HEX128.test(sigHex)) return false;
+  const sig = fromHex(sigHex);
+  return pointOk(fromHex(xHex)) && pointOk(sig.slice(0, 32)) && leInt(sig.slice(32)) < L25519;
+}
+// A version-2 proof signs a domain-separated input, so a signature the same key made for another object kind, or for
+// another system entirely, can never be presented as this AMEP object:  "AMEP-v0.3" 0x00 kind 0x00 canon(object
+// without proof). A proof without "v" (version 1, AMEP v0.2) signs canon(object without proof), exactly as before.
+export const SIG_CONTEXT = "AMEP-v0.3";
+export function signingInput(o) {
+  const body = canon(stripProof(o));
+  return o.proof && o.proof.v === 2 ? `${SIG_CONTEXT}\u0000${o.kind ?? ""}\u0000${body}` : body;
 }
 
 // ---- SHA-256 over UTF-8 (pure JS, so evaluation stays synchronous in the browser) ----
@@ -166,20 +259,95 @@ const cost = x => {
   return COST_BASE[x.effect] * m * rev;
 };
 
-// ---- evaluation (spec 10) ----
-// state (spec 10.6): { approvals_used: {id: [invocation, digest]}, spent: {node: points} }, read on entry and
-// updated on exit, so approval single use and risk budgets hold across a stream of packets.
-export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
-  const bad = unsafeNumber(pk);
-  if (bad) {   // spec 12.1: such a packet cannot be canonicalized the same way by every verifier
-    const ids = (pk.invocations || []).map(i => (i && typeof i === "object" && i.id) || "?");
-    return (ids.length ? ids : ["-"]).map(id => ({ id, outcome: "unresolved", invariant: "I7", reason: `number outside the I-JSON range at ${bad}` }));
+// ---- quantities and limits (spec 5.9, 7.6, v0.3). An executed effect may carry value = {amount, unit}: an exact
+// decimal string and a unit such as "iso4217:EUR", "caip19:…", "count:records" or "bytes". Claims may carry limits
+// that cap it per call and per period. Amounts are compared as exact decimals (scaled BigInts), never as floats. ----
+const AMOUNT = /^(0|[1-9][0-9]{0,38})(\.[0-9]{1,18})?$/, UNIT = /^[a-z][a-z0-9-]{0,31}:[!-~]{1,128}$/;
+const SCALE = 10n ** 18n;
+const MONEY_UNITS = ["iso4217:", "caip19:"];
+export const CLAIM_MEMBERS = new Set(["actions", "resources", "data", "ceiling", "exp", "nbf", "purpose", "deny_actions", "deny_resources", "depth", "budget", "limits"]);
+const LIMIT_MEMBERS = new Set(["unit", "per_call", "per_period", "period", "actions"]);
+export function amountUnits(s) {
+  if (typeof s !== "string" || !AMOUNT.test(s)) throw new Malformed(`malformed amount ${JSON.stringify(s)} (a decimal string such as "1200.00" is required)`);
+  const [ip, fp = ""] = s.split(".");
+  return BigInt(ip) * SCALE + BigInt((fp + "0".repeat(18)).slice(0, 18));
+}
+const unitOf = u => { if (typeof u !== "string" || !UNIT.test(u)) throw new Malformed(`malformed unit ${JSON.stringify(u)}`); return u; };
+const unitsStr = u => { const ip = u / SCALE, fp = (u % SCALE).toString().padStart(18, "0").replace(/0+$/, ""); return fp ? `${ip}.${fp}` : `${ip}`; };
+export const isExtensionMember = name => name.startsWith("x-") || name.includes(".");
+function checkLimits(lims) {
+  if (!Array.isArray(lims) || !lims.length) throw new Malformed("limits must be a non-empty array");
+  for (const lim of lims) {
+    if (!lim || typeof lim !== "object" || Array.isArray(lim)) throw new Malformed("limit must be an object");
+    unitOf(lim.unit);
+    if ("per_call" in lim) amountUnits(lim.per_call);
+    if (("per_period" in lim) !== ("period" in lim)) throw new Malformed("per_period and period go together");
+    if ("per_period" in lim) {
+      amountUnits(lim.per_period);
+      if (!Number.isInteger(lim.period) || lim.period <= 0) throw new Malformed("period must be a positive integer number of seconds");
+    }
+    if ("actions" in lim && !(Array.isArray(lim.actions) && lim.actions.every(p => typeof p === "string")))
+      throw new Malformed("limit actions must be an array of action patterns");
   }
-  // signature valid AND the signing key holds a role allowed for this object kind (spec 12.5)
+  return lims;
+}
+// A limit with `actions` applies to effects whose action matches; without, to every financial effect.
+const limitApplies = (lim, x) => ("actions" in lim) ? lim.actions.some(p => patMatch(x.action, p)) : x.effect === "financial";
+// I1 for limits: a child may add limits, but never raise one the parent sets for the same unit and period.
+function limitsNarrower(c, p) {
+  for (const pl of p.limits || []) for (const cl of c.limits || []) {
+    if (cl.unit !== pl.unit || JSON.stringify(cl.actions) !== JSON.stringify(pl.actions)) continue;
+    if ("per_call" in pl && "per_call" in cl && amountUnits(cl.per_call) > amountUnits(pl.per_call)) return `per-call limit raised for ${pl.unit}`;
+    if ("per_period" in pl && cl.period === pl.period && "per_period" in cl && amountUnits(cl.per_period) > amountUnits(pl.per_period))
+      return `per-period limit raised for ${pl.unit}`;
+  }
+  return null;
+}
+function revocationWindow(node) {
+  const w = (node.revocation || {}).window ?? 0;
+  if (typeof w !== "number" || !Number.isFinite(w) || w < 0) throw new Malformed("revocation window must be a non-negative number of seconds");
+  return w;
+}
+const fmt = n => String(n); // Python's :g for the integer and short decimal times used in reasons
+
+// ---- evaluation (spec 10) ----
+// state (spec 10.6): { approvals_used: {id: [invocation, digest]}, spent: {node: points}, period_totals: {key: amount} },
+// read on entry and updated on exit, so approval single use, risk budgets and period limits hold across packets.
+const allUnresolved = (pk, reason) => {
+  const ids = (pk.invocations || []).map(i => (i && typeof i === "object" && i.id) || "?");
+  return (ids.length ? ids : ["-"]).map(id => ({ id, outcome: "unresolved", invariant: "I7", reason }));
+};
+export function evaluateText(text, keys, sigOk, extraProtected = [], state = {}) {
+  let pk;
+  try { pk = parseStrict(text); } catch (e) { return [{ id: "-", outcome: "unresolved", invariant: "I7", reason: `malformed packet text: ${e.message}` }]; }
+  return evaluate(pk, keys, sigOk, extraProtected, state);
+}
+export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
+  if (!pk || typeof pk !== "object" || Array.isArray(pk)) return [{ id: "-", outcome: "unresolved", invariant: "I7", reason: "packet is not a JSON object" }];
+  let bad = unsafeNumber(pk);
+  if (bad) return allUnresolved(pk, `number outside the I-JSON range at ${bad}`); // spec 12.1
+  bad = malformedReason(pk);
+  if (bad) return allUnresolved(pk, `malformed packet: ${bad}`); // spec 12.1 (v0.3)
+  const version = pk.amep_version ?? null;
+  if (![null, "0.2", "0.3"].includes(version)) return allUnresolved(pk, `unsupported amep_version ${JSON.stringify(version)}`); // spec 16
+  const v03 = version === "0.3";
+  // Object ids are unique within a packet (spec 5.2, v0.3): two objects with one id would let a receipt or a
+  // statement be read as evidence for the wrong one.
+  const seenIds = new Set();
+  for (const kind of ["mandates", "delegations", "intents", "interpretations", "invocations", "effects", "approvals", "findings", "call_statements"])
+    for (const o of pk[kind] || []) if (o && typeof o === "object" && "id" in o) {
+      if (seenIds.has(o.id)) return allUnresolved(pk, `malformed packet: duplicate object id ${JSON.stringify(o.id)}`);
+      seenIds.add(o.id);
+    }
+  // signature valid AND the signing key holds a role allowed for this object kind (spec 12.5), under the exact
+  // Ed25519 acceptance rule; AMEP 0.3 packets must use domain-separated (version 2) proofs
   const verify = o => {
     if (!o || typeof o !== "object" || !o.proof || o.proof.alg !== "Ed25519") return false;
+    const pv = "v" in o.proof ? o.proof.v : 1;
+    if (![1, 2].includes(pv) || (v03 && pv !== 2)) return false;
     const k = keys[o.proof.kid]; if (!k || k.alg !== "Ed25519") return false;
     if (!(k.roles || []).some(r => (SIGNER_ROLES[o.kind] || []).includes(r))) return false;
+    if (!ed25519StrictOk(k.x, o.proof.sig)) return false;
     try { return sigOk(o, k); } catch { return false; }
   };
   const objs = {};
@@ -187,6 +355,8 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     for (const o of pk[kind] || []) if (o && typeof o === "object" && "id" in o) objs[o.id] = o;
   const revocations = pk.revocations || [], statuses = pk.statuses || [], effects = pk.effects || [];
   const spent = { ...(state.spent || {}) };
+  const totals = new Map(Object.entries(state.period_totals || {}).map(([k, v]) => [k, amountUnits(v)]));
+  const priorWindows = new Set(totals.keys());
   const approvalUse = Object.fromEntries(Object.entries(state.approvals_used || {}).map(([k, v]) => [k, [...v]]));
   let out = [];
   const invocations = pk.invocations || [];
@@ -225,44 +395,104 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     check(!chain.length || chain[0].kind !== "mandate", "unresolved", "I7", "no root mandate");
     const interp = objs[inv.interpretation_ref];
     const needed = [...chain, inv, ...(interp ? [interp] : [])];
+    let intent = null;
     if ("intent_ref" in inv) {
-      const it = objs[inv.intent_ref];
-      check(!it || it.kind !== "intent", "unresolved", "I7", "cited intent not found");
-      needed.push(it);
+      intent = objs[inv.intent_ref];
+      check(!intent || intent.kind !== "intent", "unresolved", "I7", "cited intent not found");
+      needed.push(intent);
     }
     check(needed.some(o => !verify(o)), "unresolved", "I7", "missing or invalid signature, or signer lacks the role");
     check((inv.derived_from || []).some(j => (order.get(j) ?? order.get(id)) >= order.get(id)), "unresolved", "I7", "lineage reference not found among earlier invocations");
+    // claim members (spec 16, v0.3): an unknown claim member may be a constraint this verifier cannot enforce, so it
+    // is never ignored. Limits are validated wherever they appear.
+    const nodes = [...chain, ...(intent ? [intent] : [])];
+    const limited = nodes.filter(x => "limits" in x.claims);
+    for (const x of limited) checkLimits(x.claims.limits);
+    if (v03) for (const x of nodes) {
+      let unknown = Object.keys(x.claims).filter(k => !CLAIM_MEMBERS.has(k) && !isExtensionMember(k)).sort();
+      check(unknown.length > 0, "unresolved", "I7", `${x.id}: claim member not understood (${unknown.join(", ")})`);
+      for (const lim of x.claims.limits || []) {
+        unknown = Object.keys(lim).filter(k => !LIMIT_MEMBERS.has(k) && !isExtensionMember(k)).sort();
+        check(unknown.length > 0, "unresolved", "I7", `${x.id}: limit member not understood (${unknown.join(", ")})`);
+      }
+    }
     check(!interp || !["curated", "customer"].includes(interp.source), "unresolved", "I3", "no approved interpretation");
     const pinned = pk.pinned_adapters || {};
     check(Object.keys(pinned).length > 0 && pinned[interp.adapter] !== interp.version, "unresolved", "I3", "adapter revision not approved (pin mismatch)");
-    for (let i = 1; i < chain.length; i++) { const [ok, why] = narrower(chain[i].claims, chain[i - 1].claims); check(!ok, "violated", "I1", `${chain[i].id}: ${why}`); }
-    // liveness (spec 5.12)
-    const ids = new Set(chain.map(c => c.id));
+    for (let i = 1; i < chain.length; i++) {
+      const [ok, why] = narrower(chain[i].claims, chain[i - 1].claims); check(!ok, "violated", "I1", `${chain[i].id}: ${why}`);
+      const lw = limitsNarrower(chain[i].claims, chain[i - 1].claims); check(!!lw, "violated", "I1", `${chain[i].id}: ${lw}`);
+    }
+    // liveness (spec 5.12), at the invocation and at each effect's own time. A revocation still inside the revoked
+    // node's declared propagation window is unresolved, not violated (spec 5.12.1, v0.3).
+    const ids = new Set(chain.map(c => c.id)), byId = new Map(chain.map(c => [c.id, c]));
     const revs = revocations.filter(r => ids.has(r.target));
-    check(revs.some(r => verify(r) && toTime(r.t) <= tInv), "violated", "I6", "ancestor revoked before invocation");
     const sts = statuses.filter(s => ids.has(s.target) && verify(s));
-    check(sts.some(s => s.revoked_at != null && toTime(s.revoked_at) <= tInv), "violated", "I6", "status shows ancestor revoked before invocation");
+    const revokedAt = [...revs.filter(r => verify(r)).map(r => [toTime(r.t), r.target, "ancestor revoked"]),
+      ...sts.filter(s => s.revoked_at != null).map(s => [toTime(s.revoked_at), s.target, "status shows ancestor revoked"])]
+      .sort((a, b) => a[0] - b[0] || (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0) || (a[2] < b[2] ? -1 : a[2] > b[2] ? 1 : 0));
+    const liveness = (t, what) => {
+      for (const [rT, target, why] of revokedAt) if (rT <= t) {
+        const w = revocationWindow(byId.get(target));
+        check(t < rT + w, "unresolved", "I6", `${why} ${fmt(t - rT)}s before ${what}, inside its ${fmt(w)}s propagation window`);
+        check(true, "violated", "I6", `${why} before ${what}`);
+      }
+    };
+    const freshStatus = (t, what) => {
+      for (const c of chain) if (c.revocation && c.revocation.status_ref)
+        check(!sts.some(s => s.target === c.id && toTime(s.as_of) >= t), "unresolved", "I7", `no signed revocation status for ${c.id} as of ${what}`);
+    };
+    liveness(tInv, "invocation");
     check(revs.some(r => !verify(r)), "unresolved", "I7", "unverifiable revocation on the chain");
-    for (const c of chain) if (c.revocation && c.revocation.status_ref)
-      check(!sts.some(s => s.target === c.id && toTime(s.as_of) >= tInv), "unresolved", "I7", `no signed revocation status for ${c.id} as of the invocation`);
+    freshStatus(tInv, "the invocation");
     check(isGuardrail(inv.declared.resource, extraProtected), "violated", "I9", "targets guardrail/evidence store");
     // influence (spec 5.11): trusted only if the finding exists, is signed and is labelled trusted
     const mine = effects.filter(e => e.invocation === id);
     const untrusted = (inv.influenced_by || []).filter(f => !(objs[f] && verify(objs[f]) && objs[f].integrity_label === "trusted"));
     check(untrusted.length > 0 && inv.declared.effect !== "read" && !inv.principal_confirmed, mine.length ? "violated" : "unresolved", "I4", "mutation shaped by untrusted content");
+    // call statements (spec 5.14, v0.3): the observer's signed account of the whole call. It binds the call to this
+    // exact signed invocation and to the arguments the server received, says whether anything was executed, and how
+    // many receipts to expect, so that "no receipt" is no longer ambiguous.
+    const invDigest = digest(inv);
+    const stmts = (pk.call_statements || []).filter(c => c && typeof c === "object" && c.invocation === id);
+    for (const c of stmts) {
+      check(!verify(c), "unresolved", "I7", "call statement unsigned or signer lacks the role");
+      check(!DISPOSITIONS.includes(c.disposition), "unresolved", "I7", "call statement with an unknown disposition");
+      check(!Number.isInteger(c.effect_count) || c.effect_count < 0, "unresolved", "I7", "call statement effect_count must be a non-negative integer");
+      check(c.disposition === "not_executed" && c.effect_count !== 0, "unresolved", "I7", "call statement says not executed but counts effects");
+      check("invocation_digest" in c && c.invocation_digest !== invDigest, "unresolved", "I7", "call statement is bound to a different invocation (invocation_digest mismatch)");
+    }
+    const notExecuted = stmts.some(c => c.disposition === "not_executed");
+    const sentArgs = inv.args_digest;
+    const rewritten = stmts.filter(c => sentArgs !== undefined && sentArgs !== null && "args_digest" in c && c.args_digest !== sentArgs);
+    check(rewritten.length > 0 && !notExecuted, "violated", "I2", "the arguments the server received differ from those the host signed (changed in transit)");
+    check(rewritten.length > 0, "unresolved", "I7", "the arguments were changed in transit; the server executed nothing");
+    check(notExecuted && mine.length > 0, "violated", "I11", "effect receipts contradict a signed not_executed statement");
+    if (!mine.length && notExecuted) {
+      // provably nothing was executed; for a high-impact call the statement must come from a party other than the actor (I10)
+      const hi = CEILING.indexOf(inv.declared.effect) >= CEILING.indexOf("write_shared");
+      check(hi && stmts.filter(c => c.disposition === "not_executed").every(c => c.observed_by === inv.actor),
+        "unresolved", "I10", "high-impact call reported not executed only by the actor itself");
+      return;
+    }
     check(!mine.length, "unresolved", "I7", "no executed-effect receipt");
     const highImpact = CEILING.indexOf(inv.declared.effect) >= CEILING.indexOf("write_shared");
     let claims = chain[0].claims; for (const c of chain.slice(1)) claims = meet(c.claims, claims);
-    if ("intent_ref" in inv) claims = meet(objs[inv.intent_ref].claims, claims);
+    if (intent) claims = meet(intent.claims, claims);
     const ap = "approval_ref" in inv ? objs[inv.approval_ref] : undefined;
     const bodies = new Map();
     for (const e of mine) {
       check(!verify(e), "unresolved", "I7", "effect receipt unsigned or signer lacks the role");
+      check("invocation_digest" in e && e.invocation_digest !== invDigest, "unresolved", "I7", `receipt ${e.id ?? "?"} is bound to a different invocation (invocation_digest mismatch)`);
       if (highImpact) {
         check(!inv.actor, "unresolved", "I10", "actor not recorded; observer independence cannot be shown");
         check(e.observed_by === inv.actor || e.assurance === "L0", "unresolved", "I10", "high-impact effect only self-reported");
       }
       const x = e.executed;
+      // liveness at each effect's own time (spec 8 I6, v0.3): authority must still be in force when the effect occurs,
+      // not only when it was invoked. Proposed by Cliff Singletary on audit@ietf.org, 19 Nov 2026.
+      liveness(toTime(x.t), `effect ${e.id ?? "?"}`);
+      freshStatus(toTime(x.t), `effect ${e.id ?? "?"}`);
       if ("mediated" in inv) check(canon(x) !== canon(inv.mediated), "violated", "I2", "executed differs from mediated effect");
       else check(x.action !== inv.declared.action || x.resource !== inv.declared.resource, "violated", "I2", "declared != executed");
       check(isGuardrail(x.resource, extraProtected), "violated", "I9", "executed effect targets guardrail/evidence store");
@@ -275,7 +505,19 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
         const leaked = [...inherited].map(c => `${c}->${x.recipient}`).filter(f => !(claims.data || []).includes(f)).sort();
         check(leaked.length > 0, "violated", "I5", `derived data released: ${leaked.join(", ")}`);
       }
+      if ("value" in x) { // validate wherever present, so a malformed amount is never silently ignored
+        const v = x.value;
+        check(!v || typeof v !== "object" || Array.isArray(v), "unresolved", "I7", "value must be an object");
+        amountUnits(v.amount); unitOf(v.unit);
+        if ("period_spent" in v) amountUnits(v.period_spent);
+      }
       const d = approvalDigest(x); if (!bodies.has(d)) bodies.set(d, x);
+    }
+    // every receipt a statement promises must be present, and no more (spec 5.14)
+    for (const c of stmts) {
+      const k = mine.filter(e => e.observed_by === c.observed_by).length;
+      check(k > c.effect_count, "violated", "I7", `${k} receipts from ${c.observed_by} but its call statement counts ${c.effect_count}`);
+      check(k < c.effect_count, "unresolved", "I7", `call statement promises ${c.effect_count} receipts from ${c.observed_by}, ${k} present (lost or withheld)`);
     }
     if ("approval_ref" in inv) {
       check(!ap || !verify(ap), "unresolved", "I7", "approval missing, unsigned or not signed by an approver");
@@ -286,6 +528,40 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
         check("nbf" in ap && toTime(ap.nbf) > tInv, "violated", "I8", "approval not yet valid");
         const first = approvalUse[ap.id] ??= [id, d];
         check(first[0] !== id || first[1] !== d, "violated", "I8", `approval already used by ${first[0]}`);
+      }
+    }
+    // quantity limits (spec 7.6, v0.3), on every node of the chain and on the intent. An approval that passed I8
+    // authorizes going over a limit; the amount still counts toward the period total.
+    for (const x of bodies.values()) for (const node of limited) {
+      const applicable = node.claims.limits.filter(lim => limitApplies(lim, x));
+      if (!applicable.length) continue;
+      const v = x.value;
+      check(v === undefined, "unresolved", "I7", `${node.id} limits this effect but the receipt records no value`);
+      const amt = amountUnits(v.amount), unit = v.unit;
+      const matching = applicable.filter(lim => lim.unit === unit);
+      if (!matching.length) {
+        const money = MONEY_UNITS.some(m => unit.startsWith(m)) || x.effect === "financial";
+        check(money, "violated", "I2", `${unit} is not an asset ${node.id} authorizes`);
+        check(true, "unresolved", "I7", `${node.id} limits this effect in another unit than ${unit}`);
+      }
+      for (const lim of matching) {
+        check("per_call" in lim && amt > amountUnits(lim.per_call) && !ap, "violated", "I2",
+          `amount ${v.amount} ${unit} exceeds the per-call limit ${lim.per_call} of ${node.id}`);
+        if (!("per_period" in lim)) continue;
+        const anchor = "nbf" in node.claims ? toTime(node.claims.nbf) : 0;
+        const window = Math.floor((toTime(x.t) - anchor) / lim.period);
+        const key = `${node.id}|${unit}|${lim.period}|${window}`;
+        let total = (totals.get(key) ?? 0n) + amt;
+        if ("period_spent" in v) {
+          const observed = amountUnits(v.period_spent);
+          check(observed < total, "violated", "I7", `observer's period total ${v.period_spent} is below the payments recorded for ${node.id}`);
+          total = observed;
+        }
+        check(total > amountUnits(lim.per_period) && !ap, "violated", "I2",
+          `period total ${unitsStr(total)} ${unit} exceeds the per-period limit ${lim.per_period} of ${node.id}`);
+        check(!("period_spent" in v) && !priorWindows.has(key), "unresolved", "I7",
+          `period total for ${node.id} cannot be established: no observer period_spent and no earlier state`);
+        totals.set(key, total);
       }
     }
     const c = [...bodies.values()].reduce((s, x) => s + cost(x), 0);
@@ -308,6 +584,7 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   for (const e of effects) if (!invIds.has(e.invocation)) out.push({ id: e.id ?? "?", outcome: "violated", invariant: "I11", reason: "effect without any authorized invocation (bypass)" });
   state.spent = spent;
   state.approvals_used = approvalUse;
+  if (totals.size) state.period_totals = Object.fromEntries([...totals].map(([k, v]) => [k, unitsStr(v)]));
   return out;
 }
 

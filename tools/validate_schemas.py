@@ -13,7 +13,23 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 SDIR = os.path.join(ROOT, "schemas", "v0.2")
 SCHEMAS = {f: json.load(open(os.path.join(SDIR, f))) for f in os.listdir(SDIR) if f.endswith(".json")}
 # Vectors that are deliberately not schema-valid (they test the verifier's handling of malformed input).
-EXPECTED_INVALID = {"must-reject/malformed-timestamp.json"}
+EXPECTED_INVALID = {"must-reject/malformed-timestamp.json",
+                    # v0.3: malformed amounts and limits, and an unknown claim member, are schema-invalid by design
+                    "must-reject/amount-in-exponent-form.json", "must-reject/amount-with-a-leading-zero.json",
+                    "must-reject/amount-written-as-a-json-number.json", "must-reject/negative-amount.json",
+                    "must-reject/malformed-limit--period-without-per-period.json",
+                    "must-reject/amep-0-3-claim-member-the-verifier-does-not-understand.json",
+                    "positive/unversioned-packet-keeps-v0-2-handling-of-unknown-claim-members.json",
+                    "must-reject/amep-0-3-limit-member-the-verifier-does-not-understand.json",
+                    "must-reject/value-given-as-a-string-instead-of-an-object.json",
+                    "must-reject/call-statement-with-an-unknown-disposition.json",
+                    "must-reject/call-statement-with-a-negative-effect-count.json"}
+
+def _no_dups(pairs):
+    if len({k for k, _ in pairs}) != len(pairs):
+        raise ValueError("duplicate member name")
+    return dict(pairs)
+
 
 TYPES = {"object": dict, "array": list, "string": str, "boolean": bool, "null": type(None)}
 
@@ -64,6 +80,11 @@ def validate(v, s, doc, path="$"):
         for r in s.get("required", []):
             if r not in v:
                 errs.append(f"{path}: missing {r}")
+        for k, deps in s.get("dependentRequired", {}).items():
+            if k in v:
+                errs += [f"{path}: {k} requires {d}" for d in deps if d not in v]
+        if len(v) < s.get("minProperties", 0):
+            errs.append(f"{path}: too few members")
         props, pats = s.get("properties", {}), s.get("patternProperties", {})
         for k, x in v.items():
             if k in props:
@@ -109,7 +130,14 @@ def main():
                 continue
             n += 1
             name = f"{sub}/{f}"
-            packet = json.load(open(os.path.join(ROOT, "vectors", sub, f)))["packet"]
+            doc = json.load(open(os.path.join(ROOT, "vectors", sub, f)))
+            if "packet_text" in doc:   # text vectors test the parser; validate those whose text parses
+                try:
+                    packet = json.loads(doc["packet_text"], object_pairs_hook=_no_dups)
+                except ValueError:
+                    continue
+            else:
+                packet = doc["packet"]
             errs = validate(packet, SCHEMAS["packet.json"], SCHEMAS["packet.json"])
             lib_errs = [e.message for e in lib[0].iter_errors(packet)] if lib else None
             if lib is not None and bool(errs) != bool(lib_errs):   # the two validators must agree on every vector

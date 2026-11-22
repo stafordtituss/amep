@@ -1,0 +1,102 @@
+{
+ "name": "in-scope bulk read over the record limit",
+ "expect": {
+  "outcome": "violated",
+  "invariant": "I2"
+ },
+ "packet": {
+  "amep_version": "0.3",
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "crm.read"
+     ],
+     "resources": [
+      "crm:customers/*"
+     ],
+     "ceiling": "read",
+     "exp": 100,
+     "limits": [
+      {
+       "unit": "count:records",
+       "per_call": "500",
+       "actions": [
+        "crm.read"
+       ]
+      }
+     ]
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "9fc4be139692c3ab34057aa433f121517efcb5e92caf1f4c009b21e05eb3f25e14b5401cdad5235511fb10c3930eada7f7196643e7c9d9407a143244d28d9503"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "crm_api",
+    "version": "v1",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "46389acc69612858d5ac241839e4ab80b2dd878b5c85d54ecf598e62c95179170776d52545b50f4c1db45b255431f549e054af5c76ab8848ac0fa37302950300"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "m-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "crm.read",
+     "resource": "crm:customers/all",
+     "effect": "read"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "c6b3c630338e68c17ae7cd026b4408d947a25817f904287b1f5690aecc5919b244584268a1744d3ecc8b2b530b7e089d42e5f4fec87d0e0e77b58cfd9a1f3409"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "service:crm.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "crm.read",
+     "resource": "crm:customers/all",
+     "effect": "read",
+     "t": 11,
+     "value": {
+      "amount": "10000000",
+      "unit": "count:records"
+     }
+    },
+    "proof": {
+     "kid": "bank-observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "f7adb8c397a23413556619db0867f7d02ef87ab35dd7d9dec62f2b6a0537bd8d8ac9fe7ddabd68b2f9d06ef2282e207d43425a6898f98a3e5726123d63e9f101"
+    }
+   }
+  ]
+ }
+}

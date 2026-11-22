@@ -1,0 +1,122 @@
+{
+ "name": "high-impact call reported not executed by an independent observer",
+ "expect": {
+  "outcome": "preserved",
+  "invariant": "-"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "fs.*",
+      "process.exec"
+     ],
+     "resources": [
+      "repo:app/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "external_send",
+     "exp": 100,
+     "depth": 2
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "a74bd5bf40aa639d6538a09574c33f42edc8bc6eadfcf2e3cac6ceed94a042ea34040226d0ed73a108cf7768d9fd8a995ef4da4f76bdc1c834ddf30bb72bfc05"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "fs.write"
+     ],
+     "resources": [
+      "repo:app/src/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "external_send",
+     "exp": 90,
+     "depth": 1
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "00f621f3c8be1e0f8adbbcd8693149656f9e5880f4ca466306a129ec654fc6364f69640ce3e3dd91f8a7b95554eda05792bd5dae8bf52e215f69ea6e80557008"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "host_shell",
+    "version": "r9",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "39a6a8663dcd45b7c212805d517d108e3864048bd5b8146837d1d638a4138dca2ed75e828946f9e33e507e9c2efc26a71c216a2e698d868963db309d5523380c"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "external_send"
+    },
+    "actor": "agent:assistant-1",
+    "args_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "4ef4821039fbaa5fd06418c6672b99b3864dfb5398df90d0480fa1d9042d8349094cdce0e4c3ad72e35dbb628af229851f983fdd11ad307c41b1192cfa53e009"
+    }
+   }
+  ],
+  "effects": [],
+  "amep_version": "0.3",
+  "call_statements": [
+   {
+    "id": "c-1",
+    "kind": "call_statement",
+    "invocation": "i-1",
+    "observed_by": "proxy:egress",
+    "disposition": "not_executed",
+    "effect_count": 0,
+    "t": 12,
+    "invocation_digest": "52f05700d7165239eecae5cc72e7ad0e814d1732e12871282de112682412ed9a",
+    "args_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "0b07ba18a2f6d7dfb980d7eac271314b88b6c4aca73b5f4ea1fba48d64b56020b1e340622dff0b98d9fbf5f450e8221c77d0765701b7b89fb0db42fc288d0508"
+    }
+   }
+  ]
+ }
+}

@@ -34,7 +34,21 @@ schemas["common"] = {
         "data_flow": {"type": "string", "pattern": "^[a-z_]+->[a-z_]+$"},
         "proof": {"type": "object", "required": ["alg", "kid", "sig"], "additionalProperties": False,
                   "properties": {"alg": {"enum": ["Ed25519", "ES256"]}, "kid": {"type": "string", "minLength": 1},
-                                 "sig": {"type": "string", "minLength": 1}, "timestamp_token": {"type": "string"}}},
+                                 "sig": {"type": "string", "minLength": 1}, "timestamp_token": {"type": "string"},
+                                 "v": {"description": "Proof version (spec 12.2). Absent or 1: signs canon(object); 2: the domain-separated input. AMEP 0.3 packets require 2.",
+                                       "enum": [1, 2]}}},
+        "amount": {"description": "Exact decimal string (spec 5.9.2): no sign, exponent or leading zeros; at most 18 decimals.",
+                   "type": "string", "pattern": "^(0|[1-9][0-9]{0,38})(\\.[0-9]{1,18})?$"},
+        "unit": {"description": "Unit of a quantity: iso4217:EUR, caip19:<CAIP-19 id>, count:records, bytes:... (spec 5.9.2).",
+                 "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}:[!-~]{1,128}$"},
+        "value": {"type": "object", "required": ["amount", "unit"], "additionalProperties": False, "patternProperties": EXT,
+                  "properties": {"amount": {"$ref": "#/$defs/amount"}, "unit": {"$ref": "#/$defs/unit"},
+                                 "period_spent": {"$ref": "#/$defs/amount"}}},
+        "limit": {"type": "object", "required": ["unit"], "additionalProperties": False, "patternProperties": EXT,
+                  "dependentRequired": {"per_period": ["period"], "period": ["per_period"]},
+                  "properties": {"unit": {"$ref": "#/$defs/unit"}, "per_call": {"$ref": "#/$defs/amount"},
+                                 "per_period": {"$ref": "#/$defs/amount"}, "period": {"type": "integer", "minimum": 1},
+                                 "actions": {"type": "array", "items": {"type": "string"}}}},
         "claims": {"type": "object", "required": ["actions", "resources", "ceiling", "exp"], "additionalProperties": False,
                    "patternProperties": EXT,
                    "properties": {"actions": {"type": "array", "items": {"type": "string"}, "minItems": 1},
@@ -45,7 +59,8 @@ schemas["common"] = {
                                   "purpose": {"type": "string"},
                                   "deny_actions": {"type": "array", "items": {"type": "string"}},
                                   "deny_resources": {"type": "array", "items": {"type": "string"}},
-                                  "depth": {"type": "integer", "minimum": 0}, "budget": {"type": "integer", "minimum": 0}}},
+                                  "depth": {"type": "integer", "minimum": 0}, "budget": {"type": "integer", "minimum": 0},
+                                  "limits": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/limit"}}}},
         "declared": {"type": "object", "required": ["action", "resource", "effect"], "additionalProperties": False,
                      "properties": {"action": {"type": "string"}, "resource": {"type": "string"}, "effect": {"$ref": "#/$defs/effect_class"}}},
         "executed_body": {"type": "object", "required": ["action", "resource", "effect", "t"], "additionalProperties": False,
@@ -55,7 +70,8 @@ schemas["common"] = {
                                          "released": {"type": "array", "items": {"$ref": "#/$defs/data_flow"}},
                                          "reversible": {"type": "boolean"}, "t": {"$ref": "#/$defs/time"},
                                          "accessed": {"type": "array", "items": {"type": "string", "pattern": "^[a-z_]+$"}},
-                                         "recipient": {"type": "string", "pattern": "^[a-z_]+$"}}},
+                                         "recipient": {"type": "string", "pattern": "^[a-z_]+$"},
+                                         "value": {"$ref": "#/$defs/value"}}},
         "token": {"description": "Source token of a mandate or delegation (spec/profiles/). value only for expired or holder-bound tokens.",
                   "type": "object", "required": ["format", "digest"], "additionalProperties": False,
                   "properties": {"format": {"enum": ["biscuit", "macaroon", "ucan"]}, "block": {"type": "integer", "minimum": 0},
@@ -70,7 +86,9 @@ schemas["common"] = {
 schemas["mandate"] = obj("mandate", "PrincipalMandate (spec 5.4). Signed by a key with role issuer.", ["id", "principal", "claims"], {
     "id": ref("ref"), "principal": {"type": "string"}, "issuer": {"type": "string"}, "subject_agent": {"type": "string"},
     "claims": ref("claims"),
-    "revocation": {"type": "object", "required": ["status_ref"], "properties": {"status_ref": {"type": "string"}}, "additionalProperties": False},
+    "revocation": {"type": "object", "additionalProperties": False, "minProperties": 1,
+                   "properties": {"status_ref": {"type": "string"},
+                                  "window": {"description": "Propagation window in seconds (spec 5.12.1).", "type": "number", "minimum": 0}}},
     "token": ref("token"), "proof": ref("proof")}, "mandate")
 schemas["delegation"] = obj("delegation", "Delegation (spec 5.5). Signed by a key with role issuer or host.", ["id", "parent", "claims"], {
     "id": ref("ref"), "parent": ref("ref"), "delegate": {"type": "string"}, "claims": ref("claims"),
@@ -87,11 +105,18 @@ schemas["invocation"] = obj("invocation", "Invocation (spec 5.8). Signed by role
     "influenced_by": {"type": "array", "items": ref("ref")}, "principal_confirmed": {"type": "boolean"},
     "derived_from": {"type": "array", "items": ref("ref")},
     "budget_spent": {"type": "integer", "minimum": 0},
+    "args_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "correlation": {"type": "object", "additionalProperties": False, "properties": {k: {"type": "string"} for k in ("session_ref", "prompt_ref", "tool_use_ref", "traceparent")}},
     "proof": ref("proof")}, "invocation")
 schemas["effect"] = obj("effect", "ExecutedEffectReceipt (spec 5.9). Signed by role observer.", ["id", "invocation", "observed_by", "assurance", "executed"], {
     "id": ref("ref"), "invocation": ref("ref"), "observed_by": {"type": "string"}, "assurance": ref("assurance"),
-    "executed": ref("executed_body"), "backend_receipt": {}, "proof": ref("proof")}, "effect")
+    "executed": ref("executed_body"), "backend_receipt": {}, "invocation_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "proof": ref("proof")}, "effect")
+schemas["call_statement"] = obj("call_statement", "CallStatement (spec 5.14). Signed by role observer: the observer's account of one tool call.",
+    ["invocation", "observed_by", "disposition", "effect_count", "t"], {
+    "id": ref("ref"), "invocation": ref("ref"), "observed_by": {"type": "string"},
+    "disposition": {"enum": ["completed", "not_executed", "failed_after_effects"]},
+    "effect_count": {"type": "integer", "minimum": 0}, "t": ref("time"),
+    "invocation_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "args_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "proof": ref("proof")}, "call_statement")
 schemas["approval"] = obj("approval", "ApprovalBinding (spec 5.10). Signed by role approver. The digest excludes t.", ["id", "effect_digest", "presence"], {
     "id": ref("ref"), "effect_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "presence": {"enum": ["webauthn", "chat_user", "host_ui", "none"]}, "approver": {"type": "string"},
@@ -122,7 +147,7 @@ schemas["packet"] = obj("packet", "A packet of AMEP objects submitted for evalua
     "amep_version": {"type": "string"}, "mandates": arr("mandate"), "delegations": arr("delegation"), "intents": arr("intent"),
     "interpretations": arr("interpretation"), "invocations": arr("invocation"), "effects": arr("effect"),
     "approvals": arr("approval"), "revocations": arr("revocation"), "statuses": arr("status"), "findings": arr("finding"),
-    "decisions": arr("decision"), "pinned_adapters": {"type": "object", "additionalProperties": {"type": "string"}}})
+    "decisions": arr("decision"), "call_statements": arr("call_statement"), "pinned_adapters": {"type": "object", "additionalProperties": {"type": "string"}}})
 schemas["keyset"] = {
     "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": BASE + "keyset.json", "title": "keyset",
     "description": "Key set served at /.well-known/amep-keys.json (spec 12.4, 12.5).", "type": "object",

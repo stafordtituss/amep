@@ -31,15 +31,18 @@
   },
   "revocation": {
    "type": "object",
-   "required": [
-    "status_ref"
-   ],
+   "additionalProperties": false,
+   "minProperties": 1,
    "properties": {
     "status_ref": {
      "type": "string"
+    },
+    "window": {
+     "description": "Propagation window in seconds (spec 5.12.1).",
+     "type": "number",
+     "minimum": 0
     }
-   },
-   "additionalProperties": false
+   }
   },
   "token": {
    "$ref": "common.json#/$defs/token"

@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | **Document** | `amep-core` |
-| **Version** | 0.2.0-draft.4 |
-| **Date** | 2026-11-17 |
+| **Version** | 0.3.0-draft.1 (working draft; v0.2 packets evaluate as before, see Section 16) |
+| **Date** | 2026-11-22 |
 | **Status** | Public Draft. Not endorsed by any standards body. |
 | **Author and editor** | Staford Titus Selvaraj (Independent) |
 | **Repository** | https://github.com/stafordtituss/amep |
@@ -95,7 +95,7 @@ AMEP does not:
 
 ### 1.4 Scope of this document
 
-This document is the **core**: data model, claim algebra, invariants, evaluation, cryptography and conformance. Bindings (Section 13) and profiles (Section 14) are summarized here and specified in companion documents. Objects marked *reserved* in Section 5.14 are named so that implementations do not collide with them, but are not normative in v0.2.
+This document is the **core**: data model, claim algebra, invariants, evaluation, cryptography and conformance. Bindings (Section 13) and profiles (Section 14) are summarized here and specified in companion documents. Objects marked *reserved* in Section 5.15 are named so that implementations do not collide with them, but are not normative in v0.2.
 
 ---
 
@@ -241,7 +241,10 @@ A packet groups the objects to be evaluated. All members are OPTIONAL arrays exc
 | `statuses` | Revocation status assertions |
 | `findings` | ContentFinding objects |
 | `decisions` | ContinuityDecision objects |
+| `call_statements` | CallStatement objects (Section 5.14) *(v0.3)* |
 | `pinned_adapters` | map of adapter id → approved version |
+
+Object `id`s are unique within a packet (v0.3): a packet in which two objects share an `id` is malformed, and every invocation in it is `unresolved` (I7). Otherwise a receipt or statement could be read as evidence for the wrong object.
 
 Unknown members whose names begin with `x-` MUST be ignored by verifiers. Unknown members without the prefix SHOULD cause a verifier to report a warning and MUST NOT change the outcome.
 
@@ -264,6 +267,7 @@ A claim set states what may be done. It appears in mandates, delegations and int
 Denies let a claim set say "everything under this prefix except…", which allow-lists alone cannot express. Denies only ever grow along a chain (Section 7.1), and an intent cannot lift one (Section 7.3).
 | `depth` | unsigned integer | no | Remaining delegation depth (Section 7.2). |
 | `budget` | unsigned integer | no | Risk budget in points (Section 9). |
+| `limits` | array of limits | no | Caps on quantities, such as money moved or records read, per call and per period (Section 7.6). *(v0.3)* |
 
 ### 5.4 PrincipalMandate (`kind: "mandate"`)
 
@@ -343,6 +347,7 @@ A declared call.
 | `principal_confirmed` | no | `true` if the principal confirmed this invocation after seeing the influence. |
 | `derived_from` | no | `id`s of **earlier** invocations whose outputs fed this one (Section 5.9.1). |
 | `budget_spent` | no | Points charged for this invocation (Section 9). |
+| `args_digest` | no | SHA-256 (lowercase hex) of the canonical form of the arguments the host sent with the call (Section 5.14). *(v0.3)* |
 | `correlation` | no | Section 4.3. |
 | `proof` | **yes**¹ | Signed by the host or PEP, not by the model. |
 
@@ -358,6 +363,7 @@ What was executed, recorded by an observer.
 | `assurance` | **yes** | `L0`–`L3` (Section 5.1.4). |
 | `executed` | **yes** | Executed-effect body (below). |
 | `backend_receipt` | no | Opaque receipt from the receiving system (L3). |
+| `invocation_digest` | no | SHA-256 of the canonical form of the signed invocation, **including its proof**, that this effect results from (Section 5.14). *(v0.3)* |
 | `proof` | **yes**¹ | Signed by the observer. |
 
 **Executed-effect body:**
@@ -372,6 +378,18 @@ What was executed, recorded by an observer.
 | `accessed` | no | Data classes this effect read or obtained, for example `["confidential"]` (Section 5.9.1). |
 | `recipient` | no | Recipient class of what this effect sent or wrote, for example `external` (Section 5.9.1). |
 | `t` | **yes** | Time of execution. |
+
+#### 5.9.2 Quantities *(v0.3)*
+
+The executed-effect body MAY carry `value`, the quantity the effect moved or touched:
+
+| Field | Req. | Meaning |
+|---|---|---|
+| `amount` | **yes** | An exact decimal **string**: `0` or a digit 1–9 followed by at most 38 digits, optionally a `.` and 1–18 digits. No sign, exponent or leading zeros. For money it is the total debited from the principal, fees included; with currency conversion, the debit side. |
+| `unit` | **yes** | `namespace:identifier`, matching `[a-z][a-z0-9-]{0,31}:[!-~]{1,128}`. Money uses `iso4217:` (for example `iso4217:EUR`) or `caip19:` followed by a CAIP-19 asset id. Other quantities use, for example, `count:records`, `count:messages` or `bytes:…`. Units are compared as exact strings; a Verifier never converts between units. |
+| `period_spent` | no | The observer's own total for the current period, including this effect, in the same unit (Section 7.6). Signed with the receipt. |
+
+Amounts are compared as exact decimals, never as binary floating point. A Producer MUST encode amounts as strings; a `value` that does not match this grammar makes the result `unresolved` (I7). Refunds are separate effects: an amount is never negative, so one effect cannot offset another.
 
 #### 5.9.1 Data lineage
 
@@ -448,9 +466,13 @@ Whoever assembles a packet could simply leave a revocation out. AMEP therefore t
 
 Rules (applied in Section 10.2 step 6):
 
-1. A **signed** revocation, or a signed status with `revoked_at`, at or before the invocation time makes the result `violated` (I6).
+1. A **signed** revocation, or a signed status with `revoked_at`, at or before the invocation time **or the time of any effect of the invocation** makes the result `violated` (I6). *(v0.3: effect times were added. A "preserved" result now establishes that authority was in force when each effect occurred, not only when the call was made. Raised by Cliff Singletary on the IETF audit list, 19 November 2026.)*
 2. An **unsigned or unverifiable** revocation targeting the chain makes the result `unresolved` (I7). It can neither be trusted nor safely ignored.
-3. For every chain element that carries `revocation.status_ref`, the packet MUST contain a signed status with `as_of` at or after the invocation time. Otherwise the result is `unresolved` (I7).
+3. For every chain element that carries `revocation.status_ref`, the packet MUST contain a signed status with `as_of` at or after the invocation time **and at or after each effect's time**. Otherwise the result is `unresolved` (I7).
+
+#### 5.12.1 Propagation window *(v0.3)*
+
+A mandate or delegation MAY declare `revocation.window`, a non-negative number of seconds, signed with it. When a revocation of that node takes effect at time r, an invocation or effect at time t with r ≤ t < r + window is `unresolved` (I6) rather than `violated`: authority was withdrawn while the action was in flight, and no party may have been able to stop it in time. At or after r + window it is `violated` (I6). An absent window is 0, which is the behaviour of rule 1. Because the window is part of the signed node, a packet's assembler cannot widen it.
 
 Profiles that need high assurance SHOULD require `revocation.status_ref` on every mandate.
 
@@ -512,7 +534,36 @@ The same "deny" means different things on a host that blocks the action when the
 | `encoded_as` | no | What the host actually received, for example `deny+approval_link`. |
 | `applied` | no | `confirmed`, `not_observed` or `contradicted`, from the effect record with the same `tool_use_ref`. |
 
-### 5.14 Reserved objects (informative)
+### 5.14 CallStatement (`kind: "call_statement"`) *(v0.3)*
+
+The observer's signed account of one call. Receipts say what was executed. A call statement also says what *was not*, and how many receipts belong to the call, so that a missing receipt can be told apart from an effect that never happened. It also binds the call to one exact signed invocation and to the arguments the executing party received.
+
+| Field | Req. | Meaning |
+|---|---|---|
+| `id`, `kind` | **yes** | |
+| `invocation` | **yes** | `id` of the invocation. |
+| `observed_by` | **yes** | Identifier of the observer, as in its receipts. |
+| `disposition` | **yes** | `completed`, `not_executed` (nothing was executed), or `failed_after_effects` (the call failed after executing the effects it counts). |
+| `effect_count` | **yes** | Number of receipts this observer issued for the call. `0` when `not_executed`. |
+| `t` | **yes** | Time of the statement. |
+| `invocation_digest` | no | As in Section 5.9: binds the statement to the exact signed invocation. |
+| `args_digest` | no | SHA-256 of the canonical form of the arguments the observer received. |
+| `proof` | **yes**¹ | Signed by a key with role `observer`. |
+
+Rules (applied in Section 10.2, before the receipts are checked):
+
+1. A statement that does not verify, has an unknown `disposition`, a negative or non-integer `effect_count`, or `not_executed` with a non-zero `effect_count` makes the result `unresolved` (I7).
+2. A statement or receipt whose `invocation_digest` differs from the digest of the invocation in the packet is not evidence for that invocation: `unresolved` (I7). A genuine receipt for one call therefore cannot be presented for another call that reuses its `id`.
+3. If the invocation carries `args_digest` and a statement's `args_digest` differs, the call was changed between the host and the observer: `violated` (I2), or `unresolved` (I7) when the statement says `not_executed`.
+4. A receipt for an invocation that a statement says was `not_executed` is equivocation: `violated` (I11).
+5. With no receipts and a verified `not_executed` statement, the invocation provably had no effect, and its evaluation ends with `preserved`. For a call declared `write_shared` or above, the statement must come from an observer other than the actor; otherwise `unresolved` (I10).
+6. For each statement, if its observer issued more receipts than `effect_count`, the result is `violated` (I7); if fewer, `unresolved` (I7): a receipt was lost or withheld.
+
+Statements are OPTIONAL in the core; bindings MAY require them. The MCP binding requires them from every server that advertises revision 0.3 of the evidence extension.
+
+**Minting.** Receipts and statements MUST be produced on the execution path: by the code that performs the effect, as it performs it, and before the result is returned. A receipt reconstructed afterwards from logs or traces attests to the logging pipeline, not to the effect, and MUST NOT claim an assurance level above L1. L3 requires a `backend_receipt` from the system that executed the effect.
+
+### 5.15 Reserved objects (informative)
 
 The following object kinds are reserved for v0.3 and MUST NOT be used with other meanings: `memory` (MemoryRecord), `lineage` (DataLineageRecord), `responsibility` (ResponsibilityAssignment), `workflow_decision` (WorkflowContinuityDecision), `threat_case` (ThreatCase).
 
@@ -564,7 +615,8 @@ For claim sets C₁ (child) and C₂ (parent), **C₁ ⊑ C₂** (C₁ is equal 
 6. `C₁.purpose == C₂.purpose`, or `C₂.purpose` is absent;
 7. every pattern in `C₂.deny_actions` is subsumed by some pattern in `C₁.deny_actions`, and likewise for `deny_resources` (the child denies at least everything the parent denies);
 8. the depth rule (Section 7.2) holds;
-8. when `C₂.budget` is present, `C₁.budget ≤ C₂.budget`, where an absent `C₁.budget` is taken to equal `C₂.budget`.
+9. when `C₂.budget` is present, `C₁.budget ≤ C₂.budget`, where an absent `C₁.budget` is taken to equal `C₂.budget`;
+10. for every limit in `C₂.limits` and every limit in `C₁.limits` with the same `unit` and `actions`: `C₁.per_call ≤ C₂.per_call` when both are present, and `C₁.per_period ≤ C₂.per_period` when both are present with the same `period`. A child MAY add limits. *(v0.3)*
 
 ### 7.2 Delegation depth
 
@@ -601,6 +653,27 @@ An executed-effect body x **satisfies** claim set C (written x ⊨ C) if and onl
 6. every data flow in `x.released` is in `C.data`;
 7. `x.t ≤ C.exp`, and `x.t ≥ C.nbf` when `C.nbf` is present.
 
+### 7.6 Limits *(v0.3)*
+
+A limit caps a quantity (Section 5.9.2). The risk budget (Section 9) bounds autonomy in points across unlike effects; a limit bounds an amount in one unit. Both apply.
+
+| Field | Req. | Meaning |
+|---|---|---|
+| `unit` | **yes** | The unit capped. |
+| `per_call` | no | Maximum amount of one effect. |
+| `per_period`, `period` | together | Maximum total within a period of `period` seconds. Periods are fixed windows starting at the node's `nbf`, or at time 0 when `nbf` is absent. |
+| `actions` | no | Action patterns the limit applies to. Absent: the limit applies to every `financial` effect. |
+
+For every executed body x and every node N on the chain (and the intent) that carries `limits`, with the limits of N that apply to x:
+
+1. If x carries no `value`: `unresolved` (I7).
+2. If no applicable limit has x's unit: `violated` (I2) when x is `financial` or its unit is a money unit (an asset N does not authorize); otherwise `unresolved` (I7).
+3. If `amount > per_call` and the invocation has no approval that passed I8: `violated` (I2).
+4. The period total of N for that unit and window is the Verifier's running total (in this packet, plus verifier state across packets, Section 10.7) plus `amount`. If x carries `period_spent` and it is below that total: `violated` (I7, accounting mismatch); otherwise `period_spent` is the total. If the total exceeds `per_period` without an approval that passed I8: `violated` (I2).
+5. If no `period_spent` is present and the Verifier has no earlier state for that window: `unresolved` (I7). A packet's assembler could leave out earlier effects, so a period total is never assumed to start at zero.
+
+An approval authorizes exceeding a limit for its one effect. The approved amount still counts toward the period total, so one approval cannot unlock later unapproved spending.
+
 ### 7.5 Properties *(informative)*
 
 - **Monotonicity:** adding a hop never widens effective claims.
@@ -620,7 +693,7 @@ Each invariant states a property of a chain of evidence. Section 10 defines the 
 | **I3** | Interpretation | The invocation was interpreted by an approved mapping (`curated` or `customer`) whose version matches the pinned version, when pins exist. | `unresolved` |
 | **I4** | Influence | Content withheld by a pre-execution quarantine did not reach any later invocation unless the principal promoted it; and a non-`read` invocation influenced by content that is not signed-and-trusted (Section 5.11) was confirmed by the principal. | `violated` if executed, otherwise `unresolved` |
 | **I5** | Release | Every data flow released is permitted by the effective claims. | `violated` |
-| **I6** | Liveness | No mandate or delegation on the chain was revoked, per signed revocation evidence, at or before the time of the invocation. | `violated` |
+| **I6** | Liveness | No mandate or delegation on the chain was revoked, per signed revocation evidence, at or before the time of the invocation **or of any of its effects** (v0.3). A revocation still inside the revoked node's declared propagation window is `unresolved` (Section 5.12). | `violated` (`unresolved` inside a propagation window) |
 | **I7** | Evidence | All evidence the evaluation needs is present, well-formed, signed by a key holding a permitted role, and fresh where freshness is required; recorded accounting matches recomputation. | `unresolved` (`violated` for an accounting mismatch) |
 | **I8** | Approval binding | An approval cited by an invocation matches the executed effect body (without `t`), is within its validity window, is unconsumed, and is used only once. | `violated` |
 | **I9** | Self-protection | No agent invocation targets, or executes against, a protected resource: guardrail configuration, keys, agent instruction files, or the evidence store. | `violated` |
@@ -825,7 +898,14 @@ The canonical form `canon(o)` of an object is its JSON Canonicalization Scheme s
 
 *Note:* JCS sorts members by **UTF-16 code unit**, not by code point, and serializes numbers exactly as ECMAScript's `Number.prototype.toString`. Generic "sorted keys, no whitespace" serializers get both wrong for some inputs. The vector `jcs-canonical-form--unicode-keys--floats` contains member names on both sides of the surrogate range and non-integer numbers, and fails on any implementation that does not follow RFC 8785 exactly.
 
-**Number range.** JSON does not distinguish integers from other numbers, and implementations parse numbers differently: ECMAScript maps every number to an IEEE 754 double, while other languages keep integers exact. A number whose magnitude exceeds 2^53 − 1, the safe-integer range of I-JSON [RFC7493], can therefore canonicalize to different bytes in different Verifiers, so that the same signed packet verifies in one and not in another, and one approval digest can cover two different values. Producers MUST NOT emit such numbers. A Verifier MUST treat a packet that contains one, anywhere, as malformed: every invocation in it is `unresolved` (I7). The range applies to every number, because a Verifier cannot tell `1e21` from `1000000000000000000000` after parsing. Values whose exact identity matters, such as amounts and identifiers, SHOULD be strings (for example `"amount": "1200.00"`).
+**Number range.** JSON does not distinguish integers from other numbers, and implementations parse numbers differently: ECMAScript maps every number to an IEEE 754 double, while other languages keep integers exact. A number whose magnitude exceeds 2^53 − 1, the safe-integer range of I-JSON [RFC7493], can therefore canonicalize to different bytes in different Verifiers, so that the same signed packet verifies in one and not in another, and one approval digest can cover two different values. Producers MUST NOT emit such numbers. A Verifier MUST treat a packet that contains one, anywhere, as malformed: every invocation in it is `unresolved` (I7). The range applies to every number, because a Verifier cannot tell `1e21` from `1000000000000000000000` after parsing. Values whose exact identity matters, such as amounts and identifiers, SHOULD be strings (for example `"amount": "1200.00"`); the amounts of Section 5.9.2 MUST be.
+
+**Well-formedness (v0.3).** A Verifier MUST treat a packet as malformed, making every invocation `unresolved` (I7), when:
+
+- an object has two members with the same name. RFC 7493 requires unique names, and parsers disagree on duplicates (first wins, last wins, error): a packet carrying `"resource"` twice could be verified under one value and displayed under the other. Until v0.3 both reference verifiers silently kept the last value;
+- a string or member name contains a lone surrogate or a noncharacter (RFC 7493 Section 2.1);
+- an `action` or `resource`, or a pattern in `actions`, `resources`, `deny_actions` or `deny_resources`, contains a control character (U+0000–U+001F, U+007F–U+009F) or is not in Unicode Normalization Form C. Verifiers never normalize identifiers; a Producer MUST emit them in NFC, so that two identifiers that look the same also compare the same;
+- nesting exceeds 32 levels, an array has more than 4096 elements, a string exceeds 8192 bytes of UTF-8, or a member name exceeds 256 bytes.
 
 **Number literals.** Two decimal literals that denote the same double (for example `1200` and `1200.0000000000000001`) share one canonical form and one approval digest. A Verifier that parses packets from text SHOULD reject a non-integer number literal whose decimal value differs from the double it denotes. The reference packages do this in their command-line tools (`parse_strict`, `parseStrict`).
 
@@ -839,6 +919,20 @@ The signing input of an object is `canon(o′)`, where `o′` is `o` with the `p
 - Hybrid post-quantum signatures (ML-DSA) are OPTIONAL for archival profiles.
 
 Deployments MAY instead wrap objects in COSE_Sign1 [RFC9052] over deterministic CBOR [RFC8949], or in JWS over the canonical form. A CDDL definition of the v0.2 objects (`schemas/amep-v0.2.cddl`) and JSON Schemas (`schemas/v0.2/`) are published alongside this document.
+
+**Version-2 proofs (v0.3).** A proof MAY carry `"v": 2`. Its signing input is domain-separated:
+
+```
+"AMEP-v0.3" 0x00 kind 0x00 canon(o′)
+```
+
+where `kind` is the object's `kind` (empty if absent). A signature that the same key made over the same canonical bytes for another object kind, or for another system, therefore never verifies as this object. A proof without `v` (or with `v: 1`) signs `canon(o′)`, exactly as in v0.2. Relabelling a version-1 signature as version 2 changes the signing input, so it fails. A packet that declares `"amep_version": "0.3"` MUST use version-2 proofs on every object, and a Verifier MUST treat any other proof in such a packet as invalid.
+
+**Exact Ed25519 acceptance (v0.3).** Ed25519 libraries disagree on edge cases. With OpenSSL 3.6, the identity public key (`01` followed by 31 zero bytes) accepts the signature R = identity, S = 0 for every message, while OpenSSL 4.1 rejects it, so two conforming Verifiers returned different verdicts on one packet. Before calling a library, a Verifier MUST reject:
+
+- a signature whose S (its last 32 bytes, little-endian) is not less than the group order L = 2^252 + 27742317777372353535851937790883648493;
+- a public key A or commitment R (the signature's first 32 bytes) whose encoding is non-canonical (y ≥ 2^255 − 19 after clearing the top bit) or is a point of small order (y ∈ {0, 1, p − 1} or one of the two y values of the order-8 points);
+- a key `x` that is not exactly 64, or a `sig` that is not exactly 128, lowercase hexadecimal digits.
 
 ### 12.3 Digests
 
@@ -868,6 +962,7 @@ A valid signature only shows that a key signed an object. It does not show that 
 | `effect` | `observer` |
 | `approval` | `approver` |
 | `finding` | `host`, `observer` |
+| `call_statement` | `observer` *(v0.3)* |
 
 Deployments SHOULD keep `approver` keys in hardware bound to a person (for example, a WebAuthn authenticator), and SHOULD give `host` and `observer` roles to different keys, so that one compromised key cannot both act and attest.
 
@@ -971,6 +1066,9 @@ Every normative change to this specification MUST be accompanied by at least one
 - The specification, schemas and suite are versioned together using Semantic Versioning. Before 1.0, a minor version MAY contain breaking changes; after 1.0, breaking changes require a major version and a deprecation window of at least six months.
 - A packet MAY declare `"amep_version": "0.2"`. Verifiers SHOULD reject packets declaring a major/minor version they do not implement.
 - Extension members MUST use the `x-` prefix, or a reverse-DNS prefix (for example, `com.example.field`). Extensions MUST NOT change the outcome of the evaluation in Section 10. Extensions that need to change outcomes are profiles (Section 14).
+- **Unknown claim members (v0.3).** In a packet that declares `"amep_version": "0.3"`, a claim member (or a member of a limit) that is neither defined by this specification nor an extension member makes the result `unresolved` (I7). A Verifier that ignored a constraint it does not implement would report `preserved` for evidence the constraint forbids: a silent downgrade. Packets without `amep_version` (or with `"0.2"`) keep the v0.2 behaviour, so existing producers are unaffected.
+- A Verifier MUST treat a packet that declares an `amep_version` other than `"0.2"` or `"0.3"` as malformed (`unresolved`, I7).
+- **Compatibility of v0.3.** Every v0.2 conformance vector keeps its verdict, with one deliberate exception that closes a gap: revocation status must be fresh as of each effect's time (Section 5.12, rule 3), so the vector `status-current-as-of-the-action` now carries a status as of the effect. The v0.3 rules that change outcomes for packets without new members (duplicate names, Unicode and bounds, the Ed25519 acceptance rule, liveness at effect time) close security gaps.
 
 ---
 
@@ -987,6 +1085,9 @@ Every normative change to this specification MUST be accompanied by at least one
 - **Selective logging and equivocation.** Producers SHOULD include sequence numbers and heartbeats; high-assurance profiles SHOULD use transparency logs with witnesses (Section 12.5). An absent record is `unresolved`, never `preserved`, which limits but does not eliminate the effect of suppression.
 - **Time manipulation.** Revocation and expiry depend on time. Producers SHOULD use trusted time sources; verifiers SHOULD treat clock skew beyond a declared tolerance as `unresolved`.
 - **Algorithm downgrade.** Algorithms are pinned per key (Section 12.2).
+- **Parser and signature differentials (v0.3).** Two Verifiers that parse or verify the same bytes differently can be played against each other. AMEP closes the cases found so far by rule: unique member names, exact number literals, NFC identifiers, input bounds (Section 12.1), and one exact Ed25519 acceptance rule (Section 12.2).
+- **Cross-protocol signature reuse (v0.3).** Version-2 proofs are domain-separated (Section 12.2), so a key that also signs data outside AMEP cannot have those signatures presented as AMEP evidence.
+- **Unbounded quantities (v0.3).** Scope and ceiling do not bound how much an in-scope effect moves: a payment of any amount to an allowed payee, or a read of every record of an allowed table. Limits (Section 7.6) bound it, and a period total is never assumed to start at zero.
 - **Cross-audience replay.** Profiles SHOULD bind mandates to an audience and invocations to a session.
 - **Token theft.** Mandates bound to keys SHOULD use proof of possession (DPoP or mTLS).
 - **Compromised adapters or observers.** High-assurance profiles SHOULD require more than one independent observer for `destructive` and `financial` effects.
@@ -1116,31 +1217,32 @@ Packet verdict: `violated`, I6. The sub-agent's own delegation was valid; its au
 
 ---
 
-## Appendix B. Conformance vector index (suite v0.2.2)
+## Appendix B. Conformance vector index (suite v0.3.0)
 
 <!-- vector-index:start -->
 *Generated by `tools/vector_index.py`; regenerate it whenever the suite changes.*
 
-Suite: 118 vectors (34 positive, 84 must-reject).
+Suite: 189 vectors (50 positive, 139 must-reject).
 
-**Positive (expect `preserved`):** `action-under-a-mandate-with-rfc-3339-validity`, `approval-used-at-its-expiry-instant`, `approval-valid-from-the-instant-of-the-action`, `approved-adapter-revision--pinned`, `budget-from-earlier-packets-still-within-limit`, `build-cleanup-within-scope`, `delegation-adds-a-deny`, `delegation-expiring-with-its-parent`, `delegation-keeps-the-parent-s-full-budget`, `deny-honoured-on-fail-closed-host--no-effect`, `derived-data-sent-to-an-allowed-recipient`, `effect-at-the-first-instant-of-validity`, `effect-at-the-last-instant-of-validity`, `extension-number-at-the-largest-i-json-integer`, `fresh-revocation-status`, `independently-observed-high-impact-effect`, `influence-confirmed-by-principal`, `influenced-read-only-action`, `jcs-canonical-form--unicode-keys--floats`, `mediated-effect-honored`, `mutation-influenced-only-by-trusted-content`, `quarantined-content-promoted-by-the-principal`, `reversible-write-is-cheaper`, `revoked-after-the-action--still-preserved`, `rfc-3339-timestamps`, `risk-budget-exceeded--human-approved`, `same-effect-observed-twice--host-and-backend`, `simulated-deny-is-not-enforcement`, `status-current-as-of-the-action`, `two-hop-chain-within-bounds`, `valid-bound-approval`, `valid-preserved-flow`, `validity-window-and-purpose-carried-through`, `within-risk-budget`.
+**Positive (expect `preserved`):** `action-under-a-mandate-with-rfc-3339-validity`, `amep-0-3-extension-claim-member-is-ignored`, `amep-0-3-packet-with-domain-separated-proofs`, `approval-used-at-its-expiry-instant`, `approval-valid-from-the-instant-of-the-action`, `approved-adapter-revision--pinned`, `budget-from-earlier-packets-still-within-limit`, `build-cleanup-within-scope`, `bulk-read-within-the-record-limit`, `call-failed-after-its-effects--counts-consistent`, `call-statement-and-receipt-bound-to-the-signed-invocation`, `delegation-adds-a-deny`, `delegation-adds-a-stricter-limit`, `delegation-expiring-with-its-parent`, `delegation-keeps-the-parent-s-full-budget`, `deny-honoured-on-fail-closed-host--no-effect`, `derived-data-sent-to-an-allowed-recipient`, `effect-at-the-first-instant-of-validity`, `effect-at-the-last-instant-of-validity`, `extension-number-at-the-largest-i-json-integer`, `fresh-revocation-status`, `high-impact-call-reported-not-executed-by-an-independent-observer`, `identifier-in-nfc-with-non-ascii-characters`, `independently-observed-high-impact-effect`, `influence-confirmed-by-principal`, `influenced-read-only-action`, `jcs-canonical-form--unicode-keys--floats`, `mediated-effect-honored`, `mutation-influenced-only-by-trusted-content`, `nesting-at-the-depth-bound`, `payment-over-the-per-call-limit-with-a-bound-approval`, `payment-within-the-per-call-limit`, `payments-within-the-period-limit--observer-total-consistent`, `quarantined-content-promoted-by-the-principal`, `reversible-write-is-cheaper`, `revoked-after-the-action--still-preserved`, `revoked-after-the-last-effect`, `rfc-3339-timestamps`, `risk-budget-exceeded--human-approved`, `same-effect-observed-twice--host-and-backend`, `signed-statement-that-nothing-was-executed`, `simulated-deny-is-not-enforcement`, `status-current-as-of-the-action`, `two-hop-chain-within-bounds`, `unversioned-packet-keeps-v0-2-handling-of-unknown-claim-members`, `valid-bound-approval`, `valid-preserved-flow`, `validity-window-and-purpose-carried-through`, `well-formed-packet-given-as-text`, `within-risk-budget`.
 
 **Must-reject:**
 
 | Invariant | Outcome | Vectors |
 |---|---|---|
-| I1 | violated | `delegation-adds-data-class`, `delegation-changes-purpose`, `delegation-depth-not-decreasing`, `delegation-drops-nbf`, `delegation-extends-validity`, `delegation-from-a-zero-depth-parent`, `delegation-removes-a-deny`, `delegation-widens-actions`, `delegation-widens-resources`, `delegation-widens-risk-budget`, `delegation-without-depth-under-bounded-parent`, `expand-then-shrink-delegation` |
-| I2 | violated | `action-outside-delegated-actions`, `budget-spent-in-earlier-packets`, `cumulative-spend-exceeds-budget`, `declared----executed--path-retarget`, `denied-action`, `destructive-command-drift--a3`, `effect-after-a-mandate-s-rfc-3339-expiry`, `effect-after-mandate-validity`, `effect-before-a-mandate-s-rfc-3339-nbf`, `effect-before-validity--nbf`, `effect-class-above-delegated-ceiling`, `effect-on-a-denied-resource`, `effect-outside-delegated-scope`, `intent-cannot-lift-a-deny`, `intent-narrower-than-grant`, `lying-adapter-caught-by-backend--l3`, `mediated-effect-not-honored`, `rfc-3339-effect-after-expiry`, `risk-budget-exceeded-without-approval`, `second-effect-outside-declared`, `violation-outranks-unresolved-in-one-packet` |
+| I1 | violated | `delegation-adds-data-class`, `delegation-changes-purpose`, `delegation-depth-not-decreasing`, `delegation-drops-nbf`, `delegation-extends-validity`, `delegation-from-a-zero-depth-parent`, `delegation-raises-the-per-call-limit`, `delegation-removes-a-deny`, `delegation-widens-actions`, `delegation-widens-resources`, `delegation-widens-risk-budget`, `delegation-without-depth-under-bounded-parent`, `expand-then-shrink-delegation` |
+| I2 | violated | `action-outside-delegated-actions`, `approved-payment-still-counts-toward-the-period-limit`, `arguments-rewritten-in-transit`, `budget-spent-in-earlier-packets`, `cumulative-spend-exceeds-budget`, `declared----executed--path-retarget`, `delegation-s-stricter-limit-is-enforced`, `denied-action`, `destructive-command-drift--a3`, `effect-after-a-mandate-s-rfc-3339-expiry`, `effect-after-mandate-validity`, `effect-before-a-mandate-s-rfc-3339-nbf`, `effect-before-validity--nbf`, `effect-class-above-delegated-ceiling`, `effect-on-a-denied-resource`, `effect-outside-delegated-scope`, `in-scope-bulk-read-over-the-record-limit`, `intent-cannot-lift-a-deny`, `intent-narrower-than-grant`, `lying-adapter-caught-by-backend--l3`, `mediated-effect-not-honored`, `payment-in-an-asset-the-mandate-does-not-authorize`, `payment-over-the-per-call-limit-without-approval`, `payments-each-within-the-per-call-limit-but-over-the-period-limit`, `period-limit-carried-across-packets-in-verifier-state`, `rfc-3339-effect-after-expiry`, `risk-budget-exceeded-without-approval`, `second-effect-outside-declared`, `violation-outranks-unresolved-in-one-packet` |
 | I3 | unresolved | `interpretation-from-provider-hint-only`, `unapproved-adapter-revision`, `unknown-interpretation` |
 | I4 | violated | `injection-driven-mutation`, `quarantined-content-reached-the-agent--a1`, `unsigned-finding-claims-trusted` |
 | I5 | violated | `data-leaving-after-a-read--a5`, `secret-released-externally--i5` |
-| I6 | violated | `revoked-at-the-instant-of-the-action`, `revoked-root-with-live-child`, `status-shows-revocation-at-the-instant-of-the-action`, `status-shows-revoked-before-action` |
-| I7 | unresolved | `deny-on-fail-open-host--no-effect-record`, `extension-float-1e21--outside-the-safe-range`, `extension-number-2-53---1--which-ecmascript-cannot-represent`, `extension-number-at-2-53--outside-i-json`, `forged-mandate--attacker-key`, `identity-only-authorization--no-mandate`, `intent-reference-names-a-non-intent-object`, `intent-reference-unresolved`, `invocation-signed-by-unknown-key`, `lineage-reference-not-found`, `malformed-timestamp`, `mandate-minted-by-host-key`, `missing-effect-receipt`, `missing-parent-lineage`, `post-execution-decision-cannot-claim-a-block`, `revocable-mandate-without-status`, `self-approval-signed-by-host-key`, `stale-revocation-status`, `tampered-effect-receipt`, `unsigned-approval`, `unsigned-intent`, `unsigned-invocation`, `unsigned-revocation-on-the-chain` |
-| I7 | violated | `recorded-budget-spend-mismatch` |
+| I6 | unresolved | `revoked-mid-action--inside-the-declared-propagation-window` |
+| I6 | violated | `revoked-at-the-instant-of-the-action`, `revoked-between-invocation-and-effect--singletary-case-1`, `revoked-between-two-effects-of-one-invocation--singletary-case-3`, `revoked-exactly-at-the-effect-time--singletary-case-2`, `revoked-mid-action--after-the-propagation-window`, `revoked-root-with-live-child`, `status-shows-revocation-at-the-instant-of-the-action`, `status-shows-revoked-before-action` |
+| I7 | unresolved | `amep-0-3-claim-member-the-verifier-does-not-understand`, `amep-0-3-limit-member-the-verifier-does-not-understand`, `amep-0-3-packet-with-a-version-1-proof`, `amount-in-exponent-form`, `amount-with-a-leading-zero`, `amount-written-as-a-json-number`, `arguments-rewritten-in-transit--nothing-executed`, `call-statement-bound-to-another-invocation`, `call-statement-signed-by-a-host-key`, `call-statement-with-a-negative-effect-count`, `call-statement-with-an-unknown-disposition`, `control-character-in-an-identifier`, `deny-on-fail-open-host--no-effect-record`, `duplicate-member-name-in-a-signed-effect-body`, `duplicate-member-name-in-an-extension-member`, `extension-float-1e21--outside-the-safe-range`, `extension-number-2-53---1--which-ecmascript-cannot-represent`, `extension-number-at-2-53--outside-i-json`, `forged-mandate--attacker-key`, `identifier-not-in-nfc--decomposed-accent`, `identity-only-authorization--no-mandate`, `intent-reference-names-a-non-intent-object`, `intent-reference-unresolved`, `invocation-signed-by-unknown-key`, `limited-payment-whose-receipt-records-no-amount`, `lineage-reference-not-found`, `lone-surrogate-in-a-string`, `malformed-limit--period-without-per-period`, `malformed-timestamp`, `mandate-minted-by-host-key`, `missing-effect-receipt`, `missing-parent-lineage`, `negative-amount`, `nesting-beyond-the-depth-bound`, `noncharacter-in-a-string`, `not-executed-statement-that-counts-effects`, `period-limit-without-an-observer-total-or-earlier-state`, `post-execution-decision-cannot-claim-a-block`, `receipt-replayed-from-another-invocation`, `receipt-signature-with-s----l--malleated`, `receipt-under-a-small-order--identity--public-key`, `receipt-under-a-small-order--order-2--public-key`, `record-limit--quantity-reported-in-another-unit`, `revocable-mandate-without-status`, `self-approval-signed-by-host-key`, `stale-revocation-status`, `statement-promises-two-receipts--one-present`, `status-current-at-the-invocation-but-stale-at-the-effect`, `string-beyond-the-size-bound`, `tampered-effect-receipt`, `two-objects-with-the-same-id`, `unsigned-approval`, `unsigned-call-statement`, `unsigned-intent`, `unsigned-invocation`, `unsigned-revocation-on-the-chain`, `unsupported-amep-version`, `value-given-as-a-string-instead-of-an-object`, `version-1-signature-relabelled-as-version-2` |
+| I7 | violated | `more-receipts-than-the-call-statement-counts`, `observer-period-total-below-the-recorded-payments`, `recorded-budget-spend-mismatch` |
 | I8 | violated | `approval-digest-mismatch--toctou`, `approval-not-yet-valid`, `approval-replay--consumed`, `approval-reused-across-packets`, `approval-reused-for-a-second-invocation`, `stale-approval--expired` |
 | I9 | violated | `guardrail-write--i9`, `guardrail-write-via-absolute-path--i9`, `mediated-into-a-guardrail-path--i9` |
-| I10 | unresolved | `high-impact-effect-without-actor`, `self-reported-high-impact-effect`, `write-shared-effect-only-self-reported` |
-| I11 | violated | `audit-only-discovery-of-an-unknown-agent--a6`, `bypass--effect-without-invocation`, `deny-contradicted-by-executed-effect` |
+| I10 | unresolved | `high-impact-call-reported-not-executed-only-by-the-actor`, `high-impact-effect-without-actor`, `self-reported-high-impact-effect`, `write-shared-call-reported-not-executed-only-by-the-actor`, `write-shared-effect-only-self-reported` |
+| I11 | violated | `audit-only-discovery-of-an-unknown-agent--a6`, `bypass--effect-without-invocation`, `deny-contradicted-by-executed-effect`, `receipt-contradicts-a-not-executed-statement` |
 <!-- vector-index:end -->
 
 **Planned for v0.3:** unknown MCP endpoint; MCP manifest rug-pull; tool shadowing; compound command; obfuscated execution; script indirection; GET with side effects; GraphQL mutation via POST; key/token read; agent impersonation; self-approval without presence; approval-fatigue loop; taint exfiltration via an allowed channel; memory-poisoned sleeper mutation; revocation quiescence breach; mediation-proof mismatch; approval reuse across packets.

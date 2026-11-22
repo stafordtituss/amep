@@ -1,17 +1,17 @@
 # amep-evidence on the MCP TypeScript SDK (experimental)
 
-> **Status: Experimental.** This is a reference implementation of the MCP extension `io.github.stafordtituss/amep-evidence` on the official MCP TypeScript SDK (v2.4.0). The extension is not an official MCP extension. Its wire format may change, so pin to a commit.
+> **Status: Experimental.** This is a reference implementation of revision 0.3 of the MCP extension `io.github.stafordtituss/amep-evidence` on the official MCP TypeScript SDK (v2.4.0), using the AMEP 0.3 verifier in this repository. The extension is not an official MCP extension. Its wire format may change, so pin to a commit.
 
-MCP tool servers sign **receipts of the effects they actually executed**. A gateway signs what the agent declared, under which authority. An AMEP verifier then checks, offline and without trusting the agent, whether each executed effect stayed within what the user delegated. The verdict is `preserved`, `violated` or `unresolved`.
+MCP tool servers sign **receipts of the effects they actually executed**, plus one **call statement** per call: whether anything was executed, how many receipts belong to the call, and a digest of the arguments the server received. A gateway signs what the agent declared, under which authority, with a digest of the arguments it sent. An AMEP verifier then checks, offline and without trusting the agent, whether each executed effect stayed within what the user delegated. The verdict is `preserved`, `violated` or `unresolved`.
 
 The extension uses only capability advertisement and `_meta`. It needs no change to the MCP protocol and is off unless both sides opt in.
 
 | File | Role |
 |---|---|
-| `src/extension.mjs` | **Server:** `AmepEvidenceExtension` advertises the extension and wraps tool handlers. Tools call `recordEffect(...)` for what they actually did, and the wrapper returns signed receipts in the result's `_meta`. **Client:** `clientCapabilities()` opts in with `wantsReceipts`; `supportsReceipts(client)` lets a client find and filter for servers that sign receipts before calling any tool. |
-| `src/gateway.mjs` | Reference gateway: signs an AMEP invocation per call, sends the invocation id in `_meta`, fetches the server's key set (`fetchKeySet`, HTTPS only, observer keys only), verifies receipts, and evaluates the evidence. |
+| `src/extension.mjs` | **Server:** `AmepEvidenceExtension` advertises the extension and wraps tool handlers. Tools call `recordEffect(...)` for what they actually did, on the execution path. Before the result leaves the server, the wrapper signs the receipts and the call statement, stores them (write-ahead), and returns them in the result's `_meta`. A client whose response was lost fetches them with `resources/read` on `amep-receipt://{invocation}`. **Client:** `clientCapabilities()` opts in with `wantsReceipts`; `supportsReceipts(client)` lets a client find and filter for servers that sign receipts before calling any tool. |
+| `src/gateway.mjs` | Reference gateway: signs an AMEP invocation per call (random 128-bit id, digest of the arguments sent), sends the id and the digest of the signed invocation in `_meta`, fetches the server's key set (`fetchKeySet`, HTTPS only, observer keys only), verifies statements and receipts (bound to that exact invocation), recovers them after a lost response, and evaluates the evidence as an AMEP 0.3 packet. |
 | `src/tickets-server.mjs` | Example server (a tiny ticket tracker). `node src/tickets-server.mjs` serves it over stdio. |
-| `test/` | 24 integration tests with real MCP sessions. |
+| `test/` | 34 integration tests with real MCP sessions. |
 
 ## Quick start
 
@@ -72,7 +72,10 @@ Every behavior is tested on **both protocol eras** the SDK serves:
 | A server that changes a different ticket than requested | Its own receipt exposes it: `violated` (I2) |
 | A client that did not opt in | No receipt: `unresolved` (I7), because missing evidence is never permission |
 | A receipt tampered with in transit | The gateway rejects it: `unresolved` (I7) |
-| A tool that executes nothing | No receipt |
+| A tool that executes nothing | No receipt, and a signed `not_executed` statement: the call is provably `preserved`, not `unresolved` |
+| Arguments changed between the gateway and the server | The server's statement shows a different argument digest: `violated` (I2) |
+| A genuine receipt from another call presented for this one | Rejected (bound to another invocation); the statement shows a receipt missing: `unresolved` (I7) |
+| The response is lost after the tool ran | The gateway recovers the statement and receipt with `resources/read`: `preserved` |
 | A server without the extension | Tool calls work exactly as in core MCP |
 | A client that does not know the extension | Plain results, no receipts |
 
@@ -90,6 +93,8 @@ Plus:
 - **Partial adoption.** Each server opts in. Calls to servers without the extension are unaffected; their effects are simply `unresolved` rather than verified. A deployment can require receipts only for high-impact tools.
 - **Stateless legacy HTTP.** A 2025-era client served statelessly over HTTP has no session that holds its `initialize` capabilities, so the server cannot see `wantsReceipts` and sends no receipts (tested in `test/stateless.test.mjs`). Use a stateful session, or the 2026-07-28 era, where the capability travels with each request.
 - **Trust.** A receipt proves what the server says it did, signed with its own key. It protects against a lying or compromised agent or host, not against a dishonest server. Trust in the key set rests on HTTPS (see AMEP spec sections 12.4–12.6 and 17).
+- **Arguments as received.** SDK 2.4.0 passes tool handlers the arguments after schema validation, not the raw request, so the server's argument digest covers what the tool received. A schema that strips or defaults fields makes it differ from what the gateway sent. The `ctx.use('tools/call')` middleware of typescript-sdk#2820 sees the raw request and removes this limit; the port to that API will use it.
+- **Receipt recovery.** Evidence is kept in a `MemoryReceiptStore` (the most recent 10,000 calls) unless the server supplies a durable store. Invocation ids are unguessable and never listed, and receipts carry identifiers, not payloads.
 - **Keys.** The example server generates a key per process. A real server loads a persistent key and publishes the public half at its `keys` URL.
 
 ## Related

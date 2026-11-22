@@ -32,6 +32,10 @@
    "$ref": "common.json#/$defs/executed_body"
   },
   "backend_receipt": {},
+  "invocation_digest": {
+   "type": "string",
+   "pattern": "^[0-9a-f]{64}$"
+  },
   "proof": {
    "$ref": "common.json#/$defs/proof"
   }

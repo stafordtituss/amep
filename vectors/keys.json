@@ -23,5 +23,29 @@
   "roles": [
    "observer"
   ]
+ },
+ "weak-identity-key": {
+  "kid": "weak-identity-key",
+  "alg": "Ed25519",
+  "x": "0100000000000000000000000000000000000000000000000000000000000000",
+  "roles": [
+   "observer"
+  ]
+ },
+ "weak-order2-key": {
+  "kid": "weak-order2-key",
+  "alg": "Ed25519",
+  "x": "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+  "roles": [
+   "observer"
+  ]
+ },
+ "bank-observer-1": {
+  "kid": "bank-observer-1",
+  "alg": "Ed25519",
+  "x": "3f59252d2be2f06a7e131a34c782ef5023494c315b528f312c8df80d08382ecb",
+  "roles": [
+   "observer"
+  ]
  }
 }

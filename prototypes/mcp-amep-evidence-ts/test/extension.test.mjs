@@ -13,9 +13,9 @@ import { fileURLToPath } from "node:url";
 import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
 import { Client, InMemoryTransport, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import { keyset } from "@stafordtituss/amep";
+import { keyset, digest } from "@stafordtituss/amep";
 import {
-  EXTENSION_ID, INVOCATION_ID_KEY, RECEIPT_KEY, clientCapabilities, receiptSettings, supportsReceipts,
+  EXTENSION_ID, INVOCATION_ID_KEY, RECEIPT_KEY, CALL_STATEMENT_KEY, clientCapabilities, receiptSettings, supportsReceipts,
 } from "../src/extension.mjs";
 import { Gateway, fetchKeySet } from "../src/gateway.mjs";
 import { ticketServer, KEYS_URL } from "../src/tickets-server.mjs";
@@ -43,9 +43,24 @@ async function connect(factory, { era, wants = true, capabilities } = {}) {
   return client;
 }
 
-async function runUpdate({ era, buggy = false, wants = true, tamper = false }) {
+async function runUpdate({ era, buggy = false, wants = true, tamper = false, rewrite = false, lose = false, replayFrom = null }) {
   const { factory, observerKey } = ticketServer({ buggy });
   const client = await connect(factory, { era, wants });
+  if (rewrite) { // something between the gateway and the server changes the arguments after the gateway signed them
+    const original = client.callTool.bind(client);
+    client.callTool = (params, ...rest) => original({ ...params, arguments: { ...params.arguments, ticket_id: "4822" } }, ...rest);
+  }
+  if (lose) { // the tool runs, but the response never reaches the gateway
+    const original = client.callTool.bind(client);
+    client.callTool = async (...a) => { await original(...a); throw new Error("connection reset"); };
+  }
+  if (replayFrom) { // a genuine receipt from another call is presented as the receipt for this one
+    const original = client.callTool.bind(client);
+    client.callTool = async (...a) => {
+      const r = await original(...a);
+      return { ...r, _meta: { ...r._meta, [RECEIPT_KEY]: replayFrom } };
+    };
+  }
   if (tamper) { // a man-in-the-middle rewrites the receipt after the server signed it
     const original = client.callTool.bind(client);
     client.callTool = async (...a) => {
@@ -56,9 +71,14 @@ async function runUpdate({ era, buggy = false, wants = true, tamper = false }) {
     };
   }
   const gw = new Gateway(client, keyset(observerKey));
-  const result = await gw.call("update_ticket", { ticket_id: "4821", status: "closed" }, UPDATE);
+  let result, error;
+  try {
+    result = await gw.call("update_ticket", { ticket_id: "4821", status: "closed" }, UPDATE);
+  } catch (e) {
+    error = e;
+  }
   await client.close();
-  return { gw, result };
+  return { gw, result, error };
 }
 
 const outcome = gw => { const { verdict } = gw.evaluate(); return [verdict.outcome, verdict.invariant]; };
@@ -67,7 +87,8 @@ for (const era of ["legacy", "modern"]) {
   describe(`protocol era: ${era === "legacy" ? "2025 (initialize)" : MODERN}`, () => {
     test("the server advertises the extension, and the client can discover it before calling a tool", async () => {
       const client = await connect(ticketServer().factory, { era });
-      assert.deepEqual(receiptSettings(client), { revision: "0.2", effectReceipts: true, keys: KEYS_URL });
+      assert.deepEqual(receiptSettings(client), { revision: "0.3", effectReceipts: true, callStatements: true,
+        receiptRecovery: "amep-receipt://{invocation}", keys: KEYS_URL });
       assert.equal(supportsReceipts(client), true);
       await client.close();
     });
@@ -96,12 +117,54 @@ for (const era of ["legacy", "modern"]) {
       assert.deepEqual(outcome(gw), ["unresolved", "I7"]);
     });
 
-    test("a tool that executes nothing returns no receipt", async () => {
+    test("a tool that executes nothing returns no receipt, and a signed statement that nothing was executed", async () => {
       const client = await connect(ticketServer().factory, { era });
       const r = await client.callTool({ name: "validate_only", arguments: { ticket_id: "4821" },
         _meta: { [INVOCATION_ID_KEY]: "i-1" } });
       assert.equal(r._meta?.[RECEIPT_KEY], undefined);
+      assert.deepEqual([r._meta[CALL_STATEMENT_KEY].disposition, r._meta[CALL_STATEMENT_KEY].effect_count], ["not_executed", 0]);
       await client.close();
+    });
+
+    test("a no-op call is provably preserved, not unresolved: the verifier can tell 'nothing ran' from 'no receipt'", async () => {
+      const { factory, observerKey } = ticketServer();
+      const client = await connect(factory, { era });
+      const gw = new Gateway(client, keyset(observerKey));
+      await gw.call("validate_only", { ticket_id: "4821" }, { action: "saas.read", resource: "tickets:issue/4821", effect: "read" });
+      await client.close();
+      assert.deepEqual([gw.receipts.length, gw.statements.length], [0, 1]);
+      assert.deepEqual(outcome(gw), ["preserved", "-"]);
+    });
+
+    test("evidence is bound to the exact signed invocation and to the arguments the server received", async () => {
+      const { gw } = await runUpdate({ era });
+      const [inv] = gw.invocations, [st] = gw.statements, [rc] = gw.receipts;
+      assert.match(inv.id, /^i-[0-9a-f-]{36}$/);   // 122 random bits (UUIDv4): never reused, never guessable
+      assert.equal(st.invocation_digest, digest(inv));
+      assert.equal(rc.invocation_digest, digest(inv));
+      assert.equal(st.args_digest, inv.args_digest);
+      assert.deepEqual([st.disposition, st.effect_count, inv.proof.v, st.proof.v, rc.proof.v], ["completed", 1, 2, 2, 2]);
+      assert.equal(gw.packet().amep_version, "0.3");
+    });
+
+    test("arguments changed in transit are exposed by the server's own statement: violated I2", async () => {
+      const { gw } = await runUpdate({ era, rewrite: true });
+      assert.notEqual(gw.statements[0].args_digest, gw.invocations[0].args_digest);
+      assert.deepEqual(outcome(gw), ["violated", "I2"]);
+    });
+
+    test("a genuine receipt from another call is rejected; the statement shows one receipt missing: unresolved I7", async () => {
+      const first = await runUpdate({ era });
+      const { gw } = await runUpdate({ era, replayFrom: first.gw.receipts[0] });
+      assert.equal(gw.rejected.length, 1);
+      assert.deepEqual(outcome(gw), ["unresolved", "I7"]);
+    });
+
+    test("a lost response is recovered with resources/read, and the call is still verified", async () => {
+      const { gw, error } = await runUpdate({ era, lose: true });
+      assert.match(String(error), /connection reset/);
+      assert.deepEqual([gw.statements.length, gw.receipts.length], [1, 1]);
+      assert.deepEqual(outcome(gw), ["preserved", "-"]);
     });
 
     test("a server without the extension works exactly as in core MCP", async () => {
@@ -191,6 +254,8 @@ test("the Python reference verifier returns the same verdicts on the packets thi
     ["honest", {}, ["preserved", "-"]],
     ["buggy", { buggy: true }, ["violated", "I2"]],
     ["no-receipt", { wants: false }, ["unresolved", "I7"]],
+    ["rewritten-arguments", { rewrite: true }, ["violated", "I2"]],
+    ["lost-response-recovered", { lose: true }, ["preserved", "-"]],
   ]) {
     for (const era of ["legacy", "modern"]) {
       const { gw } = await runUpdate({ era, ...opts });

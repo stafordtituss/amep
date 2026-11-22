@@ -1,0 +1,103 @@
+{
+ "name": "AMEP 0.3 limit member the verifier does not understand",
+ "expect": {
+  "outcome": "unresolved",
+  "invariant": "I7"
+ },
+ "packet": {
+  "amep_version": "0.3",
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "crm.read"
+     ],
+     "resources": [
+      "crm:customers/*"
+     ],
+     "ceiling": "read",
+     "exp": 100,
+     "limits": [
+      {
+       "unit": "count:records",
+       "per_call": "500",
+       "actions": [
+        "crm.read"
+       ],
+       "per_recipient": "10"
+      }
+     ]
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "38b2035ab551b5a8bb9dade680dddea379acf1c131d932a8457d516075b797f4735315d6590cb4511cafd84d7c2c0c51f0cec30fa548eb5bcb9b0c3835d0ea0d"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "crm_api",
+    "version": "v1",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "46389acc69612858d5ac241839e4ab80b2dd878b5c85d54ecf598e62c95179170776d52545b50f4c1db45b255431f549e054af5c76ab8848ac0fa37302950300"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "m-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "crm.read",
+     "resource": "crm:customers/all",
+     "effect": "read"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "c6b3c630338e68c17ae7cd026b4408d947a25817f904287b1f5690aecc5919b244584268a1744d3ecc8b2b530b7e089d42e5f4fec87d0e0e77b58cfd9a1f3409"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "service:crm.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "crm.read",
+     "resource": "crm:customers/all",
+     "effect": "read",
+     "t": 11,
+     "value": {
+      "amount": "320",
+      "unit": "count:records"
+     }
+    },
+    "proof": {
+     "kid": "bank-observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "d30d9ce475a08f7d356ebf811bb836dc3482408836b9c40cd51f7a2e64b0e12df832b59cdea328143e1fb316bdf95c06a1bc56c6157b9ff2fa4d8a363c0f230b"
+    }
+   }
+  ]
+ }
+}

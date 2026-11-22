@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from cryptography.hazmat.primitives import serialization  # noqa: E402
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey  # noqa: E402
 
-from amep_protocol.core import approval_digest, canon, evaluate, verdict  # noqa: E402
+from amep_protocol.core import approval_digest, canon, evaluate, evaluate_text, signing_input, verdict  # noqa: E402
 
 # ---------------- signing ----------------
 class Signer:
@@ -39,8 +39,12 @@ class Signer:
         raw = self.key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
         return {"kid": self.kid, "alg": "Ed25519", "x": raw.hex(), "roles": self.roles}
 
-    def sign(self, body: dict) -> dict:
-        body = {k: v for k, v in body.items() if k != "proof"}
+    def sign(self, body: dict, v: int = 1) -> dict:
+        """v=1: the v0.2 signing input. v=2: the domain-separated input of spec 12.2 (AMEP 0.3)."""
+        body = {k: v_ for k, v_ in body.items() if k != "proof"}
+        if v == 2:
+            proof = {"kid": self.kid, "alg": "Ed25519", "v": 2}
+            return {**body, "proof": {**proof, "sig": self.key.sign(signing_input({**body, "proof": proof})).hex()}}
         # strict=False so the suite can contain numbers outside the I-JSON range that verifiers must reject
         return {**body, "proof": {"kid": self.kid, "alg": "Ed25519", "sig": self.key.sign(canon(body, strict=False)).hex()}}
 
@@ -396,7 +400,7 @@ def vectors():
     add("status shows revocation at the instant of the action", ("violated", "I6"), lambda p, I, *a: (
         revocable(p, I), p.update(statuses=[I.sign({"kind": "status", "target": "m-1", "as_of": 12, "revoked_at": 10})])))
     add("status current as of the action", ("preserved", "-"), lambda p, I, *a: (
-        revocable(p, I), p.update(statuses=[I.sign({"kind": "status", "target": "m-1", "as_of": 10})])))
+        revocable(p, I), p.update(statuses=[I.sign({"kind": "status", "target": "m-1", "as_of": 11})])))
     add("approval used at its expiry instant", ("preserved", "-"), lambda p, I, H, O, X: with_approval(p, I, H, "ap-11", expiry=11))
     add("approval valid from the instant of the action", ("preserved", "-"), lambda p, I, H, O, X: with_approval(p, I, H, "ap-12", nbf=10))
 
@@ -429,6 +433,285 @@ def vectors():
     # which Python keeps exact, so the range applies to every number (until v0.2.3, the JCS vector used 1e21).
     add("extension float 1e21, outside the safe range", ("unresolved", "I7"), lambda p, I, H, O, X:
         ticket(p, H, 1e21))
+
+    # ---------------- Suite v0.3.0 ----------------
+    # 1. Well-formed I-JSON within bounds (spec 12.1). Text vectors carry the packet as JSON text ("packet_text"),
+    # because a duplicate member name or a lone surrogate cannot be written from a parsed object. A verifier parses
+    # the text with its strict parser; text that is not I-JSON makes every invocation unresolved (I7).
+    def text_add(name, expect, text):
+        V.append((name, expect, {"__text__": text}, None))
+
+    good_text = json.dumps(base(I, H, O), ensure_ascii=False)
+    # A duplicate inside the SIGNED executed body: last-wins parsers see the signed value (auth.ts), first-wins
+    # parsers show repo:app/.env. Before v0.3 both reference verifiers silently took the last value.
+    dup = good_text.replace('"executed": {"action": "fs.write", "resource": ',
+                            '"executed": {"action": "fs.write", "resource": "repo:app/.env", "resource": ', 1)
+    assert dup != good_text
+    text_add("duplicate member name in a signed effect body", ("unresolved", "I7"), dup)
+    text_add("duplicate member name in an extension member", ("unresolved", "I7"),
+             good_text.replace("{", '{"x-note": "a", "x-note": "b", ', 1))
+    text_add("lone surrogate in a string", ("unresolved", "I7"), good_text.replace("{", '{"x-note": "\\ud800", ', 1))
+    text_add("noncharacter in a string", ("unresolved", "I7"), good_text.replace("{", '{"x-note": "\\ufdd0", ', 1))
+    text_add("well-formed packet given as text", ("preserved", "-"), good_text)
+
+    def resource_as(p, H, O, res):
+        p.update(delegations=[I.sign({**p["delegations"][0], "claims": claims_of(p, "delegations", resources=["repo:app/src/*"])})])
+        p.update(invocations=[H.sign({**p["invocations"][0], "declared": {**p["invocations"][0]["declared"], "resource": res}})])
+        p.update(effects=[O.sign({**p["effects"][0], "executed": {**p["effects"][0]["executed"], "resource": res}})])
+    add("identifier in NFC with non-ASCII characters", ("preserved", "-"), lambda p, I, H, O, X:
+        resource_as(p, H, O, "repo:app/src/café.ts"))
+    add("identifier not in NFC (decomposed accent)", ("unresolved", "I7"), lambda p, I, H, O, X:
+        resource_as(p, H, O, "repo:app/src/café.ts"))
+    add("control character in an identifier", ("unresolved", "I7"), lambda p, I, H, O, X:
+        resource_as(p, H, O, "repo:app/src/auth.ts\u0007"))
+
+    def deep(n):
+        v = "leaf"
+        for _ in range(n):
+            v = {"x": v}
+        return v
+    add("nesting at the depth bound", ("preserved", "-"), lambda p, I, H, O, X:
+        p.update(invocations=[H.sign({**p["invocations"][0], "x-deep": deep(28)})]))
+    add("nesting beyond the depth bound", ("unresolved", "I7"), lambda p, I, H, O, X:
+        p.update(invocations=[H.sign({**p["invocations"][0], "x-deep": deep(40)})]))
+    add("string beyond the size bound", ("unresolved", "I7"), lambda p, I, H, O, X:
+        p.update(invocations=[H.sign({**p["invocations"][0], "x-note": "a" * 8193})]))
+
+    # 2. One exact Ed25519 acceptance rule (spec 12.2). With OpenSSL 3.6 the identity public key accepted the
+    # signature (R = identity, S = 0) for every message; OpenSSL 4.1 rejects it. AMEP rejects it everywhere.
+    identity = "01" + "00" * 31
+    keys["weak-identity-key"] = {"kid": "weak-identity-key", "alg": "Ed25519", "x": identity, "roles": ["observer"]}
+    keys["weak-order2-key"] = {"kid": "weak-order2-key", "alg": "Ed25519", "x": "ec" + "ff" * 30 + "7f", "roles": ["observer"]}
+
+    def forged(p, kid, sig):
+        body = {k: v for k, v in p["effects"][0].items() if k != "proof"}
+        p.update(effects=[{**body, "proof": {"kid": kid, "alg": "Ed25519", "sig": sig}}])
+    add("receipt under a small-order (identity) public key", ("unresolved", "I7"), lambda p, I, H, O, X:
+        forged(p, "weak-identity-key", identity + "00" * 32))
+    add("receipt under a small-order (order 2) public key", ("unresolved", "I7"), lambda p, I, H, O, X:
+        forged(p, "weak-order2-key", identity + "00" * 32))
+
+    def malleable(p, O):
+        e = p["effects"][0]
+        sig = bytes.fromhex(e["proof"]["sig"])
+        s = int.from_bytes(sig[32:], "little") + 2 ** 252 + 27742317777372353535851937790883648493
+        e["proof"]["sig"] = (sig[:32] + s.to_bytes(32, "little")).hex()
+    add("receipt signature with S >= L (malleated)", ("unresolved", "I7"), lambda p, I, H, O, X: malleable(p, O))
+
+    # 3. Versioning and domain-separated proofs (spec 12.2, 16)
+    def v03(p, I, H, O):
+        p["amep_version"] = "0.3"
+        for kind, s in (("mandates", I), ("delegations", I), ("interpretations", H), ("invocations", H), ("effects", O)):
+            p[kind] = [s.sign(o, v=2) for o in p.get(kind, [])]
+    add("AMEP 0.3 packet with domain-separated proofs", ("preserved", "-"), lambda p, I, H, O, X: v03(p, I, H, O))
+    add("AMEP 0.3 packet with a version-1 proof", ("unresolved", "I7"), lambda p, I, H, O, X: (
+        v03(p, I, H, O), p.update(effects=[O.sign(p["effects"][0])])))
+    add("version-1 signature relabelled as version 2", ("unresolved", "I7"), lambda p, I, H, O, X: (
+        v03(p, I, H, O), p.update(effects=[{**O.sign(p["effects"][0]), "proof": {**O.sign(p["effects"][0])["proof"], "v": 2}}])))
+    add("unsupported amep_version", ("unresolved", "I7"), lambda p, I, H, O, X: p.update(amep_version="0.4"))
+    add("AMEP 0.3 claim member the verifier does not understand", ("unresolved", "I7"), lambda p, I, H, O, X: (
+        p.update(delegations=[I.sign({**p["delegations"][0], "claims": claims_of(p, "delegations", max_recipients=3)})]), v03(p, I, H, O)))
+    add("AMEP 0.3 extension claim member is ignored", ("preserved", "-"), lambda p, I, H, O, X: (
+        p.update(delegations=[I.sign({**p["delegations"][0], "claims": claims_of(p, "delegations", **{"x-team": "payments"})})]), v03(p, I, H, O)))
+    add("unversioned packet keeps v0.2 handling of unknown claim members", ("preserved", "-"), lambda p, I, H, O, X:
+        p.update(delegations=[I.sign({**p["delegations"][0], "claims": claims_of(p, "delegations", max_recipients=3)})]))
+
+    # 4. Liveness at each effect's time (spec 8 I6). Cases proposed by Cliff Singletary on audit@ietf.org
+    # (19 Nov 2026): revocation between invocation and effect, exactly at the effect, and between two effects.
+    def two_effects(p, O, t1, t2):
+        e1 = O.sign({**p["effects"][0], "executed": {**p["effects"][0]["executed"], "t": t1}})
+        e2 = O.sign({**p["effects"][0], "id": "e-2", "executed": {**p["effects"][0]["executed"], "t": t2}})
+        p.update(effects=[e1, e2])
+    rev = lambda p, I, t: p.update(revocations=[I.sign({"kind": "revocation", "target": "m-1", "t": t})])  # noqa: E731
+    add("revoked between invocation and effect (Singletary case 1)", ("violated", "I6"), lambda p, I, H, O, X: (
+        times(p, H, O, eff_t=20), rev(p, I, 15)))
+    add("revoked exactly at the effect time (Singletary case 2)", ("violated", "I6"), lambda p, I, H, O, X: (
+        times(p, H, O, eff_t=20), rev(p, I, 20)))
+    add("revoked between two effects of one invocation (Singletary case 3)", ("violated", "I6"), lambda p, I, H, O, X: (
+        two_effects(p, O, 12, 20), rev(p, I, 15)))
+    add("revoked after the last effect", ("preserved", "-"), lambda p, I, H, O, X: (
+        two_effects(p, O, 12, 20), rev(p, I, 21)))
+    add("status current at the invocation but stale at the effect", ("unresolved", "I7"), lambda p, I, *a: (
+        revocable(p, I), p.update(statuses=[I.sign({"kind": "status", "target": "m-1", "as_of": 10})])))
+    window = lambda p, I, w: p.update(mandates=[I.sign({**p["mandates"][0], "revocation": {"window": w}})])  # noqa: E731
+    add("revoked mid-action, inside the declared propagation window", ("unresolved", "I6"), lambda p, I, H, O, X: (
+        window(p, I, 10), times(p, H, O, eff_t=20), rev(p, I, 15)))
+    add("revoked mid-action, after the propagation window", ("violated", "I6"), lambda p, I, H, O, X: (
+        window(p, I, 3), times(p, H, O, eff_t=20), rev(p, I, 15)))
+
+    # 5. Quantities and limits (spec 7.6). A payments review of the MCP extension proposal (vendrell46,
+    # modelcontextprotocol/agents-ig#31, 21 Nov 2026) showed that without an approval nothing bounded the amount:
+    # 840000.00 EUR came out preserved under a budget of 100 points.
+    B = Signer("bank-observer-1", ["observer"])
+    keys[B.kid] = B.public()
+
+    def pay(p, amounts, limits=None, value=True, approve_n=(), deleg_limits=None, unit="iso4217:EUR", spent=None,
+            num_amount=False):
+        """A v0.3 packet: an assistant pays payees under a mandate (and optionally a delegation)."""
+        claims = {"actions": ["payments.send"], "resources": ["payee:*"], "ceiling": "financial", "exp": 100}
+        if limits is not None:
+            claims["limits"] = limits
+        p.clear()
+        p["amep_version"] = "0.3"
+        p["mandates"] = [I.sign({"id": "m-1", "kind": "mandate", "principal": "user:alice", "claims": claims}, v=2)]
+        auth = "m-1"
+        if deleg_limits is not None:
+            p["delegations"] = [I.sign({"id": "d-1", "kind": "delegation", "parent": "m-1",
+                                        "claims": {**claims, "limits": deleg_limits}}, v=2)]
+            auth = "d-1"
+        p["interpretations"] = [H.sign({"id": "a-1", "kind": "interpretation", "source": "curated", "adapter": "bank_api", "version": "v3"}, v=2)]
+        p["invocations"], p["effects"], p["approvals"] = [], [], []
+        for n, amt in enumerate(amounts, 1):
+            body = {"action": "payments.send", "resource": "payee:city-utility", "effect": "financial", "released": [], "t": 10 * n + 1}
+            if value:
+                body["value"] = {"amount": float(amt) if num_amount else amt, "unit": unit}
+                if spent:
+                    body["value"]["period_spent"] = spent[n - 1]
+            inv = {"id": f"i-{n}", "kind": "invocation", "authority_ref": auth, "interpretation_ref": "a-1",
+                   "actor": "agent:payments-assistant", "t": 10 * n,
+                   "declared": {"action": "payments.send", "resource": "payee:city-utility", "effect": "financial"}}
+            if n in approve_n:
+                p["approvals"].append(I.sign({"id": f"ap-{n}", "kind": "approval", "effect_digest": approval_digest(body),
+                                              "presence": "webauthn", "expiry": 90}, v=2))
+                inv["approval_ref"] = f"ap-{n}"
+            p["invocations"].append(H.sign(inv, v=2))
+            p["effects"].append(B.sign({"id": f"e-{n}", "kind": "effect", "invocation": f"i-{n}", "observed_by": "service:bank.example",
+                                        "assurance": "L3", "executed": body}, v=2))
+        if not p["approvals"]:
+            del p["approvals"]
+
+    EUR = lambda **kw: [{"unit": "iso4217:EUR", **kw}]  # noqa: E731
+    MONTH = 2592000
+    add("payment within the per-call limit", ("preserved", "-"), lambda p, *a: pay(p, ["84.10"], EUR(per_call="500.00")))
+    add("payment over the per-call limit without approval", ("violated", "I2"), lambda p, *a: pay(p, ["840000.00"], EUR(per_call="500.00")))
+    add("payment over the per-call limit with a bound approval", ("preserved", "-"), lambda p, *a:
+        pay(p, ["840000.00"], EUR(per_call="500.00"), approve_n=(1,)))
+    add("limited payment whose receipt records no amount", ("unresolved", "I7"), lambda p, *a:
+        pay(p, ["84.10"], EUR(per_call="500.00"), value=False))
+    add("payment in an asset the mandate does not authorize", ("violated", "I2"), lambda p, *a:
+        pay(p, ["84.10"], EUR(per_call="500.00"), unit="iso4217:USD"))
+    add("amount written as a JSON number", ("unresolved", "I7"), lambda p, *a:
+        pay(p, ["84.10"], EUR(per_call="500.00"), num_amount=True))
+    add("amount with a leading zero", ("unresolved", "I7"), lambda p, *a: pay(p, ["084.10"], EUR(per_call="500.00")))
+    add("amount in exponent form", ("unresolved", "I7"), lambda p, *a: pay(p, ["8.41e1"], EUR(per_call="500.00")))
+    add("negative amount", ("unresolved", "I7"), lambda p, *a: pay(p, ["-84.10"], EUR(per_call="500.00")))
+    add("payments within the period limit, observer total consistent", ("preserved", "-"), lambda p, *a:
+        pay(p, ["300.00", "150.00"], EUR(per_call="500.00", per_period="500.00", period=MONTH), spent=["300.00", "450.00"]))
+    add("payments each within the per-call limit but over the period limit", ("violated", "I2"), lambda p, *a:
+        pay(p, ["300.00", "300.00"], EUR(per_call="500.00", per_period="500.00", period=MONTH), spent=["300.00", "600.00"]))
+    add("period limit without an observer total or earlier state", ("unresolved", "I7"), lambda p, *a:
+        pay(p, ["300.00"], EUR(per_period="500.00", period=MONTH)))
+    add("observer period total below the recorded payments", ("violated", "I7"), lambda p, *a:
+        pay(p, ["300.00", "300.00"], EUR(per_period="5000.00", period=MONTH), spent=["300.00", "300.00"]))
+    add("approved payment still counts toward the period limit", ("violated", "I2"), lambda p, *a:
+        pay(p, ["900.00", "100.00"], EUR(per_call="1000.00", per_period="500.00", period=MONTH), approve_n=(1,), spent=["900.00", "1000.00"]))
+    V.append(("period limit carried across packets in verifier state", ("violated", "I2"), None,
+              {"period_totals": {"m-1|iso4217:EUR|2592000|0": "450.00"}}))
+    _p = {}
+    pay(_p, ["100.00"], EUR(per_period="500.00", period=MONTH))
+    V[-1] = (V[-1][0], V[-1][1], _p, V[-1][3])
+    add("delegation raises the per-call limit", ("violated", "I1"), lambda p, *a:
+        pay(p, ["84.10"], EUR(per_call="500.00"), deleg_limits=EUR(per_call="5000.00")))
+    add("delegation adds a stricter limit", ("preserved", "-"), lambda p, *a:
+        pay(p, ["84.10"], EUR(per_call="500.00"), deleg_limits=EUR(per_call="100.00")))
+    add("delegation's stricter limit is enforced", ("violated", "I2"), lambda p, *a:
+        pay(p, ["184.10"], EUR(per_call="500.00"), deleg_limits=EUR(per_call="100.00")))
+    add("malformed limit (period without per_period)", ("unresolved", "I7"), lambda p, *a:
+        pay(p, ["84.10"], EUR(per_call="500.00", period=MONTH)))
+
+    # Quantity limits beyond money: an in-scope bulk read that exceeds a record cap (data exfiltration volume).
+    def records(p, n_records, unit="count:records", limit_extra=None):
+        claims = {"actions": ["crm.read"], "resources": ["crm:customers/*"], "ceiling": "read", "exp": 100,
+                  "limits": [{"unit": "count:records", "per_call": "500", "actions": ["crm.read"], **(limit_extra or {})}]}
+        p.clear()
+        p["amep_version"] = "0.3"
+        p["mandates"] = [I.sign({"id": "m-1", "kind": "mandate", "principal": "user:alice", "claims": claims}, v=2)]
+        p["interpretations"] = [H.sign({"id": "a-1", "kind": "interpretation", "source": "curated", "adapter": "crm_api", "version": "v1"}, v=2)]
+        p["invocations"] = [H.sign({"id": "i-1", "kind": "invocation", "authority_ref": "m-1", "interpretation_ref": "a-1", "t": 10,
+                                    "declared": {"action": "crm.read", "resource": "crm:customers/all", "effect": "read"}}, v=2)]
+        p["effects"] = [B.sign({"id": "e-1", "kind": "effect", "invocation": "i-1", "observed_by": "service:crm.example", "assurance": "L3",
+                                "executed": {"action": "crm.read", "resource": "crm:customers/all", "effect": "read", "t": 11,
+                                             "value": {"amount": n_records, "unit": unit}}}, v=2)]
+    add("bulk read within the record limit", ("preserved", "-"), lambda p, *a: records(p, "320"))
+    add("in-scope bulk read over the record limit", ("violated", "I2"), lambda p, *a: records(p, "10000000"))
+    add("record limit, quantity reported in another unit", ("unresolved", "I7"), lambda p, *a: records(p, "52428800", unit="bytes:utf8"))
+    add("AMEP 0.3 limit member the verifier does not understand", ("unresolved", "I7"), lambda p, *a:
+        records(p, "320", limit_extra={"per_recipient": "10"}))
+    add("value given as a string instead of an object", ("unresolved", "I7"), lambda p, *a: (
+        pay(p, ["84.10"], EUR(per_call="500.00")),
+        p.update(effects=[B.sign({**p["effects"][0], "executed": {**p["effects"][0]["executed"], "value": "84.10 EUR"}}, v=2)])))
+
+    # 6. Call statements and binding (spec 5.14). From the review of the MCP extension proposal by Brennan Zambo
+    # (modelcontextprotocol/agents-ig#31): a missing receipt must be distinguishable from "nothing was executed", a
+    # genuine receipt must not be presentable for a different call, and arguments rewritten in transit must show.
+    from amep_protocol.core import digest as _digest
+
+    def stmt(p, O, disposition="completed", count=1, inv_digest=True, args="a" * 64, signer=None, observed_by="hook:host", **kw):
+        body = {"id": f"c-{len(p.get('call_statements', [])) + 1}", "kind": "call_statement", "invocation": "i-1",
+                "observed_by": observed_by, "disposition": disposition, "effect_count": count, "t": 12, **kw}
+        if inv_digest is True:
+            body["invocation_digest"] = _digest(p["invocations"][0])
+        elif inv_digest:
+            body["invocation_digest"] = inv_digest
+        if args:
+            body["args_digest"] = args
+        p.setdefault("call_statements", []).append((signer or O).sign(body, v=2))
+
+    def bound(p, I, H, O, sent_args="a" * 64):
+        v03(p, I, H, O)
+        if sent_args:
+            p["invocations"] = [H.sign({**p["invocations"][0], "args_digest": sent_args}, v=2)]
+        p["effects"] = [O.sign({**p["effects"][0], "invocation_digest": _digest(p["invocations"][0])}, v=2)]
+
+    add("call statement and receipt bound to the signed invocation", ("preserved", "-"), lambda p, I, H, O, X: (
+        bound(p, I, H, O), stmt(p, O)))
+    add("receipt replayed from another invocation", ("unresolved", "I7"), lambda p, I, H, O, X: (
+        bound(p, I, H, O), p.update(effects=[O.sign({**p["effects"][0], "invocation_digest": "b" * 64}, v=2)])))
+    add("call statement bound to another invocation", ("unresolved", "I7"), lambda p, I, H, O, X: (
+        bound(p, I, H, O), stmt(p, O, inv_digest="c" * 64)))
+    add("arguments rewritten in transit", ("violated", "I2"), lambda p, I, H, O, X: (
+        bound(p, I, H, O), stmt(p, O, args="d" * 64)))
+    add("arguments rewritten in transit, nothing executed", ("unresolved", "I7"), lambda p, I, H, O, X: (
+        bound(p, I, H, O), p.update(effects=[]), stmt(p, O, disposition="not_executed", count=0, args="d" * 64)))
+    add("signed statement that nothing was executed", ("preserved", "-"), lambda p, I, H, O, X: (
+        bound(p, I, H, O), p.update(effects=[]), stmt(p, O, disposition="not_executed", count=0)))
+    add("receipt contradicts a not-executed statement", ("violated", "I11"), lambda p, I, H, O, X: (
+        bound(p, I, H, O), stmt(p, O, disposition="not_executed", count=0)))
+    add("not-executed statement that counts effects", ("unresolved", "I7"), lambda p, I, H, O, X: (
+        bound(p, I, H, O), p.update(effects=[]), stmt(p, O, disposition="not_executed", count=1)))
+    add("statement promises two receipts, one present", ("unresolved", "I7"), lambda p, I, H, O, X: (
+        bound(p, I, H, O), stmt(p, O, count=2)))
+    add("more receipts than the call statement counts", ("violated", "I7"), lambda p, I, H, O, X: (
+        bound(p, I, H, O),
+        p["effects"].append(O.sign({**p["effects"][0], "id": "e-2", "executed": {**p["effects"][0]["executed"], "t": 12}}, v=2)),
+        stmt(p, O, count=1)))
+    add("call failed after its effects, counts consistent", ("preserved", "-"), lambda p, I, H, O, X: (
+        bound(p, I, H, O), stmt(p, O, disposition="failed_after_effects", count=1)))
+    add("unsigned call statement", ("unresolved", "I7"), lambda p, I, H, O, X: (
+        bound(p, I, H, O), stmt(p, O), p["call_statements"][0].pop("proof")))
+    add("call statement signed by a host key", ("unresolved", "I7"), lambda p, I, H, O, X: (
+        bound(p, I, H, O), stmt(p, O, signer=H)))
+    add("call statement with an unknown disposition", ("unresolved", "I7"), lambda p, I, H, O, X: (
+        bound(p, I, H, O), stmt(p, O, disposition="partial")))
+    add("high-impact call reported not executed only by the actor", ("unresolved", "I10"), lambda p, I, H, O, X: (
+        high_impact(p), bound(p, I, H, O), p.update(effects=[]),
+        stmt(p, O, disposition="not_executed", count=0, observed_by="agent:assistant-1")))
+    add("high-impact call reported not executed by an independent observer", ("preserved", "-"), lambda p, I, H, O, X: (
+        high_impact(p), bound(p, I, H, O), p.update(effects=[]),
+        stmt(p, O, disposition="not_executed", count=0, observed_by="proxy:egress")))
+    add("call statement with a negative effect count", ("unresolved", "I7"), lambda p, I, H, O, X: (
+        bound(p, I, H, O), stmt(p, O, count=-1)))
+
+    def shared_noop(p, I, H, O, observed_by):
+        bound(p, I, H, O)
+        p["invocations"] = [H.sign({**p["invocations"][0], "actor": "agent:assistant-1",
+                                    "declared": {**p["invocations"][0]["declared"], "effect": "write_shared"}}, v=2)]
+        p["effects"] = []
+        stmt(p, O, disposition="not_executed", count=0, observed_by=observed_by)
+    add("write_shared call reported not executed only by the actor", ("unresolved", "I10"), lambda p, I, H, O, X:
+        shared_noop(p, I, H, O, "agent:assistant-1"))
+    add("two objects with the same id", ("unresolved", "I7"), lambda p, I, H, O, X: (
+        p["effects"].append(O.sign({**p["effects"][0], "invocation": "i-1"}))))
     return keys, V
 
 
@@ -440,7 +723,10 @@ def check_dir(d: str) -> int:
             if not f.endswith(".json"):
                 continue
             v = json.load(open(os.path.join(d, sub, f)))
-            r = verdict(evaluate(v["packet"], keys, state=v.get("state")))
+            if "packet_text" in v:
+                r = verdict(evaluate_text(v["packet_text"], keys, state=v.get("state")))
+            else:
+                r = verdict(evaluate(v["packet"], keys, state=v.get("state")))
             n += 1
             if (r.outcome, r.invariant) == (v["expect"]["outcome"], v["expect"]["invariant"]):
                 ok += 1
@@ -463,10 +749,15 @@ if __name__ == "__main__":
                 os.remove(f"{out_dir}/{sub}/{f}")
     json.dump(keys, open(f"{out_dir}/keys.json", "w"), indent=1)
     for name, (exp_out, exp_inv), packet, state in V:
-        doc = {"name": name, "expect": {"outcome": exp_out, "invariant": exp_inv}, "packet": packet}
+        doc = {"name": name, "expect": {"outcome": exp_out, "invariant": exp_inv}}
+        if "__text__" in packet:
+            doc["packet_text"] = packet["__text__"]
+        else:
+            doc["packet"] = packet
         if state is not None:
             doc["state"] = json.loads(json.dumps(state))   # stored before evaluation mutates it
-        r = verdict(evaluate(packet, keys, state=state))
+        r = verdict(evaluate_text(packet["__text__"], keys, state=state) if "__text__" in packet
+                    else evaluate(packet, keys, state=state))
         slug = "".join(ch if ch.isalnum() else "-" for ch in name.lower()).strip("-")
         folder = "positive" if exp_out == "preserved" else "must-reject"
         json.dump(doc, open(f"{out_dir}/{folder}/{slug}.json", "w", encoding="utf-8"), indent=1, ensure_ascii=False)
