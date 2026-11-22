@@ -393,3 +393,61 @@ describe("profile: Delegation Receipt Protocol", () => {
     assert.deepEqual([out.result.outcome, out.result.invariant, out.result.blame], ["violated", "I2", "agent"]);
   });
 });
+
+// ---- EMILIA Protocol vectors ----
+import { checkReceipt as epCheckReceipt, predictedEffects as epPredicted } from "../src/profiles/ep.mjs";
+import { compare as epCompare } from "../../../interop/ep/compare.mjs";
+
+describe("profile: EMILIA Protocol", () => {
+  const FIX = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "ep");
+  const receipts = JSON.parse(readFileSync(join(FIX, "receipts.v1.json"), "utf8"));
+
+  test("the fixtures are byte-identical to the ones EP's manifest pins", () => {
+    const h = f => createHash("sha256").update(readFileSync(join(FIX, f))).digest("hex");
+    assert.equal(h("receipts.v1.json"), "e27b31759c9c901f5cd6e2986758a249175ea14dbc818e401d42fb71280aa83b");
+    assert.equal(h("outcome-binding.v1.json"), "c549c9fc53eab2e716dfb0f20957a84dd80f8cf263f8b3d8a51d86f5f3ed8152");
+  });
+
+  test("EP receipts: the clean-room check agrees with EP's expected result on every vector", () => {
+    for (const v of receipts.vectors) assert.equal(epCheckReceipt(v.document, v.public_key).valid, v.expect.valid, v.id);
+  });
+
+  test("EP-MERKLE-v2: a multi-step proof, with a left sibling, under the hex-text branch rule", () => {
+    const base = receipts.vectors.find(v => v.id === "accept_with_merkle_anchor_v2");
+    const hx = b => createHash("sha256").update(b).digest("hex");
+    const node = (l, r) => hx(Buffer.concat([Buffer.from([1]), Buffer.from(l + r, "utf8")]));
+    const leaf = base.document.anchor.leaf_hash, s1 = "ff".repeat(32), s2 = "00".repeat(32);
+    const root = node(s2, node(leaf, s1));   // the leaf's sibling is on the right, then the parent's is on the left
+    const doc = structuredClone(base.document);
+    doc.anchor.merkle_proof = [{ hash: s1, position: "right" }, { hash: s2, position: "left" }];
+    doc.anchor.merkle_root = root;
+    assert.equal(epCheckReceipt(doc, base.public_key).valid, true);
+    doc.anchor.merkle_proof = [{ hash: s1, position: "right" }, { hash: s2, position: "right" }];
+    assert.match(epCheckReceipt(doc, base.public_key).problems.join(" "), /does not reconstruct the root/);
+    doc.anchor.merkle_proof = [{ hash: s1, position: "right" }, { hash: s2, position: "left" }];
+    doc.anchor.merkle_root = "00" + root.slice(2);
+    assert.match(epCheckReceipt(doc, base.public_key).problems.join(" "), /does not reconstruct the root/);
+  });
+
+  test("outcome binding: where AMEP can express EP's prediction, it agrees except on an unpredicted effect", () => {
+    const rows = Object.fromEntries(epCompare().predicates.filter(r => !r.amep.na).map(r => [r.id, [r.ep, r.amep.result.outcome, r.amep.result.invariant]]));
+    assert.deepEqual(rows, {
+      lte_pass: ["in_bounds", "preserved", "-"],
+      lte_fail_divergent: ["divergent", "violated", "I2"],
+      absent_pass: ["in_bounds", "violated", "I2"],   // AMEP's claims are an allowlist; see interop/ep/README.md
+      absent_fail_unpredicted_destructive_effect: ["divergent", "violated", "I2"],
+      amount_as_number_in_predicate_rejected: ["incomparable", "unresolved", "I7"],
+      amount_as_number_in_observation_rejected: ["incomparable", "unresolved", "I7"],
+      missing_observed_effect_incomparable: ["incomparable", "unresolved", "I7"],
+    });
+  });
+
+  test("a gap, never an approximation: predicates AMEP can't express exactly aren't mapped", () => {
+    const p = (op, extra = {}) => [{ effect_type: "payment", target: "acct:x", predicate: { op, ...extra } }];
+    const obs = [{ effect_type: "payment", target: "acct:x", value: "1.00" }];
+    for (const op of ["eq", "set_eq", "gte", "range", "count_lte"]) assert.match(epPredicted(p(op, { value: "1" }), obs).na, /no exact form/, op);
+    assert.match(epPredicted(p("approx", { value: "1" }), obs).na, /not an EP predicate op/);
+    assert.match(epPredicted(p("lte", { value: "9" }), [{ ...obs[0], note: "x" }]).na, /unknown member/);
+    assert.ok(epPredicted(p("lte", { value: "9" }), obs).claims.limits);
+  });
+});

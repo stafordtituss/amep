@@ -2,6 +2,17 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## Comparison with EMILIA Protocol's vectors (unreleased, 2026-11-23)
+
+- **EP profile** (`packages/conformance/src/profiles/ep.mjs`) and **`interop/ep/`:** AMEP beside two of EP's published suites (draft-schrock-ep-authorization-receipts).
+  - **`receipts.v1`:** EP-RECEIPT-v1, checked by a clean-room reading of EP's rules (written from the vectors and EP's documentation, not its code). It agrees with EP's expected result on all 14 vectors.
+  - **`outcome-binding.v1`, predicate vectors:** EP's `in_bounds` / `divergent` / `incomparable` beside AMEP's `preserved` / `violated` / `unresolved`. AMEP can express 7 of the 24 exactly and agrees on 6. The difference is by design: EP's predictions bound only the effect types they name, while AMEP's claims are an allowlist.
+- **Findings, in the README:**
+  - EP's Merkle branch hash runs over the children's hex text, not their raw bytes, which EP's design notes don't make clear;
+  - the vectors can't distinguish position order from sorted order, and have no v2 tampered-root case;
+  - EP's predicates (exact values, sets, minimums, counts) are richer than AMEP's claims. Count limits are now needed by two outside formats.
+- The vectors are vendored, unchanged and with their licence, as test fixtures (Apache-2.0); their digests match EP's manifest.
+
 ## Comparison with the Delegation Receipt Protocol's vectors (unreleased, 2026-11-22)
 
 - **DRP profile** (`packages/conformance/src/profiles/drp.mjs`) and **`interop/drp/`:** AMEP beside the 14 published vectors of DRP's reference SDK (draft-nelson-agent-delegation-receipts). Each receipt is checked by DRP's own rule first (signature, receipt id, orchestrator binding); only `invalid-signature` fails, as intended. AMEP then answers the matching question, had the action run as proposed, with the scope the DRP verifier was given adopted as authority and labelled as such. Of the 8 vectors that can be compared, AMEP agrees on 6. The remaining 2 are DRP's single-use receipts, which AMEP doesn't have. The 6 that can't be compared state authority only in natural language, or decide by the verifier's chain-depth limit.

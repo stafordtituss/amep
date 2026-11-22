@@ -47,5 +47,5 @@ Each row is the AMEP author's reading of a format, through the code that imports
 ## Formats without a profile yet
 
 No cells until a profile exists and has been run on the format's own published examples:
-- Authorization Receipts for High-Risk Agent Actions (EMILIA, draft-schrock-ep-authorization-receipts);
+- Authorization Receipts for High-Risk Agent Actions (EMILIA, draft-schrock-ep-authorization-receipts). A partial profile covers two of its 21 suites, its receipts and its outcome predicates (`interop/ep/`); a column waits for the rest;
 - Notarized Agents (arXiv 2606.04193).
