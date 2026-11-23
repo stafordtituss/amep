@@ -27,6 +27,13 @@ export const sha256b64u = text => b64u(createHash("sha256").update(text, "ascii"
 
 // ISO 4217 minor units for the currencies the profile maps; anything else is a gap, never guessed.
 export const MINOR_UNITS = { USD: 2, EUR: 2, GBP: 2, AED: 2, INR: 2, SGD: 2, CHF: 2, JPY: 0, KRW: 0 };
+/** A major-unit number (AP2's budget max, e.g. 300.0) as an exact decimal string, or null if it isn't exact. */
+export function majorDecimal(major, currency) {
+  const d = MINOR_UNITS[currency];
+  if (d === undefined || typeof major !== "number" || !Number.isFinite(major) || major < 0) return null;
+  const s = major.toFixed(d);
+  return Number(s) === major ? s : null;
+}
 export function majorUnits(minor, currency) {
   const d = MINOR_UNITS[currency];
   if (d === undefined || !Number.isSafeInteger(minor) || minor < 0) return null;
@@ -64,18 +71,41 @@ export function readSdJwt(token, issuerJwk, expectTyp) {
   checks.push(["signature", es256ok(issuerJwk, signingInput, sig), "ES256 over the issuer JWT"]);
   checks.push(["_sd_alg sha-256", (payload._sd_alg ?? "sha-256") === "sha-256", `_sd_alg ${payload._sd_alg}`]);
   // resolve disclosures referenced from delegate_payload (and _sd, if present)
-  const byDigest = new Map(disclosures.map(d => [sha256b64u(d), d]));
+  const byDigest = new Map(disclosures.map(d => [sha256b64u(d), JSON.parse(unb64u(d))]));
+  // SD-JWT: an array element {"...": digest} is replaced by its disclosure's value (or dropped when not disclosed);
+  // an object's "_sd" digests add the disclosed [salt, name, value] members. Applied recursively.
+  let hidden = 0;
+  const resolve = v => {
+    if (Array.isArray(v)) return v.flatMap(e => {
+      if (e && typeof e === "object" && !Array.isArray(e) && Object.keys(e).length === 1 && "..." in e) {
+        const d = byDigest.get(e["..."]);
+        if (!d || d.length !== 2) { hidden++; return []; }
+        return [resolve(d[1])];
+      }
+      return [resolve(e)];
+    });
+    if (v && typeof v === "object") {
+      const out = {};
+      for (const [k, x] of Object.entries(v)) if (k !== "_sd" && k !== "_sd_alg") out[k] = resolve(x);
+      for (const dg of Array.isArray(v._sd) ? v._sd : []) {
+        const d = byDigest.get(dg);
+        if (d && d.length === 3) out[d[1]] = resolve(d[2]); else hidden++;
+      }
+      return out;
+    }
+    return v;
+  };
   const claims = {}, extra = [];
-  const refs = [...(payload.delegate_payload ?? []).map(x => x?.["..."]), ...(payload._sd ?? [])].filter(Boolean);
+  const top = [...(payload.delegate_payload ?? []).map(x => x?.["..."]), ...(payload._sd ?? [])].filter(Boolean);
   let unresolved = 0;
-  for (const ref of refs) {
+  for (const ref of top) {
     const d = byDigest.get(ref);
     if (!d) { unresolved++; continue; }
-    const arr = JSON.parse(unb64u(d));
-    const value = arr.length === 3 ? { [arr[1]]: arr[2] } : arr[1];
+    const value = resolve(d.length === 3 ? { [d[1]]: d[2] } : d[1]);
     if (value && typeof value === "object" && !Array.isArray(value)) Object.assign(claims, value); else extra.push(value);
   }
   checks.push(["every referenced disclosure present", unresolved === 0, `${unresolved} digest(s) without a disclosure`]);
+  if (hidden) checks.push(["nested selective disclosures", true, `${hidden} nested element(s) not disclosed in this presentation`]);
   for (const k of ["iat", "exp", "aud", "nonce", "sd_hash", "issuer_jwt_hash"]) if (k in payload && !(k in claims)) claims[k] = payload[k];
   const presentation = `${jwt}~${disclosures.join("~")}${disclosures.length ? "~" : ""}`;
   return { header, claims, extra, presentation, issuerJwt: jwt, checks };
@@ -149,8 +179,9 @@ export function claimsFromOpen(oc, constraints) {
       else out.limits.push({ unit: `iso4217:${k.currency}`, per_call: max });
     }
     if (k.type === "payment.budget") {
-      const max = majorUnits(k.max, k.currency);
-      if (max === null) problems.push(`budget max ${k.max} ${k.currency} is not an integer amount in a known currency's minor units`);
+      // unlike amount_range (integer minor units), AP2's budget max is a major-unit number (SDK: Budget.max: float)
+      const max = majorDecimal(k.max, k.currency);
+      if (max === null) problems.push(`budget max ${k.max} ${k.currency} is not an exact amount in a known currency's units`);
       else if (!out.exp || !out.nbf) problems.push("a budget needs the open mandate's iat and exp to fix its window");
       else out.limits.push({ unit: `iso4217:${k.currency}`, per_period: max, period: out.exp - out.nbf });
     }
@@ -159,4 +190,4 @@ export function claimsFromOpen(oc, constraints) {
   return { claims: out, problems };
 }
 
-export const ap2 = { id: "ap2", analyseBundle, claimsFromOpen, readSdJwt, readReceipt, majorUnits, splitChain };
+export const ap2 = { id: "ap2", analyseBundle, claimsFromOpen, readSdJwt, readReceipt, majorUnits, majorDecimal, splitChain };

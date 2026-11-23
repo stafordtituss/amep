@@ -454,7 +454,7 @@ describe("profile: EMILIA Protocol", () => {
 
 // ---- AP2 (Agent Payments Protocol) ----
 import { analyseBundle, claimsFromOpen, majorUnits, readSdJwt, splitChain } from "../src/profiles/ap2.mjs";
-import { compare as ap2Compare } from "../../../interop/ap2/compare.mjs";
+import { compare as ap2Compare, amepOf as amepOfAp2 } from "../../../interop/ap2/compare.mjs";
 
 describe("profile: AP2 (Agent Payments Protocol)", () => {
   const FX = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "fixtures", "ap2", "bundles.json"), "utf8"));
@@ -496,6 +496,27 @@ describe("profile: AP2 (Agent Payments Protocol)", () => {
       "s5-lost-receipt": "unresolved I7 receipt", "s6-budget": "preserved -, violated I2",
       "s7-receipt-for-another-mandate": "unresolved I7 receipt", "s8-altered-amount": "unresolved I7 signature",
       "s9-unknown-then-second": "unresolved I7 receipt, unresolved I7 held_outcome",
+    });
+  });
+});
+
+describe("profile: AP2, on bundles produced by AP2's own Python SDK (e1ea56d)", () => {
+  const SDK = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "fixtures", "ap2", "sdk-bundles.json"), "utf8"));
+
+  test("every SDK artifact passes AP2's checks as the profile implements them, and receipts bind by the SDK's rule", () => {
+    for (const [id, b] of Object.entries(SDK.bundles)) {
+      const an = analyseBundle(b, SDK.trust);
+      assert.deepEqual([an.open, ...an.payments.map(p => p.closed)].flatMap(x => x.checks.filter(c => !c[1]).map(c => c[0])), [], id);
+      for (const p of an.payments) for (const r of p.receipts) assert.equal(r.referenceRule, "closed issuer JWT (AP2 SDK)", id);
+    }
+  });
+
+  test("AMEP afterwards, per payment, on SDK output", () => {
+    const got = Object.fromEntries(Object.entries(SDK.bundles).map(([id, b]) =>
+      [id, amepOfAp2(analyseBundle(b, SDK.trust)).results.map(x => `${x.outcome} ${x.invariant}`).join(", ")]));
+    assert.deepEqual(got, {
+      "sdk-within": "preserved -", "sdk-over-range": "violated I2", "sdk-wrong-payee": "violated I2", "sdk-declined": "preserved -",
+      "sdk-lost-receipt": "unresolved I7", "sdk-budget": "preserved -, violated I2", "sdk-issuer-jwt-hash": "preserved -",
     });
   });
 });

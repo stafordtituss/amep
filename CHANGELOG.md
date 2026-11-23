@@ -8,7 +8,13 @@ Specification drafts, conformance-suite versions and package versions are listed
 - `interop/ap2/` evaluates nine scenarios payment by payment, next to AP2's own per-payment check. AMEP decides two things AP2 leaves open:
   - two payments within `amount_range` that together exceed the budget are `violated`;
   - a second payment while the first one's outcome is unknown is `unresolved`, not `preserved`.
-- The bundles are synthetic, written to the AP2 specification's field names, and not yet checked against AP2's reference implementation. Unmapped constraints are reported as gaps.
+- **Checked against AP2's own Python SDK** (`e1ea56d`). Seven bundles produced by the SDK pass AP2's checks as the profile implements them, and give the expected AMEP verdicts. Nine further synthetic scenarios cover cases the SDK can't produce.
+- **Four findings for AP2** (in `interop/ap2/README.md`):
+  - the specification and SDK compute the receipt `reference` differently;
+  - the budget arithmetic `int(max * 100)` loses a cent to floating point and assumes two decimals;
+  - a budget depends on past spend the caller supplies;
+  - open mandates may omit `exp`.
+- Unmapped constraints are reported as gaps.
 
 ## Packages amep-protocol 0.3.0a3, @stafordtituss/amep 0.3.0-alpha.3, amep-mcp 0.1.0a4 (2026-11-23)
 

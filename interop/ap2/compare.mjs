@@ -52,7 +52,7 @@ const OTHER = { id: "merchant_2", name: "Other Merchant", website: "https://othe
 const CONSTRAINTS = [
   { type: "payment.amount_range", currency: "USD", max: 20000, min: 0 },
   { type: "payment.allowed_payees", allowed: [MERCHANT] },
-  { type: "payment.budget", currency: "USD", max: 30000 },
+  { type: "payment.budget", currency: "USD", max: 300.0 },
 ];
 const openMandate = () => sdJwt({ alg: "ES256", typ: "example+sd-jwt", kid: "ap2-user" }, {},
   [{ vct: "mandate.payment.open.1", constraints: CONSTRAINTS, cnf: { jwk: AGENT.jwk }, iat: T0, exp: T0 + 3600 }], USER.priv);
@@ -109,7 +109,7 @@ function ap2PrePayment(open, c) {
   for (const k of open.claims?.constraints ?? []) {
     if (k.type === "payment.amount_range" && (c.payment_amount?.amount > k.max || c.payment_amount?.amount < (k.min ?? 0))) why.push("amount outside amount_range");
     if (k.type === "payment.allowed_payees" && !k.allowed.some(p => p.id === c.payee?.id)) why.push("payee not allowed");
-    if (k.type === "payment.budget" && c.payment_amount?.amount > k.max) why.push("over budget (this payment alone)");
+    if (k.type === "payment.budget" && c.payment_amount?.amount > Math.round(k.max * 100)) why.push("over budget (this payment alone)");
   }
   return why.length ? `reject: ${why.join("; ")}` : "accept";
 }
@@ -179,7 +179,7 @@ function render(rows) {
     "",
     "Open mandate in every scenario: payee `merchant_1` only, `amount_range` max 200.00 USD, `budget` 300.00 USD, valid one hour.",
     "",
-    "| Scenario | AP2 artifact checks | AP2 per-payment check (before) | Receipts | AMEP afterwards (worst result) | Per payment, in order |",
+    "| Scenario | AP2 artifact checks | AP2 constraint check, this payment alone (before) | Receipts | AMEP afterwards (worst result) | Per payment, in order |",
     "|---|---|---|---|---|---|",
   ];
   for (const r of rows) {

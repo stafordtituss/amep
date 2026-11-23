@@ -6,7 +6,7 @@ AP2 (Agent Payments Protocol) checks each payment **before** it happens: the cre
 
 Open mandate in every scenario: payee `merchant_1` only, `amount_range` max 200.00 USD, `budget` 300.00 USD, valid one hour.
 
-| Scenario | AP2 artifact checks | AP2 per-payment check (before) | Receipts | AMEP afterwards (worst result) | Per payment, in order |
+| Scenario | AP2 artifact checks | AP2 constraint check, this payment alone (before) | Receipts | AMEP afterwards (worst result) | Per payment, in order |
 |---|---|---|---|---|---|
 | `s1-within`: One payment within the mandate, processed | pass | accept | Success | preserved - | i-1: preserved - |
 | `s2-over-range`: Closed mandate above amount_range max (250.00 > 200.00), processed anyway | pass | reject: amount outside amount_range | Success | violated I2 (blame agent) | i-1: violated I2 (blame agent) |
