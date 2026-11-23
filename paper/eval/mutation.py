@@ -76,7 +76,7 @@ def mutants(src):
     lines = src.splitlines(keepends=True)
     fr = func_ranges(src)
     in_fn = lambda ln, *names: any(fr[n][0] <= ln <= fr[n][1] for n in names)
-    eval_fns = ("evaluate", "_evaluate_invocation")
+    eval_fns = ("evaluate", "_evaluate_invocation", "_check_limit")   # _check_limit: spec 7.6, one limit for one effect
     # CHECK: one per _check call and per appended violation/unresolved result in the evaluation procedure
     for i, l in enumerate(lines, 1):
         if in_fn(i, *eval_fns) and "_check(" in l and "def _check" not in l:

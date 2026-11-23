@@ -90,7 +90,10 @@
       "amount": "300.00",
       "unit": "iso4217:EUR",
       "period_spent": {
-       "2592000": "300.00"
+       "2592000": {
+        "from": 0,
+        "total": "300.00"
+       }
       }
      }
     },
@@ -98,7 +101,7 @@
      "kid": "psp-observer-2",
      "alg": "Ed25519",
      "v": 2,
-     "sig": "ba015f4354f9b69599bd15a829fa3093609035fc12783f07f49b246a995e0b6cbb90b8564da675b26bba25f241b3aad99d755c1186f554602e1ba0735a9da50e"
+     "sig": "62f539a2569e82ff311d6c8b5d1808e72acf3e6b6505af441db6468b612c917549312057d3c78f8b8df00c37b875edc7833d2edde152b8ede2f10d9f16f14e05"
     }
    }
   ]

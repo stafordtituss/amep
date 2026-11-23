@@ -414,6 +414,8 @@ PERIOD_KEY = re.compile(r"^[1-9][0-9]{0,15}$")
 def amount_units(s, unit: str | None = None) -> int:
     """'1200.50' -> 1200500000000000000000 (units of 10^-18). Rejects signs, exponents, leading zeros, > 18 decimals.
     Amounts in caip19: units are integers in the asset's smallest unit, as the chain records them (spec 5.9.2)."""
+    if unit is not None and unit.startswith("caip19:") and not (isinstance(s, str) and INTEGER_AMOUNT.match(s)):
+        raise Malformed(f"amount {s!r} in {unit} must be an integer in the asset's smallest unit")
     if not isinstance(s, str) or not AMOUNT.match(s):
         raise Malformed(f"malformed amount {s!r} (a decimal string such as \"1200.00\" is required)")
     if unit is not None and unit.startswith("caip19:") and not INTEGER_AMOUNT.match(s):
@@ -423,11 +425,21 @@ def amount_units(s, unit: str | None = None) -> int:
 
 
 def period_spent_of(v: dict, unit: str) -> dict:
-    """value.period_spent: the observer's own totals, keyed by period length in seconds (spec 5.9.2)."""
+    """value.period_spent: the observer's own totals, keyed by period length in seconds (spec 5.9.2). Each is
+    {"from": <window start>, "total": <amount>}, or a bare amount, which names no window and so never counts as a limit's
+    total (amep#10). Returns {period: (window start or None, amount)}."""
     ps = v.get("period_spent", {})
     if not isinstance(ps, dict) or not all(isinstance(k, str) and PERIOD_KEY.match(k) for k in ps):
-        raise Malformed("period_spent must map period lengths in seconds to amounts, for example {\"2592000\": \"300.00\"}")
-    return {k: amount_units(a, unit) for k, a in ps.items()}
+        raise Malformed("period_spent must map period lengths in seconds to totals, for example {\"2592000\": {\"from\": 0, \"total\": \"300.00\"}}")
+    out = {}
+    for k, a in ps.items():
+        if isinstance(a, dict):
+            if set(a) != {"from", "total"}:
+                raise Malformed("a period_spent total must be {from, total}")
+            out[k] = (to_time(a["from"]), amount_units(a["total"], unit))
+        else:
+            out[k] = (None, amount_units(a, unit))
+    return out
 
 
 def _unit(u) -> str:
@@ -470,6 +482,12 @@ def period_key(n: dict, lim: dict, unit: str, t) -> str:
     anchor = to_time(n["claims"]["nbf"]) if "nbf" in n["claims"] else 0
     window = int((to_time(t) - anchor) // lim["period"])
     return f"{n['id']}|{unit}|{lim['period']}|{window}" + (f"|{','.join(sorted(lim['actions']))}" if "actions" in lim else "")
+
+
+def window_start(n: dict, lim: dict, t) -> float:
+    """Start time of the limit window that contains t (spec 7.6): windows of `period` seconds from the node's nbf, or 0."""
+    anchor = to_time(n["claims"]["nbf"]) if "nbf" in n["claims"] else 0
+    return anchor + int((to_time(t) - anchor) // lim["period"]) * lim["period"]
 
 
 def check_reserve(r) -> dict:
@@ -674,6 +692,46 @@ def _revocation_window(node) -> float:
     if isinstance(w, bool) or not isinstance(w, (int, float)) or w < 0:
         raise Malformed("revocation window must be a non-negative number of seconds")
     return w
+
+
+def _check_limit(n, i, lim, x, v, unit, amt, obs, appr, call_sum, ctx):
+    """One applicable limit of node n for one effect x (spec 7.6 rules 3 to 6). Raises Stop on the first failed check."""
+    _check("per_effect" in lim and amt > amount_units(lim.get("per_effect", "0")) and not appr, "violated", "I2",
+           f"amount {v['amount']} {unit} exceeds the per-effect limit {lim.get('per_effect')} of {n['id']}", blame="agent")
+    call_sum[i] = call_sum.get(i, 0) + amt
+    _check("per_call" in lim and call_sum[i] > amount_units(lim.get("per_call", "0")) and not appr, "violated", "I2",
+           f"this call moves {_units_str(call_sum[i])} {unit}, over the per-call limit {lim.get('per_call')} of {n['id']}", blame="agent")
+    if "per_period" not in lim:
+        return
+    key, start = period_key(n, lim, unit, x["t"]), window_start(n, lim, x["t"])
+    total = ctx["totals"].get(key, 0) + amt
+    # An observer's total is the principal's total only when that observer sees all of this node's spending in the unit
+    # (the limit names it in counted_by, amep#10), and only for this limit's own window: the figure must say the window
+    # starts where the limit's does (amep#10, vendrell46). Other figures never count.
+    entry = period_spent_of(v, unit).get(str(int(lim["period"]))) if lim.get("counted_by") == obs else None
+    counted = entry[1] if entry is not None and entry[0] is not None and entry[0] == start else None
+    if counted is not None:
+        _check(counted < total, "violated", "I7",
+               f"{obs}'s period total {_units_str(counted)} {unit} is below the payments recorded for {n['id']}", blame="server")
+        total = counted
+    _check(total > amount_units(lim["per_period"]) and not appr, "violated", "I2",
+           f"period total {_units_str(total)} {unit} exceeds the per-period limit {lim['per_period']} of {n['id']}", blame="agent")
+    _check(counted is None and key not in ctx["prior_windows"], "unresolved", "I7",
+           f"period total for {n['id']} cannot be established: no total from its counting observer for this window and no earlier state",
+           need="period_total", ref=n['id'])
+    # holds (spec 7.6 rule 6): an earlier call with an unknown outcome may already have spent part of this window. An
+    # approval that passed I8 authorizes going over the limit for its effect, so holds don't block it.
+    holds = [(h["invocation"], h["amounts"][key]) for h in ctx["held"].values() if key in h["amounts"]]
+    if holds and not appr:
+        unknown = [h for h, a in holds if a is None]
+        _check(bool(unknown), "unresolved", "I7",
+               f"the outcome of {unknown[0] if unknown else ''} is unknown, so the period total of {n['id']} cannot be bounded",
+               need="held_outcome", ref=unknown[0] if unknown else "-")
+        held_sum = sum(amount_units(a, unit) for _, a in holds)
+        _check(total + held_sum > amount_units(lim["per_period"]), "unresolved", "I7",
+               f"period total {_units_str(total)} {unit} plus {_units_str(held_sum)} held for {', '.join(h for h, _ in holds)} "
+               f"would exceed the per-period limit {lim['per_period']} of {n['id']}", need="held_outcome", ref=holds[0][0])
+    ctx["totals"][key] = total
 
 
 def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects, spent, approval_use, extra_protected, order, taint, ctx):
@@ -896,56 +954,38 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
             first = approval_use.setdefault(appr["id"], use)
             _check(first != use, "violated", "I8", f"approval already used by {first[0]}", blame="agent")
     # 16. quantity limits (spec 7.6, v0.3), on every node of the chain and on the intent. An approval that passed I8
-    # authorizes going over a limit; the amount still counts toward the period total.
+    # authorizes going over a limit; the amount still counts toward the period total. Every applicable limit is
+    # checked before the result is decided, and a violation beats an unresolved check, so the verdict doesn't depend on
+    # the order the limits are listed in (amep#10, vendrell46).
+    deferred: list = []
     for n in limited:
         call_sum: dict = {}   # limit index -> amount moved by this call so far
         for x, _d, obs in effects_of:
             applicable = [(i, lim) for i, lim in enumerate(n["claims"]["limits"]) if limit_applies(lim, x)]
             if not applicable:
                 continue
-            v = x.get("value")
-            _check(v is None, "unresolved", "I7", f"{n['id']} limits this effect but the receipt records no value", need="value", ref=n['id'])
-            unit = v["unit"]
-            amt = amount_units(v["amount"], unit)
-            matching = [(i, lim) for i, lim in applicable if lim["unit"] == unit]
-            if not matching:
-                money = unit.startswith(MONEY_UNITS) or x["effect"] == "financial"
-                _check(money, "violated", "I2", f"{unit} is not an asset {n['id']} authorizes", blame="agent")
-                _check(True, "unresolved", "I7", f"{n['id']} limits this effect in another unit than {unit}", need="value", ref=n['id'])
+            try:
+                v = x.get("value")
+                _check(v is None, "unresolved", "I7", f"{n['id']} limits this effect but the receipt records no value", need="value", ref=n['id'])
+                unit = v["unit"]
+                amt = amount_units(v["amount"], unit)
+                matching = [(i, lim) for i, lim in applicable if lim["unit"] == unit]
+                if not matching:
+                    money = unit.startswith(MONEY_UNITS) or x["effect"] == "financial"
+                    _check(money, "violated", "I2", f"{unit} is not an asset {n['id']} authorizes", blame="agent")
+                    _check(True, "unresolved", "I7", f"{n['id']} limits this effect in another unit than {unit}", need="value", ref=n['id'])
+            except Stop as stop:
+                deferred.append(stop)
+                continue
             for i, lim in matching:
-                _check("per_effect" in lim and amt > amount_units(lim.get("per_effect", "0")) and not appr, "violated", "I2",
-                       f"amount {v['amount']} {unit} exceeds the per-effect limit {lim.get('per_effect')} of {n['id']}", blame="agent")
-                call_sum[i] = call_sum.get(i, 0) + amt
-                _check("per_call" in lim and call_sum[i] > amount_units(lim.get("per_call", "0")) and not appr, "violated", "I2",
-                       f"this call moves {_units_str(call_sum[i])} {unit}, over the per-call limit {lim.get('per_call')} of {n['id']}", blame="agent")
-                if "per_period" not in lim:
-                    continue
-                key = period_key(n, lim, unit, x["t"])
-                total = ctx["totals"].get(key, 0) + amt
-                # An observer's total is the principal's total only when that observer sees all of this node's spending
-                # in the unit: the limit names it in counted_by (amep#10). Other observers' totals never count.
-                counted = period_spent_of(v, unit).get(str(int(lim["period"]))) if lim.get("counted_by") == obs else None
-                if counted is not None:
-                    _check(counted < total, "violated", "I7",
-                           f"{obs}'s period total {_units_str(counted)} {unit} is below the payments recorded for {n['id']}", blame="server")
-                    total = counted
-                _check(total > amount_units(lim["per_period"]) and not appr, "violated", "I2",
-                       f"period total {_units_str(total)} {unit} exceeds the per-period limit {lim['per_period']} of {n['id']}", blame="agent")
-                _check(counted is None and key not in ctx["prior_windows"], "unresolved", "I7",
-                       f"period total for {n['id']} cannot be established: no total from its counting observer and no earlier state", need="period_total", ref=n['id'])
-                # holds (spec 7.6 rule 6): an earlier call with an unknown outcome may already have spent part of this window
-                # An approval that passed I8 authorizes going over the limit for its effect, so holds don't block it.
-                holds = [(h["invocation"], h["amounts"][key]) for h in ctx["held"].values() if key in h["amounts"]]
-                if holds and not appr:
-                    unknown = [i for i, a in holds if a is None]
-                    _check(bool(unknown), "unresolved", "I7",
-                           f"the outcome of {unknown[0] if unknown else ''} is unknown, so the period total of {n['id']} cannot be bounded",
-                           need="held_outcome", ref=unknown[0] if unknown else "-")
-                    held_sum = sum(amount_units(a, unit) for _, a in holds)
-                    _check(total + held_sum > amount_units(lim["per_period"]), "unresolved", "I7",
-                           f"period total {_units_str(total)} {unit} plus {_units_str(held_sum)} held for {', '.join(i for i, _ in holds)} "
-                           f"would exceed the per-period limit {lim['per_period']} of {n['id']}", need="held_outcome", ref=holds[0][0])
-                ctx["totals"][key] = total
+                try:
+                    _check_limit(n, i, lim, x, v, unit, amt, obs, appr, call_sum, ctx)
+                except Stop as stop:
+                    deferred.append(stop)
+    for o in ("violated", "unresolved"):
+        stop = next((d for d in deferred if d.r[0] == o), None)
+        if stop:
+            raise stop
     # 17. risk budget: recorded spend must match receipts; over budget needs a bound approval
     c = sum(cost(x) for x, _, _ in effects_of)
     _check("budget_spent" in inv and inv["budget_spent"] != c, "violated", "I7", "recorded budget spend does not match receipts", blame="host")

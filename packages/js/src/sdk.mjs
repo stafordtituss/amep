@@ -46,6 +46,8 @@ export function effectBody(action, resource, effect, t, { released = [], reversi
 }
 
 /** A quantity (spec 5.9.2): amounts are exact decimal strings, for example value("1200.00", "iso4217:EUR"). */
+// periodSpent: the observer's own totals by period length, each for the window it names (spec 5.9.2), for example
+// { "2592000": { from: 1765152000, total: "1030.00" } }.
 export function value(amount, unit, { periodSpent } = {}) {
   if (typeof amount !== "string") throw new Error('amount must be a decimal string, for example "1200.00"');
   return clean({ amount, unit, period_spent: periodSpent });

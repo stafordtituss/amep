@@ -92,7 +92,10 @@
       "amount": "900.00",
       "unit": "iso4217:EUR",
       "period_spent": {
-       "2592000": "900.00"
+       "2592000": {
+        "from": 0,
+        "total": "900.00"
+       }
       }
      }
     },
@@ -100,7 +103,7 @@
      "kid": "bank-observer-1",
      "alg": "Ed25519",
      "v": 2,
-     "sig": "24dfa386062d2ca2b56be5cfe746ba5240354dba8968ea2425c51dbf90e0837bc1570a27d34d840ba44cd0995ae72332e582b6686d7b013096248248aba65a02"
+     "sig": "988370cab306ce15b51897935ffbc12765157fe68f29cf0bd084ffc65f578d9f78629b5656af995799d6f3d5fc456c03ee23cc7cc2841cd0bab49f99546c2202"
     }
    }
   ],

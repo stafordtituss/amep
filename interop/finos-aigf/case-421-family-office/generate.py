@@ -82,7 +82,7 @@ def build():
                                   "executed": {"action": "trade.book", "resource": inv["declared"]["resource"],
                                                "effect": "financial", "released": [], "t": inv["t"] + 1,
                                                "value": {"amount": amount, "unit": USD,
-                                                         "period_spent": {str(PERIOD): spent}}}}, v=2)
+                                                         "period_spent": {str(PERIOD): {"from": 0, "total": spent}}}}}, v=2)
         st = obs[inst].sign({"id": f"c-{inv['id'][2:]}", "kind": "call_statement", "invocation": inv["id"],
                              "observed_by": INST[inst], "disposition": "completed", "effect_count": 1,
                              "t": inv["t"] + 2, "invocation_digest": d}, v=2)

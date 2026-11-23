@@ -2,6 +2,25 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## Limits: order-independent, and observer totals name their window (unreleased, 2026-11-23)
+
+From Carlos Vendrell Felici's rerun of his payments review against this draft (stafordtituss/amep#10, 23 Nov 2026). He found three problems.
+
+- **Order (spec 7.6).** With a daily and a monthly limit, and a bank figure for the month only, the verdict depended on which limit was listed first: `unresolved` (I7) one way, `violated` (I2) the other. Both verifiers now check every applicable limit before deciding, and a violation beats an unresolved check, as across results (10.5).
+- **Windows (spec 5.9.2, 7.6 rule 4).** `period_spent` named a period length but not a window. A bank reporting its own month, which started on day 20, was taken as the limit's total for a window starting at day 0:
+  - with no state, a payment was `preserved` at 300.00 of 500.00 although the window also held 400.00 (a false `preserved`);
+  - with that 400.00 in state, the honest bank was blamed (`violated` I7).
+
+  Each figure is now `{from, total}`, and counts only when `from` is the start of the limit's window. A bare figure names no window and never counts, so it fails closed: the packet is decided from verifier state or is `unresolved`. The generated vectors now state their window, so they keep their verdicts.
+- **caip19 reason.** A decimal amount in a `caip19:` unit now gets the reason that asks for an integer in the asset's smallest unit. The outcome is unchanged.
+- **Five new vectors:**
+  - the order case, both ways round (both `violated` I2);
+  - a bare figure, and a figure for another window (both `unresolved`);
+  - the honest-bank case (now `violated` I2, blame `agent`, at 700.00).
+
+  Suite v0.3.0 is 233 vectors (62 positive, 171 must-reject); both verifiers agree on all 269 of the three suites. JSON Schema and CDDL require `{from, total}`.
+- **Private vulnerability reporting** is now enabled on the repository, for the operation-approval findings he holds back for a private advisory.
+
 ## Holds: an unknown outcome stays counted across packets (unreleased, 2026-11-23)
 
 - **Spec 7.6 rule 6, 5.8 and 10.7:** an invocation may carry `reserve` (`{amount, unit}`), the most the call can move. When a verified invocation ends a packet with no receipt and no `not_executed` statement, the verifier's state holds it against every period limit on its chain: at its `reserve`, or at an unknown amount without one. In later packets:

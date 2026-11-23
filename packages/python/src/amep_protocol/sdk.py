@@ -134,8 +134,10 @@ def effect_body(action, resource, effect, t, *, released=None, reversible=None, 
                    "value": value, "t": t})
 
 
-def value(amount: str, unit: str, *, period_spent: str | None = None) -> dict:
-    """A quantity (spec 5.9.2): amounts are exact decimal strings, for example value("1200.00", "iso4217:EUR")."""
+def value(amount: str, unit: str, *, period_spent: dict | None = None) -> dict:
+    """A quantity (spec 5.9.2): amounts are exact decimal strings, for example value("1200.00", "iso4217:EUR").
+    period_spent: the observer's own totals by period length, each for the window it names, for example
+    {"2592000": {"from": 1765152000, "total": "1030.00"}}."""
     if not isinstance(amount, str):
         raise ValueError('amount must be a decimal string, for example "1200.00"')
     return _clean({"amount": amount, "unit": unit, "period_spent": period_spent})

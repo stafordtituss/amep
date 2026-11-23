@@ -43,9 +43,11 @@ schemas["common"] = {
                  "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}:[!-~]{1,128}$"},
         "value": {"type": "object", "required": ["amount", "unit"], "additionalProperties": False, "patternProperties": EXT,
                   "properties": {"amount": {"$ref": "#/$defs/amount"}, "unit": {"$ref": "#/$defs/unit"},
-                                 "period_spent": {"description": "The observer's own totals, keyed by period length in seconds (spec 5.9.2).",
+                                 "period_spent": {"description": "The observer's own totals, keyed by period length in seconds, each for the window starting at `from` (spec 5.9.2).",
                                                   "type": "object", "additionalProperties": False,
-                                                  "patternProperties": {"^[1-9][0-9]{0,15}$": {"$ref": "#/$defs/amount"}}}}},
+                                                  "patternProperties": {"^[1-9][0-9]{0,15}$": {
+                                                      "type": "object", "required": ["from", "total"], "additionalProperties": False,
+                                                      "properties": {"from": {"$ref": "#/$defs/time"}, "total": {"$ref": "#/$defs/amount"}}}}}}},
         "limit": {"type": "object", "required": ["unit"], "additionalProperties": False, "patternProperties": EXT,
                   "dependentRequired": {"per_period": ["period"], "period": ["per_period"]},
                   "properties": {"unit": {"$ref": "#/$defs/unit"}, "per_effect": {"$ref": "#/$defs/amount"}, "per_call": {"$ref": "#/$defs/amount"},

@@ -548,11 +548,13 @@ def vectors():
     keys[PSP.kid] = PSP.public()
 
     def pay(p, amounts, limits=None, value=True, approve_n=(), deleg_limits=None, unit="iso4217:EUR", spent=None,
-            num_amount=False, one_call=False, observers=None):
+            num_amount=False, one_call=False, observers=None, bare=False, window_from=None):
         """A v0.3 packet: an assistant pays payees under a mandate (and optionally a delegation).
         spent: the bank's signed monthly totals, one per payment; the limits then name the bank in counted_by.
         one_call: every payment is an effect of one invocation (one tool call that pays several times).
-        observers: per payment, "bank" (default) or "psp", a second payment service."""
+        observers: per payment, "bank" (default) or "psp", a second payment service.
+        Each figure in spent is the bank's total for the window that contains the payment, stated as {from, total}
+        (amep#10, vendrell46). bare: give bare figures instead, which name no window. window_from: state this start."""
         claims = {"actions": ["payments.send"], "resources": ["payee:*"], "ceiling": "financial", "exp": 100}
         if limits is not None:
             if spent:
@@ -574,7 +576,10 @@ def vectors():
             if value:
                 body["value"] = {"amount": float(amt) if num_amount else amt, "unit": unit}
                 if spent and spent[n - 1] is not None:
-                    body["value"]["period_spent"] = spent[n - 1] if isinstance(spent[n - 1], dict) else {"2592000": spent[n - 1]}
+                    figures = spent[n - 1] if isinstance(spent[n - 1], dict) else {"2592000": spent[n - 1]}
+                    body["value"]["period_spent"] = figures if bare else {
+                        k: {"from": (body["t"] // int(k)) * int(k) if window_from is None else window_from, "total": f} if isinstance(f, str) else f
+                        for k, f in figures.items()}
             iid = "i-1" if one_call else f"i-{n}"
             if not one_call or n == 1:
                 inv = {"id": iid, "kind": "invocation", "authority_ref": auth, "interpretation_ref": "a-1",
@@ -696,6 +701,22 @@ def vectors():
     add("value given as a string instead of an object", ("unresolved", "I7"), lambda p, *a: (
         pay(p, ["84.10"], EUR(per_call="500.00")),
         p.update(effects=[B.sign({**p["effects"][0], "executed": {**p["effects"][0]["executed"], "value": "84.10 EUR"}}, v=2)])))
+
+    # Limit order and observer windows, from vendrell46's rerun (stafordtituss/amep#10, 23 Nov 2026). The verdict must
+    # not depend on the order the limits are listed in, and an observer's figure counts only for the window it names.
+    DAYLIM = {"unit": "iso4217:EUR", "per_period": "100.00", "period": 86400}
+    MONTHLIM = {"unit": "iso4217:EUR", "per_period": "1000.00", "period": MONTH}
+    add("limit order: the daily limit listed first", ("violated", "I2"), lambda p, *a: pay(
+        p, ["30.00"], [DAYLIM, MONTHLIM], spent=[{str(MONTH): "1030.00"}]))
+    add("limit order: the monthly limit listed first", ("violated", "I2"), lambda p, *a: pay(
+        p, ["30.00"], [MONTHLIM, DAYLIM], spent=[{str(MONTH): "1030.00"}]))
+    add("observer figure that names no window does not count", ("unresolved", "I7"), lambda p, *a: pay(
+        p, ["300.00"], EUR(per_period="500.00", period=MONTH), spent=["300.00"], bare=True))
+    add("observer figure for another window does not count", ("unresolved", "I7"), lambda p, *a: pay(
+        p, ["300.00"], EUR(per_period="500.00", period=MONTH), spent=["300.00"], window_from=20 * 86400))
+    add("observer's own month is not held against it", ("violated", "I2"), lambda p, *a: pay(
+        p, ["300.00"], EUR(per_period="500.00", period=MONTH), spent=["300.00"], window_from=20 * 86400),
+        state={"period_totals": {"m-1|iso4217:EUR|2592000|0": "400.00"}, "spent": {}, "approvals_used": {}})
 
     # 6. Call statements and binding (spec 5.14). From the review of the MCP extension proposal by Brennan Zambo
     # (modelcontextprotocol/agents-ig#31): a missing receipt must be distinguishable from "nothing was executed", a

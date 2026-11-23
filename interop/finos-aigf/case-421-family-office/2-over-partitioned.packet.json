@@ -177,7 +177,10 @@
      "amount": "6000000.00",
      "unit": "iso4217:USD",
      "period_spent": {
-      "1000": "6000000.00"
+      "1000": {
+       "from": 0,
+       "total": "6000000.00"
+      }
      }
     }
    },
@@ -185,7 +188,7 @@
     "kid": "inst:bank-a.example",
     "alg": "Ed25519",
     "v": 2,
-    "sig": "563d63b2fd86f9705f4ce3f9e08ddceed02b26dc34d9bdc4ed7c389278035a7bcb809deee4097124ff5f23c763043318c3307347140fefb4cd8f30a020d2c003"
+    "sig": "e01ab912d78266a530431204009e227f37be5377dd96569df85a7f89b306ffb2adacb483197e76fea0b6897fa4259fa0a2f9e907881dde799849323e6b3fab08"
    }
   },
   {
@@ -205,7 +208,10 @@
      "amount": "5000000.00",
      "unit": "iso4217:USD",
      "period_spent": {
-      "1000": "5000000.00"
+      "1000": {
+       "from": 0,
+       "total": "5000000.00"
+      }
      }
     }
    },
@@ -213,7 +219,7 @@
     "kid": "inst:bank-b.example",
     "alg": "Ed25519",
     "v": 2,
-    "sig": "7d3583ea7e19b2714859dbd1f5888d43e6e2da504edcdd7f9da030d6708974913dc329d9774f24ffed0e57b713c5140013a462d32cae9834c64ad2200d0a9c08"
+    "sig": "b9687f619a566380b274cb3d1e7051e0b7dbf167b1ef23044f82fdb59398d4d2a0e938d68c6c5c7852c55af253d80c7680593819d940962a32820f996d87d90a"
    }
   }
  ],

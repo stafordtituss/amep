@@ -303,18 +303,28 @@ const LIMIT_MEMBERS = new Set(["unit", "per_effect", "per_call", "per_period", "
 const INTEGER_AMOUNT = /^(0|[1-9][0-9]{0,38})$/, PERIOD_KEY = /^[1-9][0-9]{0,15}$/;
 // Amounts in caip19: units are integers in the asset's smallest unit, as the chain records them (spec 5.9.2).
 export function amountUnits(s, unit) {
+  if (unit !== undefined && unit.startsWith("caip19:") && !(typeof s === "string" && INTEGER_AMOUNT.test(s)))
+    throw new Malformed(`amount ${JSON.stringify(s)} in ${unit} must be an integer in the asset's smallest unit`);
   if (typeof s !== "string" || !AMOUNT.test(s)) throw new Malformed(`malformed amount ${JSON.stringify(s)} (a decimal string such as "1200.00" is required)`);
   if (unit !== undefined && unit.startsWith("caip19:") && !INTEGER_AMOUNT.test(s))
     throw new Malformed(`amount ${JSON.stringify(s)} in ${unit} must be an integer in the asset's smallest unit`);
   const [ip, fp = ""] = s.split(".");
   return BigInt(ip) * SCALE + BigInt((fp + "0".repeat(18)).slice(0, 18));
 }
-// value.period_spent: the observer's own totals, keyed by period length in seconds (spec 5.9.2)
+// value.period_spent: the observer's own totals, keyed by period length in seconds (spec 5.9.2). Each is
+// {"from": <window start>, "total": <amount>}, or a bare amount, which names no window and so never counts as a limit's
+// total (amep#10). Returns period -> [window start or null, amount].
 function periodSpentOf(v, unit) {
   const ps = "period_spent" in v ? v.period_spent : {};
   if (!ps || typeof ps !== "object" || Array.isArray(ps) || !Object.keys(ps).every(k => PERIOD_KEY.test(k)))
-    throw new Malformed('period_spent must map period lengths in seconds to amounts, for example {"2592000": "300.00"}');
-  return new Map(Object.entries(ps).map(([k, a]) => [k, amountUnits(a, unit)]));
+    throw new Malformed('period_spent must map period lengths in seconds to totals, for example {"2592000": {"from": 0, "total": "300.00"}}');
+  return new Map(Object.entries(ps).map(([k, a]) => {
+    if (a && typeof a === "object" && !Array.isArray(a)) {
+      if (Object.keys(a).sort().join() !== "from,total") throw new Malformed("a period_spent total must be {from, total}");
+      return [k, [toTime(a.from), amountUnits(a.total, unit)]];
+    }
+    return [k, [null, amountUnits(a, unit)]];
+  }));
 }
 const unitOf = u => { if (typeof u !== "string" || !UNIT.test(u)) throw new Malformed(`malformed unit ${JSON.stringify(u)}`); return u; };
 const unitsStr = u => { const ip = u / SCALE, fp = (u % SCALE).toString().padStart(18, "0").replace(/0+$/, ""); return fp ? `${ip}.${fp}` : `${ip}`; };
@@ -338,6 +348,11 @@ function checkLimits(lims) {
 }
 // The running-total key of one limit window (spec 7.6): one total per limit, so limits that differ only in their actions
 // are separate caps (amep#10).
+// Start time of the limit window that contains t (spec 7.6): windows of `period` seconds from the node's nbf, or 0.
+function windowStart(node, lim, t) {
+  const anchor = "nbf" in node.claims ? toTime(node.claims.nbf) : 0;
+  return anchor + Math.floor((toTime(t) - anchor) / lim.period) * lim.period;
+}
 function periodKey(node, lim, unit, t) {
   const anchor = "nbf" in node.claims ? toTime(node.claims.nbf) : 0;
   const window = Math.floor((toTime(t) - anchor) / lim.period);
@@ -668,57 +683,71 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       }
     }
     // quantity limits (spec 7.6, v0.3), on every node of the chain and on the intent. An approval that passed I8
-    // authorizes going over a limit; the amount still counts toward the period total.
+    // authorizes going over a limit; the amount still counts toward the period total. Every applicable limit is checked
+    // before the result is decided, and a violation beats an unresolved check, so the verdict doesn't depend on the
+    // order the limits are listed in (amep#10, vendrell46).
+    const deferred = [];
+    const defer = f => { try { f(); } catch (e) { if (e instanceof Stop) deferred.push(e); else throw e; } };
     for (const node of limited) {
       const callSum = new Map();   // limit index -> amount moved by this call so far
       for (const [x, , obs] of effectsOf) {
         const applicable = node.claims.limits.map((lim, i) => [i, lim]).filter(([, lim]) => limitApplies(lim, x));
         if (!applicable.length) continue;
-        const v = x.value;
-        check(v === undefined, "unresolved", "I7", `${node.id} limits this effect but the receipt records no value`, { need: "value", ref: node.id });
-        const unit = v.unit, amt = amountUnits(v.amount, unit);
-        const matching = applicable.filter(([, lim]) => lim.unit === unit);
-        if (!matching.length) {
-          const money = MONEY_UNITS.some(m => unit.startsWith(m)) || x.effect === "financial";
-          check(money, "violated", "I2", `${unit} is not an asset ${node.id} authorizes`, { blame: "agent" });
-          check(true, "unresolved", "I7", `${node.id} limits this effect in another unit than ${unit}`, { need: "value", ref: node.id });
-        }
-        for (const [i, lim] of matching) {
-          check("per_effect" in lim && amt > amountUnits(lim.per_effect) && !ap, "violated", "I2",
-            `amount ${v.amount} ${unit} exceeds the per-effect limit ${lim.per_effect} of ${node.id}`, { blame: "agent" });
-          callSum.set(i, (callSum.get(i) ?? 0n) + amt);
-          check("per_call" in lim && callSum.get(i) > amountUnits(lim.per_call) && !ap, "violated", "I2",
-            `this call moves ${unitsStr(callSum.get(i))} ${unit}, over the per-call limit ${lim.per_call} of ${node.id}`, { blame: "agent" });
-          if (!("per_period" in lim)) continue;
-          const key = periodKey(node, lim, unit, x.t);
-          let total = (totals.get(key) ?? 0n) + amt;
-          // An observer's total is the principal's total only when that observer sees all of this node's spending in
-          // the unit: the limit names it in counted_by (amep#10). Other observers' totals never count.
-          const counted = lim.counted_by === obs ? periodSpentOf(v, unit).get(String(lim.period)) : undefined;
-          if (counted !== undefined) {
-            check(counted < total, "violated", "I7", `${obs}'s period total ${unitsStr(counted)} ${unit} is below the payments recorded for ${node.id}`, { blame: "server" });
-            total = counted;
+        let v, unit, amt, matching, ok = false;
+        defer(() => {
+          v = x.value;
+          check(v === undefined, "unresolved", "I7", `${node.id} limits this effect but the receipt records no value`, { need: "value", ref: node.id });
+          unit = v.unit; amt = amountUnits(v.amount, unit);
+          matching = applicable.filter(([, lim]) => lim.unit === unit);
+          if (!matching.length) {
+            const money = MONEY_UNITS.some(m => unit.startsWith(m)) || x.effect === "financial";
+            check(money, "violated", "I2", `${unit} is not an asset ${node.id} authorizes`, { blame: "agent" });
+            check(true, "unresolved", "I7", `${node.id} limits this effect in another unit than ${unit}`, { need: "value", ref: node.id });
           }
-          check(total > amountUnits(lim.per_period) && !ap, "violated", "I2",
-            `period total ${unitsStr(total)} ${unit} exceeds the per-period limit ${lim.per_period} of ${node.id}`, { blame: "agent" });
-          check(counted === undefined && !priorWindows.has(key), "unresolved", "I7",
-            `period total for ${node.id} cannot be established: no total from its counting observer and no earlier state`, { need: "period_total", ref: node.id });
-          // holds (spec 7.6 rule 6): an earlier call with an unknown outcome may already have spent part of this window
-          // An approval that passed I8 authorizes going over the limit for its effect, so holds don't block it.
-          const holds = Object.values(held).filter(h => key in h.amounts).map(h => [h.invocation, h.amounts[key]]);
-          if (holds.length && !ap) {
-            const unknown = holds.filter(([, a]) => a === null).map(([i]) => i);
-            check(unknown.length > 0, "unresolved", "I7",
-              `the outcome of ${unknown[0] ?? ""} is unknown, so the period total of ${node.id} cannot be bounded`,
-              { need: "held_outcome", ref: unknown[0] ?? "-" });
-            const heldSum = holds.reduce((s, [, a]) => s + amountUnits(a, unit), 0n);
-            check(total + heldSum > amountUnits(lim.per_period), "unresolved", "I7",
-              `period total ${unitsStr(total)} ${unit} plus ${unitsStr(heldSum)} held for ${holds.map(([i]) => i).join(", ")} would exceed the per-period limit ${lim.per_period} of ${node.id}`,
-              { need: "held_outcome", ref: holds[0][0] });
-          }
-          totals.set(key, total);
-        }
+          ok = true;
+        });
+        if (!ok) continue;
+        for (const [i, lim] of matching) defer(() => checkLimit(node, i, lim, x, v, unit, amt, obs, callSum));
       }
+    }
+    for (const o of ["violated", "unresolved"]) { const d = deferred.find(e => e.outcome === o); if (d) throw d; }
+    // One applicable limit of node for one effect x (spec 7.6 rules 3 to 6). Throws Stop on the first failed check.
+    function checkLimit(node, i, lim, x, v, unit, amt, obs, callSum) {
+      check("per_effect" in lim && amt > amountUnits(lim.per_effect) && !ap, "violated", "I2",
+        `amount ${v.amount} ${unit} exceeds the per-effect limit ${lim.per_effect} of ${node.id}`, { blame: "agent" });
+      callSum.set(i, (callSum.get(i) ?? 0n) + amt);
+      check("per_call" in lim && callSum.get(i) > amountUnits(lim.per_call) && !ap, "violated", "I2",
+        `this call moves ${unitsStr(callSum.get(i))} ${unit}, over the per-call limit ${lim.per_call} of ${node.id}`, { blame: "agent" });
+      if (!("per_period" in lim)) return;
+      const key = periodKey(node, lim, unit, x.t), start = windowStart(node, lim, x.t);
+      let total = (totals.get(key) ?? 0n) + amt;
+      // An observer's total is the principal's total only when that observer sees all of this node's spending in the
+      // unit (the limit names it in counted_by, amep#10), and only for this limit's own window: the figure must say the
+      // window starts where the limit's does (amep#10, vendrell46). Other figures never count.
+      const entry = lim.counted_by === obs ? periodSpentOf(v, unit).get(String(lim.period)) : undefined;
+      const counted = entry !== undefined && entry[0] !== null && entry[0] === start ? entry[1] : undefined;
+      if (counted !== undefined) {
+        check(counted < total, "violated", "I7", `${obs}'s period total ${unitsStr(counted)} ${unit} is below the payments recorded for ${node.id}`, { blame: "server" });
+        total = counted;
+      }
+      check(total > amountUnits(lim.per_period) && !ap, "violated", "I2",
+        `period total ${unitsStr(total)} ${unit} exceeds the per-period limit ${lim.per_period} of ${node.id}`, { blame: "agent" });
+      check(counted === undefined && !priorWindows.has(key), "unresolved", "I7",
+        `period total for ${node.id} cannot be established: no total from its counting observer for this window and no earlier state`, { need: "period_total", ref: node.id });
+      // holds (spec 7.6 rule 6): an earlier call with an unknown outcome may already have spent part of this window. An
+      // approval that passed I8 authorizes going over the limit for its effect, so holds don't block it.
+      const holds = Object.values(held).filter(h => key in h.amounts).map(h => [h.invocation, h.amounts[key]]);
+      if (holds.length && !ap) {
+        const unknown = holds.filter(([, a]) => a === null).map(([h]) => h);
+        check(unknown.length > 0, "unresolved", "I7",
+          `the outcome of ${unknown[0] ?? ""} is unknown, so the period total of ${node.id} cannot be bounded`,
+          { need: "held_outcome", ref: unknown[0] ?? "-" });
+        const heldSum = holds.reduce((s, [, a]) => s + amountUnits(a, unit), 0n);
+        check(total + heldSum > amountUnits(lim.per_period), "unresolved", "I7",
+          `period total ${unitsStr(total)} ${unit} plus ${unitsStr(heldSum)} held for ${holds.map(([h]) => h).join(", ")} would exceed the per-period limit ${lim.per_period} of ${node.id}`,
+          { need: "held_outcome", ref: holds[0][0] });
+      }
+      totals.set(key, total);
     }
     const c = effectsOf.reduce((s, [x]) => s + cost(x), 0);
     check("budget_spent" in inv && inv.budget_spent !== c, "violated", "I7", "recorded budget spend does not match receipts", { blame: "host" });

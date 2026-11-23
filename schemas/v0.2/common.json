@@ -106,12 +106,25 @@
      "$ref": "#/$defs/unit"
     },
     "period_spent": {
-     "description": "The observer's own totals, keyed by period length in seconds (spec 5.9.2).",
+     "description": "The observer's own totals, keyed by period length in seconds, each for the window starting at `from` (spec 5.9.2).",
      "type": "object",
      "additionalProperties": false,
      "patternProperties": {
       "^[1-9][0-9]{0,15}$": {
-       "$ref": "#/$defs/amount"
+       "type": "object",
+       "required": [
+        "from",
+        "total"
+       ],
+       "additionalProperties": false,
+       "properties": {
+        "from": {
+         "$ref": "#/$defs/time"
+        },
+        "total": {
+         "$ref": "#/$defs/amount"
+        }
+       }
       }
      }
     }

@@ -110,7 +110,10 @@
       "amount": "300.00",
       "unit": "iso4217:EUR",
       "period_spent": {
-       "2592000": "300.00"
+       "2592000": {
+        "from": 0,
+        "total": "300.00"
+       }
       }
      }
     },
@@ -118,7 +121,7 @@
      "kid": "bank-observer-1",
      "alg": "Ed25519",
      "v": 2,
-     "sig": "3a5b43249e72b3c7ff0436ac07db4ab985c474fd0e5b80edc2526aab89e181f32655c5912b97f526b5288dd8b9122897346d714fca5a94585e555f1456b70604"
+     "sig": "b0429d5a61ce261b6e3a8c931866f666d922e5639665a968ab236b73df4ad565f567022bf3271a25f2e73ebc294152992187aa391581a1576a82075e67e7500a"
     }
    },
    {
@@ -137,7 +140,10 @@
       "amount": "150.00",
       "unit": "iso4217:EUR",
       "period_spent": {
-       "2592000": "450.00"
+       "2592000": {
+        "from": 0,
+        "total": "450.00"
+       }
       }
      }
     },
@@ -145,7 +151,7 @@
      "kid": "bank-observer-1",
      "alg": "Ed25519",
      "v": 2,
-     "sig": "6caa5dad2867a0d206d68025af0d338709ecdee20a9fd15efe7a8f2bf8b0801b7577de7267a17e17a4485274076744e0d9491b1bb6fc36081879c38c061c4e0f"
+     "sig": "f0bb411b8b894c9681ac005f6c724abccbef90e92aa532f33a62279c1dcdc56b63d3652f0d98f01de66636c4cbd8a956f503861411300039e2be7b0a95c9cf03"
     }
    }
   ]
