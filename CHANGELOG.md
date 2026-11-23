@@ -2,6 +2,14 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## AP2 payments, evaluated afterwards (unreleased, 2026-11-23)
+
+- `packages/conformance/src/profiles/ap2.mjs` reads Google's Agent Payments Protocol (AP2) artifacts and checks them by AP2's own rules: ES256 signatures, SD-JWT disclosures, the closed mandate's `sd_hash`, and receipt references. It builds AMEP evidence from them: the open mandate becomes the authority, each closed mandate an invocation with its amount as `reserve`, and each signed receipt an effect or a `not_executed` statement.
+- `interop/ap2/` evaluates nine scenarios payment by payment, next to AP2's own per-payment check. AMEP decides two things AP2 leaves open:
+  - two payments within `amount_range` that together exceed the budget are `violated`;
+  - a second payment while the first one's outcome is unknown is `unresolved`, not `preserved`.
+- The bundles are synthetic, written to the AP2 specification's field names, and not yet checked against AP2's reference implementation. Unmapped constraints are reported as gaps.
+
 ## Packages amep-protocol 0.3.0a3, @stafordtituss/amep 0.3.0-alpha.3, amep-mcp 0.1.0a4 (2026-11-23)
 
 They carry the three changes below that were marked unreleased:

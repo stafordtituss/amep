@@ -451,3 +451,51 @@ describe("profile: EMILIA Protocol", () => {
     assert.ok(epPredicted(p("lte", { value: "9" }), obs).claims.limits);
   });
 });
+
+// ---- AP2 (Agent Payments Protocol) ----
+import { analyseBundle, claimsFromOpen, majorUnits, readSdJwt, splitChain } from "../src/profiles/ap2.mjs";
+import { compare as ap2Compare } from "../../../interop/ap2/compare.mjs";
+
+describe("profile: AP2 (Agent Payments Protocol)", () => {
+  const FX = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "fixtures", "ap2", "bundles.json"), "utf8"));
+
+  test("minor units: integer amounts in a known currency only", () => {
+    assert.equal(majorUnits(19900, "USD"), "199.00");
+    assert.equal(majorUnits(5, "USD"), "0.05");
+    assert.equal(majorUnits(1200, "JPY"), "1200");
+    assert.equal(majorUnits(100.5, "USD"), null);
+    assert.equal(majorUnits(100, "XYZ"), null);
+  });
+
+  test("AP2's own artifact checks: only the altered closed mandate fails them", () => {
+    const failing = Object.entries(FX.bundles).filter(([, b]) => {
+      const an = analyseBundle(b, FX.trust);
+      return [an.open, ...an.payments.map(p => p.closed)].some(x => x.checks.some(c => !c[1]));
+    }).map(([id]) => id);
+    assert.deepEqual(failing, ["s8-altered-amount"]);
+  });
+
+  test("a closed mandate verified with the wrong key fails its signature", () => {
+    const b = FX.bundles["s1-within"];
+    const r = readSdJwt(splitChain(b.chains[0])[1], FX.trust.userJwk);
+    assert.equal(r.checks.find(c => c[0] === "signature")[1], false);
+  });
+
+  test("the open mandate's constraints become AMEP claims: payees, per-call max, budget window", () => {
+    const an = analyseBundle(FX.bundles["s1-within"], FX.trust);
+    const { claims, problems } = claimsFromOpen(an.open.claims, an.constraints);
+    assert.deepEqual(problems, []);
+    assert.deepEqual(claims.resources, ["payee:merchant_1"]);
+    assert.deepEqual(claims.limits, [{ unit: "iso4217:USD", per_call: "200.00" }, { unit: "iso4217:USD", per_period: "300.00", period: 3600 }]);
+  });
+
+  test("AMEP afterwards: every scenario's result per payment", () => {
+    const got = Object.fromEntries(ap2Compare().map(r => [r.id, r.amep.results.map(x => `${x.outcome} ${x.invariant}${x.gaps.length ? ` ${x.gaps[0].need}` : ""}`).join(", ")]));
+    assert.deepEqual(got, {
+      "s1-within": "preserved -", "s2-over-range": "violated I2", "s3-wrong-payee": "violated I2", "s4-declined": "preserved -",
+      "s5-lost-receipt": "unresolved I7 receipt", "s6-budget": "preserved -, violated I2",
+      "s7-receipt-for-another-mandate": "unresolved I7 receipt", "s8-altered-amount": "unresolved I7 signature",
+      "s9-unknown-then-second": "unresolved I7 receipt, unresolved I7 held_outcome",
+    });
+  });
+});
