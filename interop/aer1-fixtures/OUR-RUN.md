@@ -65,4 +65,22 @@ what AMEP needs that this record does not carry:
 
 ## Noted before the run, and seen in it
 
-The gap text for binding still describes the old layout's relation to `args_digest`, even for a record whose layout already declares RFC 8785. That's wording only; the result is unchanged. It was deliberately left until after the run, so that the code that ran is the code the expectations were written against. It will now be fixed.
+The gap text for binding still describes the old layout's relation to `args_digest`, even for a record whose layout already declares RFC 8785. That's wording only; the result is unchanged. It was deliberately left until after the run, so that the code that ran is the code the expectations were written against. It was fixed afterwards in `2b54ebd`.
+
+## Regression check (added 2026-11-23)
+
+[`regress.mjs`](regress.mjs) reruns both fixtures and checks the results that [EXPECTED.md](EXPECTED.md) (`5f59f88`) requires:
+- for `0bc28781`: six format checks, binding by digest, `preserved`, exit status 0;
+- for `38a410ab`: six format checks, **not imported** because nothing executed, no verdict, exit status 1.
+
+It checks results, not wording, so the later fix to the gap text doesn't trip it.
+
+```bash
+(cd packages/conformance && npm install)
+node interop/aer1-fixtures/regress.mjs            # fetches the fixtures and the tool map
+node interop/aer1-fixtures/regress.mjs --dir DIR  # or uses local copies
+```
+
+- The inputs are pinned by the SHA-256 values above. If a fixture or the tool map changes upstream, the check stops with exit status 2 and names it, because the expectations were written for those bytes. Exit status 1 is a regression.
+- It was tested against a mutant importer that imports the refusal as an effect: the check fails on `38a410ab` with exit status 1.
+- It runs the importer from this repository (`amep-conformance` isn't published yet) on top of `@stafordtituss/amep` 0.3.0-alpha.2, and prints the commit and versions it used.

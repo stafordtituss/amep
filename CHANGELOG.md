@@ -2,6 +2,10 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## AER-1 regression check (2026-11-23)
+
+- `interop/aer1-fixtures/regress.mjs` reruns Brennan Zambo's two AER-1 fixtures, pinned by hash, against the expectations committed in `5f59f88` before either side ran them. Above all, a gateway refusal must never be imported as an executed action. Asked for in amep#17.
+
 ## Internet-Draft -01 posted (2026-11-23)
 
 - **draft-stafordtituss-agentic-mandate-evidence-01** is posted to the IETF repository (https://datatracker.ietf.org/doc/draft-stafordtituss-agentic-mandate-evidence/), rewritten from v0.3.0-draft.1. It adds:
