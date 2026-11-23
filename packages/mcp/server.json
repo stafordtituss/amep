@@ -9,12 +9,12 @@
     "subfolder": "packages/mcp"
   },
   "websiteUrl": "https://github.com/stafordtituss/amep",
-  "version": "0.1.0a2",
+  "version": "0.1.0a3",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "amep-mcp",
-      "version": "0.1.0a2",
+      "version": "0.1.0a3",
       "transport": {
         "type": "stdio"
       }
