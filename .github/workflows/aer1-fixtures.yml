@@ -39,5 +39,5 @@ jobs:
           node interop/aer1-fixtures/regress.mjs
       - name: Released verifier, @stafordtituss/amep 0.3.0-alpha.2
         run: |
-          (cd packages/conformance && npm pkg set "dependencies.@stafordtituss/amep=0.3.0-alpha.2" && npm install --no-audit --no-fund)
+          (cd packages/conformance && npm install --no-audit --no-fund @stafordtituss/amep@0.3.0-alpha.2)
           node interop/aer1-fixtures/regress.mjs --amep 0.3.0-alpha.2
