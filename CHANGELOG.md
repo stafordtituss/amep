@@ -2,6 +2,11 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## Reasons: a call that provably didn't run says so (unreleased, 2026-11-23)
+
+- A call whose observer signed a `not_executed` statement was `preserved` with the generic reason "continuity preserved", which reads as "within authority". It now says "nothing executed: <observer> signed a not_executed call statement", in both verifiers. Outcomes are unchanged; only that reason text differs.
+- Found while building an audit exercise, in which a reviewer reading the verifier's result for a refused call could have taken it for an approved one.
+
 ## Packages amep-protocol 0.3.0a2, @stafordtituss/amep 0.3.0-alpha.2, amep-mcp 0.1.0a3 (released 2026-11-23)
 
 They carry every change below, down to "Operation approvals", in both reference verifiers. In order, newest first:

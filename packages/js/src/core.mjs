@@ -471,8 +471,8 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     try {
       const leaked = (inv.influenced_by || []).filter(f => quarantined.has(f) && n > quarantined.get(f));
       check(leaked.length > 0 && !inv.principal_confirmed, "violated", "I4", `quarantined content reached the agent (${leaked.join(", ")})`, { blame: "host" });
-      evalInvocation(inv);
-      out.push(result(id, "preserved", "-", "continuity preserved"));
+      const why = evalInvocation(inv);
+      out.push(result(id, "preserved", "-", why || "continuity preserved"));
     } catch (e) {
       if (e instanceof Stop) out.push(result(id, e.outcome, e.invariant, e.reason, e.blame, e.gaps));
       else out.push(result(id, "unresolved", "I7", `malformed evidence: ${e.message}`, null, [{ need: "well_formed_evidence", ref: String(id) }]));
@@ -580,7 +580,9 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       const hi = CEILING.indexOf(inv.declared.effect) >= CEILING.indexOf("write_shared");
       check(hi && stmts.filter(c => c.disposition === "not_executed").every(c => c.observed_by === inv.actor),
         "unresolved", "I10", "high-impact call reported not executed only by the actor itself", { need: "independent_observer", ref: id });
-      return;
+      // say why it is preserved: nothing ran, on the observer's signed word, not "within authority"
+      const who = [...new Set(stmts.filter(c => c.disposition === "not_executed").map(c => String(c.observed_by)))].sort().join(", ");
+      return `nothing executed: ${who} signed a not_executed call statement`;
     }
     // effect receipts. With none and no not_executed statement, the call may still have moved value: hold its reserve (or
     // an unknown amount) against every period limit on its chain that applies to it (spec 7.6 rule 6).

@@ -636,8 +636,8 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
         try:
             leaked = [f for f in inv.get("influenced_by", []) if f in quarantined and n > quarantined[f]]
             _check(bool(leaked) and not inv.get("principal_confirmed"), "violated", "I4", f"quarantined content reached the agent ({', '.join(leaked)})", blame="host")
-            _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects, spent, approval_use, extra_protected, order, taint, ctx)
-            out.append(Result(rid, "preserved", "-", "continuity preserved"))
+            why = _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects, spent, approval_use, extra_protected, order, taint, ctx)
+            out.append(Result(rid, "preserved", "-", why or "continuity preserved"))
         except Stop as s:
             out.append(Result(rid, *s.r))
         except (Malformed, KeyError, TypeError, ValueError, AttributeError) as e:
@@ -854,7 +854,9 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         hi = CEILING.index(inv["declared"]["effect"]) >= CEILING.index("write_shared")
         _check(hi and all(c.get("observed_by") == inv.get("actor") for c in stmts if c["disposition"] == "not_executed"),
                "unresolved", "I10", "high-impact call reported not executed only by the actor itself", need="independent_observer", ref=rid)
-        return
+        # say why it is preserved: nothing ran, on the observer's signed word, not "within authority"
+        who = ", ".join(sorted({str(c.get("observed_by")) for c in stmts if c["disposition"] == "not_executed"}))
+        return f"nothing executed: {who} signed a not_executed call statement"
     # 11. effect receipts. With none and no not_executed statement, the call may still have moved value: hold its
     # reserve (or an unknown amount) against every period limit on its chain that applies to it (spec 7.6 rule 6).
     if not mine:
