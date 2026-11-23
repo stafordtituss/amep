@@ -23,7 +23,7 @@
       </address>
     </author>
 
-    <date year="2026" month="November" day="19"/>
+    <date year="2026" month="November" day="23"/>
 
     <area>Security</area>
     <workgroup>AUDIT BOF</workgroup>
@@ -32,11 +32,11 @@
     <abstract>
 
 
-<?line 120?>
+<?line 140?>
 
-<t>The AUDIT architecture defines records that capture the user's intent, delegation, authorization state, and the actions that agents take across trust boundaries. Records alone don't answer the question an auditor, an operator, or a relying party asks next: did the executed effect stay within the authority the user delegated?</t>
+<t>The AUDIT architecture defines records that capture the user's intent, delegation, authorization state, and the actions that agents take across trust boundaries. Records alone don't answer the question an auditor, an operator, or a relying party asks next: did what was executed stay within the authority the user delegated?</t>
 
-<t>This document defines a deterministic, three-valued evaluation over such records. The outcomes are preserved, violated, and unresolved, and every non-preserved outcome names the invariant that was broken. The document also defines the claim model that the evaluation needs, the roles permitted to sign each record, a mapping onto the AUDIT record types, and a set of interoperable test vectors. It is derived from the Agentic Mandate Evidence Protocol (AMEP).</t>
+<t>This document defines a deterministic, three-valued evaluation over such records. The outcomes are preserved, violated, and unresolved. A violated outcome names the invariant that was broken and the party whose own signed record departed from authority first. An unresolved outcome names the evidence that is missing; missing evidence is never treated as success. The document also defines the claim model the evaluation needs, the roles permitted to sign each record, a signed statement of what a call did or did not execute, a portable verdict record, a mapping onto the AUDIT record types, and interoperable test vectors. It is derived from the Agentic Mandate Evidence Protocol (AMEP).</t>
 
 
 
@@ -49,7 +49,7 @@
   <middle>
 
 
-<?line 126?>
+<?line 146?>
 
 <section anchor="introduction"><name>Introduction</name>
 
@@ -60,18 +60,21 @@
   <t>a sub-agent receives broader scope than its parent held;</t>
   <t>untrusted content steers a mutation;</t>
   <t>an adapter maps a tool call to an effect that differs from the one declared;</t>
+  <t>a gateway refusal is later read as an executed action, or a lost response is read as a failure;</t>
   <t>a decision made after the fact, from an audit log, is presented as if it had prevented the action.</t>
 </list></t>
 
-<t><xref target="I-D.kuehlewind-audit-architecture"/> defines Interaction, Action, Delegation, and Authorization Transition records, and the propagation of audit context, so that these chains can be reconstructed.</t>
+<t><xref target="I-D.kuehlewind-audit-architecture"/> defines Interaction, Action, Delegation, and Authorization Transition records, and the propagation of audit context, so that these chains can be reconstructed. Its Auditor role determines whether recorded behaviour matched the authorization in force at the time.</t>
 
-<t>This document is complementary. Given a set of such records, it specifies:</t>
+<t>This document specifies that determination. Given a set of records, it specifies:</t>
 
 <t><list style="numbers" type="1">
-  <t>a <strong>claim model</strong> that makes delegated authority machine-checkable (actions, resources, deny lists, data classes, an effect ceiling, validity, a delegation budget, and an optional risk budget);</t>
-  <t><strong>signer roles</strong>, so that a record counts as evidence only when it is signed by a party entitled to make it;</t>
+  <t>a <strong>claim model</strong> that makes delegated authority machine-checkable (<xref target="claims"/>);</t>
+  <t><strong>signer roles</strong>, so that a record counts as evidence only when it is signed by a party entitled to make it (<xref target="roles"/>);</t>
+  <t><strong>call statements</strong>, so that "nothing was executed" and "the outcome is unknown" are distinguishable from each other and from an executed action (<xref target="statements"/>);</t>
   <t><strong>invariants</strong> that a chain of records must satisfy (I1 to I11);</t>
-  <t>a deterministic <strong>evaluation procedure</strong> that returns preserved, violated, or unresolved, together with the deciding invariant;</t>
+  <t>a deterministic <strong>evaluation procedure</strong> that returns preserved, violated, or unresolved, with the deciding invariant, the party at fault, and the missing evidence (<xref target="evaluation"/>);</t>
+  <t>a portable, signed <strong>verdict record</strong>, so that a second auditor can check a first auditor's conclusion (<xref target="verdicts"/>);</t>
   <t><strong>test vectors</strong>, so that independent verifiers can demonstrate that they agree.</t>
 </list></t>
 
@@ -111,7 +114,15 @@ appear in all capitals, as shown here.</t>
   </dd>
   <dt>Observer:</dt>
   <dd>
-    <t>the party that produced the effect record.</t>
+    <t>the party that produced the effect record or call statement.</t>
+  </dd>
+  <dt>Call statement:</dt>
+  <dd>
+    <t>the observer's signed account of one call: what it executed, or that it executed nothing, and how many effect records belong to the call.</t>
+  </dd>
+  <dt>Packet:</dt>
+  <dd>
+    <t>the set of records a verifier evaluates together.</t>
   </dd>
   <dt>Verifier:</dt>
   <dd>
@@ -135,22 +146,25 @@ appear in all capitals, as shown here.</t>
       <c>attenuation, I1</c>
       <c>Approval</c>
       <c>Interaction Record (approval, HITL escalation)</c>
-      <c>binding to the exact effect, I8</c>
+      <c>binding to the exact effect or effects, I8</c>
       <c>Invocation and interpretation</c>
       <c>Action Record (declared)</c>
       <c>interpretation provenance (I3), influence (I4)</c>
       <c>Effect</c>
       <c>Action Record (at the effect boundary)</c>
       <c>I2, I5, I9, I10, I11</c>
+      <c>Call statement</c>
+      <c>Action Record (call outcome, including "not executed")</c>
+      <c>I7, I11, binding to the exact invocation</c>
       <c>Grant, revocation, status</c>
       <c>Authorization Transition Record</c>
-      <c>liveness, I6</c>
-      <c>Continuity decision</c>
+      <c>liveness at the invocation and at each effect, I6</c>
+      <c>Verdict record</c>
       <c>(none)</c>
-      <c>the output of this document, with its phase</c>
+      <c>the output of this document (<xref target="verdicts"/>)</c>
 </texttable>
 
-<t>Mandates and delegations commonly originate in OAuth 2.0 Token Exchange chains <xref target="RFC8693"/>. Records <bcp14>MAY</bcp14> be carried as COSE_Sign1 objects <xref target="RFC9052"/>, and <bcp14>MAY</bcp14> be registered with a transparency service <xref target="I-D.ietf-scitt-architecture"/>, which makes selective omission of records detectable.</t>
+<t>Mandates and delegations commonly originate in OAuth 2.0 Token Exchange chains <xref target="RFC8693"/>. Records <bcp14>MAY</bcp14> be carried as COSE_Sign1 objects <xref target="RFC9052"/>, and <bcp14>MAY</bcp14> be registered with a transparency service <xref target="I-D.ietf-scitt-architecture"/>, which makes selective omission of records detectable. Conversation records such as <xref target="I-D.birkholz-verifiable-agent-conversations"/> can supply the Interaction Records from which mandates, intents and approvals are taken.</t>
 
 <t>This document doesn't define new transport or storage. It requires only that records carry the fields listed in <xref target="fields"/>, and that records can be linked using the AUDIT audit context: trace, parent, actor, and on-behalf-of.</t>
 
@@ -160,10 +174,10 @@ appear in all capitals, as shown here.</t>
 <t>Most related work grants or checks authority before an agent acts. This document evaluates whether what was executed stayed within that authority, and the two are complementary.</t>
 
 <t><list style="symbols">
-  <t>The Delegation Receipt Protocol <xref target="I-D.nelson-agent-delegation-receipts"/> has the user sign an Authorization Object (scope, time window, an instruction hash, and a model-state commitment) that is anchored before the agent receives control and checked before execution. Such an object can serve as the mandate whose claims this document evaluates.</t>
+  <t>The Delegation Receipt Protocol <xref target="I-D.nelson-agent-delegation-receipts"/> has the user sign an authorization object that is checked before execution. Such an object can serve as the mandate whose claims this document evaluates.</t>
   <t>Authenticated delegation for AI agents <xref target="SOUTH2025"/> proposes scoped, verifiable delegation credentials that extend OpenID Connect and OAuth 2.0. Those credentials are another source of mandates and delegations. GNAP <xref target="RFC9635"/> negotiates delegated authorization across multiple parties; its grants can likewise be recorded as mandates.</t>
   <t>Work on infrastructure for AI agents <xref target="CHAN2025"/> identifies attribution and incident response as functions that require shared infrastructure outside the agent. The evaluation in <xref target="evaluation"/> supplies one verifiable input to both.</t>
-  <t>The DIF threat model for delegated authority <xref target="DIF-DATM"/> argues that delegated authority commonly fails at the moment of action rather than at issuance, and asks for execution-time evaluation. <xref target="DIF-DAE"/> compares existing authorization specifications (including OAuth, UCAN, zCaps, KYA-OS, and AuthZEN) against a set of criteria. This document addresses the execution-time and after-the-fact evaluation those documents call for, and does not define a new credential format.</t>
+  <t>The DIF threat model for delegated authority <xref target="DIF-DATM"/> argues that delegated authority commonly fails at the moment of action rather than at issuance, and asks for execution-time evaluation. <xref target="DIF-DAE"/> compares existing authorization specifications against a set of criteria. This document addresses the execution-time and after-the-fact evaluation those documents call for, and does not define a new credential format.</t>
   <t>The NCCoE concept paper on agent identity and authorization <xref target="NCCOE-AGENTS"/> covers identification, authorization, auditing, and non-repudiation for agents using existing standards. The records and outcomes defined here are one way to make the auditing and non-repudiation goals checkable.</t>
   <t>Prompt-injection benchmarks and defenses, such as AgentDojo <xref target="AGENTDOJO"/> and CaMeL <xref target="CAMEL"/>, detect or prevent untrusted content from steering an agent. When such steering produces an effect outside the user's mandate, this document reports it as violated (I2 or I4), independent of how the injection was detected.</t>
 </list></t>
@@ -171,27 +185,42 @@ appear in all capitals, as shown here.</t>
 </section>
 <section anchor="claims"><name>Claim Model</name>
 
-<t>A claim set is C = (A, R, A⁻, R⁻, D, E, V, P, K, B), where:</t>
+<t>A claim set is C = (G, A⁻, R⁻, D, E, V, P, K, B, L), where:</t>
 
 <t><list style="symbols">
-  <t>A and R are sets of canonical action and resource patterns that are permitted;</t>
-  <t>A⁻ and R⁻ are sets of action and resource patterns that are denied even when A or R would permit them;</t>
+  <t>G is the set of grants. Each grant is a pair (A, R) of canonical action and resource patterns, and permits its actions on its resources. A claim set with plain action and resource lists has one grant. A list of grants expresses permissions such as "read the documents, write the reports" that a single product of actions and resources cannot express without also permitting "write the documents";</t>
+  <t>A⁻ and R⁻ are sets of action and resource patterns that are denied even when a grant would permit them;</t>
   <t>D is a set of (data class, recipient class) pairs;</t>
   <t>E is the effect ceiling, an element of the totally ordered set <spanx style="verb">read &lt; write_local &lt; write_shared &lt; external_send &lt; destructive &lt; financial</spanx>;</t>
   <t>V is the validity interval;</t>
   <t>P is the purpose;</t>
   <t>K is the delegation budget (remaining depth);</t>
-  <t>B is an <bcp14>OPTIONAL</bcp14> risk budget in points.</t>
+  <t>B is an <bcp14>OPTIONAL</bcp14> risk budget in points;</t>
+  <t>L is an <bcp14>OPTIONAL</bcp14> list of limits on quantities (<xref target="limits"/>).</t>
 </list></t>
 
-<t>C1 ⊑ C2 (C1 is equal to or narrower than C2) holds if and only if: every pattern in A1 and R1 is subsumed by some pattern in A2 or R2 respectively; every pattern in A2⁻ and R2⁻ is subsumed by some pattern in A1⁻ or R1⁻ respectively (denies only grow); D1 ⊆ D2; E1 ≤ E2; V1 ⊆ V2; P1 = P2 or P2 is unrestricted; the depth rule holds (if K2 is present, K2 &gt; 0 and K1 &lt; K2); and B1 ≤ B2 when B2 is present.</t>
+<t>C1 ⊑ C2 (C1 is equal to or narrower than C2) holds if and only if: every grant of C1 lies within a single grant of C2 (its actions subsumed by that grant's actions and its resources by that grant's resources); every pattern in A2⁻ and R2⁻ is subsumed by some pattern in A1⁻ or R1⁻ respectively (denies only grow); D1 ⊆ D2; E1 ≤ E2; V1 ⊆ V2; P1 = P2 or P2 is unrestricted; the depth rule holds (if K2 is present, K2 &gt; 0 and K1 &lt; K2); B1 ≤ B2 when B2 is present; and no limit of C1 is higher than a limit of C2 in the same unit, actions and period. A child <bcp14>MAY</bcp14> add limits.</t>
 
-<t>The meet C1 ⊓ C2 is taken component-wise, with denies unioned so that no hop and no intent can lift a deny.</t>
+<t>The meet C1 ⊓ C2 takes the pairwise intersection of grants and is otherwise taken component-wise, with denies unioned so that no hop and no intent can lift a deny.</t>
 
 <t>Resource identifiers <bcp14>MUST</bcp14> be canonical. File-system paths <bcp14>MUST</bcp14> be absolute and normalized, with the home directory expanded and ".." collapsed. URLs <bcp14>MUST</bcp14> carry their resolved host class. SaaS objects <bcp14>MUST</bcp14> be identified as <spanx style="verb">provider:type/id</spanx>. A verifier <bcp14>MUST NOT</bcp14> rely on user-relative forms.</t>
 
-<t>An effect is x = (a, r, d, e, t). x ⊨ C if and only if a matches A and not A⁻, r matches R and not R⁻, e ≤ E, every released (data class, recipient class) pair is in D, and t ∈ V.</t>
+<t>An effect is x = (a, r, d, e, t, v), where v is an <bcp14>OPTIONAL</bcp14> quantity. x ⊨ C if and only if some grant of C permits both a and r, a matches no pattern of A⁻, r matches no pattern of R⁻, e ≤ E, every released (data class, recipient class) pair is in D, and t ∈ V.</t>
 
+<t>A claim set that carries a member this document does not define, and that is not an extension member, makes the result unresolved (I7): ignoring a member that narrows authority could widen it.</t>
+
+<section anchor="limits"><name>Limits</name>
+
+<t>A limit caps a quantity of one unit, such as <spanx style="verb">iso4217:EUR</spanx>, an asset, or <spanx style="verb">count:records</spanx>, with an <bcp14>OPTIONAL</bcp14> maximum per effect, per call (the total of one invocation's effects), and per period (a total within fixed windows of a stated length, starting at the node's validity start). An effect's quantity is an exact decimal string and a unit. Amounts are compared exactly, never as floating point.</t>
+
+<t><list style="numbers" type="1">
+  <t>For every node on the chain that carries limits, every limit that applies to an effect is checked before the result is decided. A violation takes precedence over an unresolved check, so the result does not depend on the order in which limits are listed.</t>
+  <t>A period total is the verifier's running total for the window, including state carried from earlier packets (<xref target="state"/>). A period total reported by an observer counts only if the limit names that observer as the one that counts all of the node's spending in the unit, and only if the observer's figure states the start of the window it covers and that start equals the limit's window start. An observer's figure for a different window would otherwise understate the limit's total, or blame an honest observer.</t>
+  <t>Without such a figure and without earlier state for the window, the period total is unknown, and the result is unresolved (I7). A packet's assembler can leave out earlier effects, so a period total is never assumed to start at zero.</t>
+  <t>An approval that passed I8 authorizes its effect to exceed a limit. The approved amount still counts toward the period total.</t>
+</list></t>
+
+</section>
 </section>
 <section anchor="roles"><name>Signer Roles</name>
 
@@ -206,7 +235,7 @@ appear in all capitals, as shown here.</t>
       <c>issuer, host</c>
       <c>Interpretation, invocation, decision</c>
       <c>host</c>
-      <c>Effect</c>
+      <c>Effect, call statement</c>
       <c>observer</c>
       <c>Approval</c>
       <c>approver</c>
@@ -215,6 +244,23 @@ appear in all capitals, as shown here.</t>
 </texttable>
 
 <t>Without roles, a compromised host key could mint its own mandate or approve its own action.</t>
+
+<t>Ed25519 <xref target="RFC8032"/> signatures are accepted under one exact rule in every verifier. A verifier <bcp14>MUST</bcp14> reject a signature whose scalar S is not less than the group order, and a public key or commitment R whose encoding is non-canonical or is a point of small order. Libraries otherwise differ on these edge cases (one accepts a signature by the identity key over every message), and two verifiers would then disagree on the same record.</t>
+
+</section>
+<section anchor="statements"><name>Call Statements</name>
+
+<t>An effect record says what was executed. It cannot say that nothing was. A <strong>call statement</strong> is the observer's signed account of one call: its disposition (completed, not executed, or failed after the effects it counts), the number of effect records it issued for the call, and OPTIONALLY the digest of the exact signed invocation and of the arguments it received.</t>
+
+<t><list style="numbers" type="1">
+  <t>A statement that does not verify, has an unknown disposition, or says "not executed" while counting effects, makes the result unresolved (I7).</t>
+  <t>A statement or effect record bound to a different invocation (by invocation digest) is not evidence for this one: unresolved (I7). A genuine record for one call therefore cannot be presented for another call that reuses its identifier.</t>
+  <t>If the arguments the observer received differ from those the host signed, the call was changed in transit: violated (I2), or unresolved (I7) when nothing was executed.</t>
+  <t>An effect record for a call the observer says was not executed is equivocation: violated (I11).</t>
+  <t>With no effect records and a verified "not executed" statement, the call provably had no effect, and the result is preserved. For a call at or above <spanx style="verb">write_shared</spanx>, the statement must come from a party other than the actor; otherwise unresolved (I10).</t>
+</list></t>
+
+<t>Without a call statement, an invocation with no effect record is unresolved (I7): the effect may have happened. A refusal by a gateway is therefore recorded as a "not executed" statement signed by the gateway, never as an absence of records.</t>
 
 </section>
 <section anchor="invariants"><name>Invariants</name>
@@ -227,7 +273,7 @@ appear in all capitals, as shown here.</t>
       <c>Attenuation: child ⊑ parent at every delegation edge</c>
       <c>violated</c>
       <c>I2</c>
-      <c>Every effect matches the declared (or mediated) effect, satisfies the meet of the chain (and of the intent), and stays within risk budgets unless a bound approval covers it</c>
+      <c>Every effect matches the declared (or mediated) effect, satisfies the meet of the chain (and of the intent), and stays within limits and risk budgets unless a bound approval covers it</c>
       <c>violated</c>
       <c>I3</c>
       <c>The invocation was interpreted by an approved, version-pinned mapping</c>
@@ -239,13 +285,13 @@ appear in all capitals, as shown here.</t>
       <c>Data classes released to a recipient are permitted</c>
       <c>violated</c>
       <c>I6</c>
-      <c>No ancestor was revoked, per signed revocation or status evidence, at or before the invocation</c>
-      <c>violated</c>
+      <c>No ancestor was revoked, per signed revocation or status evidence, at or before the invocation or the time of any of its effects</c>
+      <c>violated (unresolved inside a declared propagation window)</c>
       <c>I7</c>
-      <c>All required records are present, well-formed, signed by a permitted role, and fresh where required</c>
+      <c>All required records are present, well-formed, signed by a permitted role, bound to the call they describe, and fresh where required</c>
       <c>unresolved</c>
       <c>I8</c>
-      <c>An approval matches the executed effect (without its time), is within its validity window, unconsumed, and used once</c>
+      <c>An approval matches the executed effect, or each effect of one call, without its time; is within its validity window, unconsumed, and used once</c>
       <c>violated</c>
       <c>I9</c>
       <c>No agent effect targets guardrail configuration, keys, instruction files, or the audit store</c>
@@ -254,14 +300,14 @@ appear in all capitals, as shown here.</t>
       <c>An effect at or above <spanx style="verb">write_shared</spanx> names its actor and was observed by a party other than that actor</c>
       <c>unresolved</c>
       <c>I11</c>
-      <c>Every recorded effect links to an authorized invocation, and none exists for an invocation a pre-execution decision denied</c>
+      <c>Every recorded effect links to an authorized invocation, none exists for an invocation a pre-execution decision denied, and none contradicts a "not executed" statement</c>
       <c>violated</c>
 </texttable>
 
 </section>
 <section anchor="evaluation"><name>Evaluation Procedure</name>
 
-<t>For each invocation, in recorded order, a verifier <bcp14>MUST</bcp14> apply the following checks in order and return the first outcome that applies. "Verified" means signed by a key holding a permitted role (<xref target="roles"/>).</t>
+<t>For each invocation, in recorded order, a verifier <bcp14>MUST</bcp14> apply the following checks in order and return the first outcome that applies, except where a group is marked as checked in full. "Verified" means signed by a key holding a permitted role (<xref target="roles"/>).</t>
 
 <figure><artwork><![CDATA[
 ID   Outcome     Condition
@@ -271,20 +317,30 @@ I7   unresolved  no root mandate
 I7   unresolved  cited intent missing, or a needed record
                  not verified
 I7   unresolved  lineage names an invocation that is not earlier
+I7   unresolved  malformed limits or reserve, or a claim member
+                 the verifier does not implement
 I3   unresolved  no approved interpretation, or a pin mismatch
 I1   violated    a delegation edge where not (child ⊑ parent)
-I6   violated    verified revocation or status shows an
-                 ancestor revoked
+I6   unresolved  revocation inside the revoked node's declared
+                 propagation window
+I6   violated    verified revocation or status shows an ancestor
+                 revoked at or before the invocation
 I7   unresolved  unverified revocation on the chain, or a
                  revocable record without a fresh verified status
 I9   violated    guardrail target
 I4   violated    untrusted influence on a mutation, unconfirmed
                  (unresolved instead if no effect exists)
-I7   unresolved  no effect record
+     Call statements (see Call Statements), rules 1 to 5
+I7   unresolved  no effect record (the call is held; see
+                 State Across Packets)
      For every effect record of the invocation:
-I7   unresolved    record not verified
+I7   unresolved    record not verified, names no observer, or is
+                   bound to a different invocation
 I10  unresolved    e >= write_shared and the actor is absent,
                    the effect is self-observed, or assurance L0
+I6   violated      revoked at or before the effect's own time
+                   (unresolved inside a propagation window, or
+                   when status is not fresh as of that time)
 I2   violated      executed != declared (and != the mediated
                    effect)
 I9   violated      executed resource is a guardrail
@@ -292,9 +348,19 @@ I2   violated      x does not satisfy the meet of the chain and
                    intent (I5 when the failure is a release)
 I5   violated      data classes carried in through lineage reach
                    a recipient class the claims do not permit
+I7   violated    more effect records than the call statement counts
+I7   unresolved  fewer effect records than it counts
 I7   unresolved  approval missing or not verified
-I8   violated    approval unbound, outside its window,
-                 consumed, or reused
+I8   violated    approval unbound, outside its window, consumed,
+                 reused, or covering an effect fewer times than
+                 it was executed
+     Limits (see Limits), every applicable limit checked in full:
+I2   violated      over a per-effect, per-call or per-period
+                   limit without a bound approval
+I7   violated      the counting observer's total for the window
+                   is below the effects recorded
+I7   unresolved    period total unknown, or held calls could
+                   take it over the limit
 I7   violated    recorded budget spend != recomputed cost
 I2   violated    risk budget exceeded without a bound approval
 -    preserved   otherwise
@@ -311,13 +377,48 @@ I11  violated    pre-execution deny/hold decision, and an effect
 I11  violated    effect with no invocation
 ]]></artwork></figure>
 
-<t>Lineage: an effect may record the data classes it read (accessed) and the recipient class of what it sent; an invocation may name the earlier invocations its input came from (derived_from). The data classes an invocation carries are those its own effects read plus those carried by the invocations it derives from, transitively. This detects sensitive data leaving in a later step even when that step declares no release.</t>
+<t>The packet verdict is the first violated result if there is one, else the first unresolved result, else preserved.</t>
 
-<t>A verifier evaluating a stream of packets <bcp14>MAY</bcp14> carry approval use and risk-budget spending from one packet to the next, so that single use and budgets hold across the stream.</t>
+<t>Lineage: an effect may record the data classes it read (accessed) and the recipient class of what it sent; an invocation may name the earlier invocations its input came from (derived_from). The data classes an invocation carries are those its own effects read plus those carried by the invocations it derives from, transitively. This detects sensitive data leaving in a later step even when that step declares no release.</t>
 
 <t>Decisions carry a phase: pre_execution, post_execution, or simulation. Only pre-execution decisions can confirm or contradict a block. A post-execution decision is detection and <bcp14>MUST NOT</bcp14> be presented as having prevented the action.</t>
 
 <t>When B is present, the cost of x is base(e) × m(d) × rev(x). The base table is read 0, write_local 1, write_shared 3, external_send 5, destructive 10, financial 20. m(d) is the largest data-class multiplier among the released classes (1, 2, or 5). rev(x) is 1 if the effect is a read, or reversible and not an external send, and 3 otherwise. The cost is charged to every node in the chain. The tables are registries (<xref target="iana"/>).</t>
+
+<section anchor="approvals"><name>Approvals</name>
+
+<t>An approval binds the digest of the exact effect it approves: SHA-256 over the JCS <xref target="RFC8785"/> form of the effect without its time and without any observer's running totals, so that it can be issued before execution. An operation approval instead lists the digests of the effects of one call, for example an operation that writes two files. Every executed effect of that call must be listed, and no effect may run more often than it is listed. Either form is single use: a retry that cites it again is violated (I8).</t>
+
+</section>
+<section anchor="blame"><name>Results: Blame and Missing Evidence</name>
+
+<t>Each result carries two further members, derived only from the signed evidence. A verifier <bcp14>MUST NOT</bcp14> infer blame the evidence does not show.</t>
+
+<t><list style="symbols">
+  <t><strong>blame</strong> (violated results only) names the party whose own signed record is the first to depart from authority: <spanx style="verb">agent</spanx> (it asked for or acted on something not allowed), <spanx style="verb">delegator</spanx> (a delegation widened its parent), <spanx style="verb">host</spanx> (the host or enforcement point failed at its own role), <spanx style="verb">transport</spanx> (the arguments received differ from those signed), or <spanx style="verb">server</spanx> (the executing party's records contradict the authorized call or each other).</t>
+  <t><strong>gaps</strong> (unresolved results only) lists the evidence that would let the evaluation continue, each as a need and the identifier of the record concerned, for example a missing effect record, a fresh revocation status, an independent observer, or the outcome of a held call.</t>
+</list></t>
+
+</section>
+<section anchor="state"><name>State Across Packets</name>
+
+<t>A verifier evaluating a stream of packets <bcp14>MAY</bcp14> carry state from one packet to the next: approval use, risk-budget spending, and per-window period totals. Within one stream, state <bcp14>MUST</bcp14> be passed in time order.</t>
+
+<t>A verified invocation that ends a packet with no effect record and no "not executed" statement may still have executed. Its outcome is unknown, and the verifier records a <strong>hold</strong> in its state against every period limit on its chain that applies to it: the amount the invocation declared as the most it can move, or an unknown amount if it declared none. In later packets, every hold whose invocation is not in that packet counts toward the same window's total. A total that could exceed the limit with the holds added, or an unknown held amount, makes the result unresolved (I7), never violated, because the held call may not have executed. A later packet that contains the held invocation replaces its hold: its effect records then count as any other, a "not executed" statement releases it, and a hold is never counted twice. Only a verified invocation can be held, so evidence that does not verify cannot place holds.</t>
+
+<t>This follows the requirement, raised in a cross-institution example of delegated payment authority <xref target="FINOS-421"/>, that a slice with an unknown outcome stays counted until reconciliation shows whether it was booked.</t>
+
+<t>State is the verifier's own bookkeeping, not evidence. A verifier that relies on it <bcp14>SHOULD</bcp14> publish the state it used alongside its verdict records.</t>
+
+</section>
+</section>
+<section anchor="verdicts"><name>Verdict Records</name>
+
+<t>A verifier <bcp14>MAY</bcp14> publish what it concluded as a verdict record: the predicate of an in-toto Statement v1 <xref target="IN-TOTO"/> whose subject is the SHA-256 of the exact packet bytes evaluated. The predicate gives the SHA-256 of the JCS form of the key set, the packet verdict, and every result in evaluation order, each with its outcome, invariant, blame and gaps. Free-text reasons are excluded, because they differ between implementations.</t>
+
+<t>Two conforming verifiers given the same packet and key set <bcp14>MUST</bcp14> produce byte-identical JCS forms of the record once the member naming the implementation is removed. A verdict record is therefore re-derivable: a party that trusts neither the agent nor its operator, nor the first auditor, can evaluate the same packet and compare. A signed verdict record is the statement carried in a DSSE envelope <xref target="DSSE"/>, signed with Ed25519.</t>
+
+<t>A verdict record is one verifier's reading of the evidence, not evidence of what the agent did. In a dispute, the packet is the evidence.</t>
 
 </section>
 <section anchor="fields"><name>Required Fields</name>
@@ -326,19 +427,26 @@ I11  violated    effect with no invocation
 
 <t><list style="symbols">
   <t>Mandate, Intent, and Delegation: id, parent, issuer, claims (C), signature.</t>
-  <t>Invocation: id, authority reference, interpretation reference (adapter and version), declared effect, actor, influence references, approval reference, time.</t>
-  <t>Effect: id, invocation reference, executed effect x, observer, assurance level (L0 self-reported to L3 provider-confirmed), signature.</t>
-  <t>Approval: id, effect digest (SHA-256 over the JCS <xref target="RFC8785"/> form of x without its time), presence (webauthn, chat_user, host_ui, or none), validity window, consumed flag, signature.</t>
-  <t>Revocation and revocation status: target, time (or as-of time and revocation time), signature.</t>
+  <t>Invocation: id, authority reference, interpretation reference (adapter and version), declared effect, actor, influence references, approval reference, time; OPTIONALLY the digest of the arguments sent, and the most the call can move (its reserve).</t>
+  <t>Effect: id, invocation reference, <bcp14>OPTIONAL</bcp14> invocation digest, executed effect x, observer, assurance level (L0 self-reported to L3 provider-confirmed), signature. A quantity carries an amount, a unit, and OPTIONALLY the observer's own totals, each with the start of the window it covers.</t>
+  <t>Call statement: id, invocation reference, observer, disposition, effect count, time, <bcp14>OPTIONAL</bcp14> invocation digest and arguments digest, signature.</t>
+  <t>Approval: id, effect digest or list of effect digests, presence (webauthn, chat_user, host_ui, or none), validity window, consumed flag, signature.</t>
+  <t>Revocation and revocation status: target, time (or as-of time and revocation time), <bcp14>OPTIONAL</bcp14> propagation window on the revocable node, signature.</t>
   <t>Continuity decision: invocation reference, mode, phase, outcome, enforcement context (enforcement point, fail mode, what was returned to the host, whether an effect record confirms it), signature.</t>
 </list></t>
 
-<t>Records are canonicalized with JCS <xref target="RFC8785"/> and signed with Ed25519 <xref target="RFC8032"/>. Times are numbers of seconds since the epoch or RFC 3339 <xref target="RFC3339"/> strings. A CDDL <xref target="RFC8610"/> definition and JSON Schemas are published in <xref target="AMEP"/>.</t>
+<t>Records are canonicalized with JCS <xref target="RFC8785"/> and signed with Ed25519 <xref target="RFC8032"/> over a domain-separated signing input. Times are numbers of seconds since the epoch or RFC 3339 <xref target="RFC3339"/> strings. A CDDL <xref target="RFC8610"/> definition and JSON Schemas are published in <xref target="AMEP"/>.</t>
+
+<t>A packet that is not well-formed I-JSON <xref target="RFC7493"/> within the bounds the specification sets (duplicate member names, numbers outside the safe-integer range, lone surrogates, excessive nesting) makes every invocation in it unresolved (I7): such a packet cannot be canonicalized to the same bytes by every verifier. Values whose exact identity matters, such as amounts and identifiers, <bcp14>SHOULD</bcp14> be strings.</t>
+
+<t>A packet <bcp14>MAY</bcp14> declare the version of the rules it was produced for. A verifier <bcp14>MUST</bcp14> treat a packet declaring a version it does not implement as malformed.</t>
 
 </section>
 <section anchor="test-vectors"><name>Test Vectors</name>
 
-<t><xref target="AMEP"/> publishes 114 vectors: 33 positive and 81 must-reject. The must-reject vectors cover all eleven invariants, signer roles, revocation status, decision phase, deny lists, data lineage, state across packets, risk-budget accounting, and a deny that an executed effect contradicts. Each vector is a packet of signed records, with the expected outcome and invariant. Two implementations written separately by the author (Python, and JavaScript run under Node.js and in a browser) agree on all 114. Implementations by other parties are invited.</t>
+<t><xref target="AMEP"/> publishes three suites of signed packets, each with an expected outcome and invariant: 233 core vectors (62 positive and 171 must-reject), 16 approval-path vectors, and 20 delegation-continuity vectors, 269 in all. The must-reject vectors cover all eleven invariants, signer roles, the Ed25519 acceptance rule, malformed I-JSON, revocation at the time of each effect, call statements and binding, operation approvals, grants, limits checked independently of their order, observer totals for the wrong window, held calls across packets, decision phase, deny lists, data lineage, and state across packets.</t>
+
+<t>Two implementations written separately by the author (Python, and JavaScript run under Node.js and in a browser) agree on all 269, on the outcome, invariant, blame and gaps of every result, and produce byte-identical verdict records. Implementations by other parties are invited. A conformance tool runs any verifier that can be invoked from a command line against all three suites.</t>
 
 <t>A conforming verifier <bcp14>MUST</bcp14> return the expected outcome and invariant for every vector.</t>
 
@@ -348,35 +456,48 @@ I11  violated    effect with no invocation
 <t><strong>Note to the RFC Editor:</strong> please remove this section before publication, per <xref target="RFC7942"/>.</t>
 
 <t><list style="symbols">
-  <t><strong>AMEP reference verifiers.</strong> Two implementations, both by the author: Python, and JavaScript (run as a Node.js command-line tool and as an offline browser page using WebCrypto). Both evaluate the procedure in <xref target="evaluation"/> and agree on all 114 published vectors. License: Apache 2.0. Location: https://github.com/stafordtituss/amep. Maturity: prototype.</t>
+  <t><strong>AMEP reference verifiers.</strong> Two implementations, both by the author: Python (package amep-protocol 0.3.0a2) and JavaScript (package @stafordtituss/amep 0.3.0-alpha.2, published with build provenance), the latter also run as an offline browser page using WebCrypto. Both evaluate the procedure in <xref target="evaluation"/>, agree on all 269 published vectors, and produce byte-identical verdict records. License: Apache 2.0. Location: https://github.com/stafordtituss/amep. Maturity: prototype.</t>
+  <t><strong>AMEP conformance tool and import profiles.</strong> It runs a verifier against the suites, and re-expresses records of other formats as evidence after checking them by their own rules: AER-1 receipts, OpenID action receipts, and Provared permission books. It also compares AMEP's results with the published test vectors of the Delegation Receipt Protocol and of EMILIA Protocol authorization receipts. Location: as above.</t>
+  <t><strong>AMEP MCP server.</strong> Exposes the verifier and the suites to MCP clients; listed in the MCP Registry. Location: as above.</t>
   <t><strong>Natsar control plane</strong> (agent-authority enforcement for coding-agent hosts and MCP). It emits decision records before tool execution from host hooks. Maturity: pre-release.</t>
 </list></t>
 
-<t>Implementation experience motivated several parts of this document: canonical resource identifiers (absolute-path forms bypassed relative-prefix rules); recording the enforcement context and phase (hosts differ in whether they support "ask" and whether hook failures block); and treating an effect that contradicts a deny as evidence of bypass.</t>
+<t>Use and review by other parties, each in a public record:</t>
+
+<t><list style="symbols">
+  <t><strong>AER-1 (Brennan Zambo).</strong> An import run over twelve live receipts from a production MCP server, with the implementer's own tool map. It found that a gateway refusal was imported as an executed effect; the importer was corrected. A later run over two re-issued records was blind, with the expected results committed before either side ran it, and both sides' results matched.</t>
+  <t><strong>Verifiable Agent Trust Envelope (Takao Sato).</strong> The maintainer verified the signatures of five published verdict records for a lost-response and recovery case, matched each to its packet by digest, and reviewed a reference example of the case.</t>
+  <t><strong>Payments review (Carlos Vendrell Felici, Zealynx Security).</strong> Two rounds of review of the quantity limits, with signed test packets run through both verifiers. They led to the per-call and per-effect limits, per-observer counting of effects, the counting observer, integer amounts for on-chain assets, independent totals per limit, order-independent evaluation of limits, and observer totals that name their window.</t>
+  <t><strong>AUDIT mailing list review (Cliff Singletary).</strong> Led to evaluating revocation and status freshness at the time of each effect, not only at the invocation.</t>
+</list></t>
+
+<t>Implementation experience motivated several parts of this document: canonical resource identifiers (absolute-path forms bypassed relative-prefix rules); recording the enforcement context and phase (hosts differ in whether they support "ask" and whether hook failures block); treating an effect that contradicts a deny as evidence of bypass; and the call statement, without which a refusal and a lost response are indistinguishable from each other.</t>
 
 </section>
 <section anchor="security-considerations"><name>Security Considerations</name>
 
 <t><list style="symbols">
   <t><strong>Adversarial models:</strong> the guarantees <bcp14>MUST</bcp14> hold even if every model in the chain is adversarial. Semantic analysis <bcp14>MAY</bcp14> raise a decision level, but <bcp14>MUST NOT</bcp14> mint authority or lower a decision.</t>
-  <t><strong>Self-reporting:</strong> records produced by the actor alone are insufficient for high-impact effects (I10).</t>
+  <t><strong>Self-reporting:</strong> records produced by the actor alone are insufficient for high-impact effects, including a statement that nothing was executed (I10).</t>
   <t><strong>Key compromise:</strong> signer roles (<xref target="roles"/>) limit what one stolen key can forge.</t>
-  <t><strong>Evidence omission:</strong> a missing record, status or signature yields unresolved. Omission of whole invocations is detected only against an independent effect log (I11).</t>
-  <t><strong>Canonicalization:</strong> non-canonical resource forms enable bypasses. Canonicalization is therefore normative.</t>
-  <t><strong>Approval replay and time-of-check/time-of-use:</strong> approvals bind the exact effect and are single use (I8).</t>
-  <t><strong>Fail-open enforcement:</strong> an enforcement point that errors <bcp14>MUST</bcp14> return a deny decision, not a transport error. Hosts commonly treat transport errors as non-blocking, and some treat an unsupported "ask" as a hook failure and run the action. A verifier <bcp14>SHOULD</bcp14> treat an effect that contradicts a pre-execution deny as evidence of bypass.</t>
+  <t><strong>Evidence omission:</strong> a missing record, status or signature yields unresolved. A call with no outcome is held across packets (<xref target="state"/>), so leaving its outcome out of later packets cannot make a later total look clean. Omission of whole invocations is detected only against an independent effect log (I11).</t>
+  <t><strong>Record substitution:</strong> binding effect records and call statements to the digest of the exact invocation prevents a genuine record for one call from being presented for another.</t>
+  <t><strong>Canonicalization:</strong> non-canonical resource forms and non-canonical JSON enable bypasses and disagreement between verifiers. Canonicalization is therefore normative.</t>
+  <t><strong>Approval replay and time-of-check/time-of-use:</strong> approvals bind the exact effect or effects and are single use (I8). Liveness is checked at the time of each effect, not only at the invocation (I6).</t>
+  <t><strong>Fail-open enforcement:</strong> an enforcement point that errors <bcp14>MUST</bcp14> return a deny decision, not a transport error. A verifier <bcp14>SHOULD</bcp14> treat an effect that contradicts a pre-execution deny as evidence of bypass.</t>
   <t><strong>Guardrail tampering:</strong> agent writes to hook configuration, keys, instruction files, or the audit store are violations (I9).</t>
+  <t><strong>Verdict records:</strong> a verdict record is a claim by its signer. Relying parties <bcp14>SHOULD</bcp14> re-derive it from the packet, which the determinism in <xref target="verdicts"/> allows.</t>
 </list></t>
 
 </section>
 <section anchor="privacy-considerations"><name>Privacy Considerations</name>
 
-<t>Effect records can contain personal data. Verifiers need only canonical actions, resource identifiers, data-class labels, and digests. Payloads <bcp14>SHOULD</bcp14> be detached and hashed, following the AUDIT selective-disclosure work.</t>
+<t>Effect records can contain personal data. Verifiers need only canonical actions, resource identifiers, data-class labels, quantities, and digests. Payloads <bcp14>SHOULD</bcp14> be detached and hashed, following the AUDIT selective-disclosure work. A verdict record names packets by digest and carries no payload.</t>
 
 </section>
 <section anchor="iana"><name>IANA Considerations</name>
 
-<t>This document proposes registries for effect classes, data classes, recipient classes, signer roles, and the risk-cost tables, with the registration policy Specification Required. The registries are to be defined in a later revision.</t>
+<t>This document proposes registries for effect classes, data classes, recipient classes, signer roles, call statement dispositions, blame values, gap names, and the risk-cost tables, with the registration policy Specification Required. The registries are to be defined in a later revision.</t>
 
 </section>
 
@@ -432,6 +553,18 @@ I11  violated    effect with no invocation
   </front>
   <seriesInfo name="RFC" value="3339"/>
   <seriesInfo name="DOI" value="10.17487/RFC3339"/>
+</reference>
+<reference anchor="RFC7493">
+  <front>
+    <title>The I-JSON Message Format</title>
+    <author fullname="T. Bray" initials="T." role="editor" surname="Bray"/>
+    <date month="March" year="2015"/>
+    <abstract>
+      <t>I-JSON (short for "Internet JSON") is a restricted profile of JSON designed to maximize interoperability and increase confidence that software can process it successfully with predictable results.</t>
+    </abstract>
+  </front>
+  <seriesInfo name="RFC" value="7493"/>
+  <seriesInfo name="DOI" value="10.17487/RFC7493"/>
 </reference>
 <reference anchor="RFC2119">
   <front>
@@ -527,6 +660,19 @@ I11  violated    effect with no invocation
   <seriesInfo name="RFC" value="9052"/>
   <seriesInfo name="DOI" value="10.17487/RFC9052"/>
 </reference>
+<reference anchor="RFC9635">
+  <front>
+    <title>Grant Negotiation and Authorization Protocol (GNAP)</title>
+    <author fullname="J. Richer" initials="J." role="editor" surname="Richer"/>
+    <author fullname="F. Imbault" initials="F." surname="Imbault"/>
+    <date month="October" year="2024"/>
+    <abstract>
+      <t>The Grant Negotiation and Authorization Protocol (GNAP) defines a mechanism for delegating authorization to a piece of software and conveying the results and artifacts of that delegation to the software. This delegation can include access to a set of APIs as well as subject information passed directly to the software.</t>
+    </abstract>
+  </front>
+  <seriesInfo name="RFC" value="9635"/>
+  <seriesInfo name="DOI" value="10.17487/RFC9635"/>
+</reference>
 
 <reference anchor="I-D.kuehlewind-audit-architecture">
    <front>
@@ -555,6 +701,42 @@ I11  violated    effect with no invocation
       </abstract>
    </front>
    <seriesInfo name="Internet-Draft" value="draft-kuehlewind-audit-architecture-01"/>
+   
+</reference>
+
+<reference anchor="I-D.birkholz-verifiable-agent-conversations">
+   <front>
+      <title>Verifiable Agent Conversation Records</title>
+      <author fullname="Henk Birkholz" initials="H." surname="Birkholz">
+         </author>
+      <author fullname="Tobias Heldt" initials="T." surname="Heldt">
+         </author>
+      <author fullname="Orie Steele" initials="O." surname="Steele">
+         </author>
+      <date day="31" month="August" year="2026"/>
+      <abstract>
+	 <t>   Autonomous agents based on large language models increasingly perform
+   consequential tasks on behalf of humans and other agents.
+   Demonstrating that recorded agent behavior truthfully represents
+   actual behavior is essential for accountability, compliance, and
+   human oversight.  This document defines a data format for verifiable
+   agent conversation records using CDDL, with representations in both
+   JSON and CBOR.  The format captures session metadata, message
+   exchanges, tool invocations, reasoning traces, and system events in a
+   structured, extensible CDDL definition for verifiable agent
+   conversation records.  COSE is used as the signing method to allow
+   for native interoperability in SCITT Transparency Services and the
+   CDDL definition allows for seemless integration in Evidence as
+   specified in RFC 9334.  The specification supports cross-vendor
+   interoperability by defining a common representation that
+   accommodates translation from multiple existing agent implementations
+   with distinct data structure layouts that are typically represented
+   in JSON.
+
+	 </t>
+      </abstract>
+   </front>
+   <seriesInfo name="Internet-Draft" value="draft-birkholz-verifiable-agent-conversations-01"/>
    
 </reference>
 
@@ -641,20 +823,25 @@ I11  violated    effect with no invocation
    <seriesInfo name="Internet-Draft" value="draft-nelson-agent-delegation-receipts-15"/>
    
 </reference>
-<reference anchor="RFC9635">
-  <front>
-    <title>Grant Negotiation and Authorization Protocol (GNAP)</title>
-    <author fullname="J. Richer" initials="J." role="editor" surname="Richer"/>
-    <author fullname="F. Imbault" initials="F." surname="Imbault"/>
-    <date month="October" year="2024"/>
-    <abstract>
-      <t>The Grant Negotiation and Authorization Protocol (GNAP) defines a mechanism for delegating authorization to a piece of software and conveying the results and artifacts of that delegation to the software. This delegation can include access to a set of APIs as well as subject information passed directly to the software.</t>
-    </abstract>
-  </front>
-  <seriesInfo name="RFC" value="9635"/>
-  <seriesInfo name="DOI" value="10.17487/RFC9635"/>
-</reference>
 
+<reference anchor="IN-TOTO" target="https://github.com/in-toto/attestation/blob/main/spec/v1/statement.md">
+  <front>
+    <title>in-toto Attestation Framework: Statement v1</title>
+    <author >
+      <organization>in-toto project</organization>
+    </author>
+    <date year="2026"/>
+  </front>
+</reference>
+<reference anchor="DSSE" target="https://github.com/secure-systems-lab/dsse">
+  <front>
+    <title>Dead Simple Signing Envelope</title>
+    <author >
+      <organization>Secure Systems Lab</organization>
+    </author>
+    <date year="2026"/>
+  </front>
+</reference>
 <reference anchor="SOUTH2025" target="https://arxiv.org/abs/2501.09674">
   <front>
     <title>Authenticated Delegation and Authorized AI Agents</title>
@@ -804,9 +991,18 @@ I11  violated    effect with no invocation
     <date year="2025"/>
   </front>
 </reference>
+<reference anchor="FINOS-421" target="https://github.com/finos/ai-governance-framework/issues/421">
+  <front>
+    <title>How should agent authorization carry across institutions? (AI Governance Framework, issue 421)</title>
+    <author >
+      <organization>FINOS AI Governance Framework contributors</organization>
+    </author>
+    <date year="2026"/>
+  </front>
+</reference>
 <reference anchor="AMEP" target="https://github.com/stafordtituss/amep">
   <front>
-    <title>Agentic Mandate Evidence Protocol (AMEP) v0.2</title>
+    <title>Agentic Mandate Evidence Protocol (AMEP) v0.3.0-draft.1</title>
     <author initials="S. T." surname="Selvaraj" fullname="Staford Titus Selvaraj">
       <organization></organization>
     </author>
@@ -820,11 +1016,28 @@ I11  violated    effect with no invocation
 </references>
 
 
-<?line 380?>
+<?line 503?>
 
+<section numbered="false" anchor="changes-from-00"><name>Changes from -00</name>
+
+<t><list style="symbols">
+  <t>Claim model: grants (a union of action and resource products) and limits on quantities (<xref target="claims"/>).</t>
+  <t>Call statements: a signed "not executed", effect counts, and binding of records to the exact invocation and arguments (<xref target="statements"/>).</t>
+  <t>I6 at the time of each effect, with an optional propagation window.</t>
+  <t>Operation approvals over the effects of one call (<xref target="approvals"/>).</t>
+  <t>Blame and missing evidence on every result (<xref target="blame"/>).</t>
+  <t>Holds for calls whose outcome is unknown, across packets (<xref target="state"/>).</t>
+  <t>Verdict records (<xref target="verdicts"/>).</t>
+  <t>Ed25519 acceptance rule; malformed I-JSON handling; versioning.</t>
+  <t>Test vectors: 269 in three suites; Implementation Status updated with use and review by other parties.</t>
+</list></t>
+
+</section>
 <section numbered="false" anchor="acknowledgments"><name>Acknowledgments</name>
 
 <t>This document is derived from the Agentic Mandate Evidence Protocol (AMEP), designed and written by the author.</t>
+
+<t>The author thanks Cliff Singletary for the review on the AUDIT mailing list that led to evaluating liveness at the time of each effect; Carlos Vendrell Felici for two rounds of review of the quantity limits; Brennan Zambo for the AER-1 runs, including the blind run; Takao Sato for verifying the verdict records of the lost-response case and the review behind operation approvals; and the participants in the FINOS AI Governance Framework discussion of cross-institution authorization, whose requirement for unknown outcomes led to holds.</t>
 
 </section>
 
@@ -832,202 +1045,324 @@ I11  violated    effect with no invocation
   </back>
 
 <!-- ##markdown-source:
-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
-sK9eS2rttOjJ1TxL8NKKHCjJW/ggWi9jo7BSkGyW0WrFzUFImykMEInUBwzD
-70JXFsFkl3TClLtctniMAKmECJhb7FqWg3GnpeFewLZz4TMYUR3zd2rnQFVk
-GU+nie10viDeyLNpJYLb6QBBObGFKHM/s2q+MJNFFBNNzxqacARyRU6wKArn
-XDTFfxJeVGNFAH55Th/AhCxLeHEKlQMK0dvcynhCnTgh/xbZCiqZQkixDnPH
-nRAZhJZA2iXS5lB3fnch9HY6MKNsucQu2Q/RcoXdQWjeF6JWACnYRPH6HAPi
-wrQIx8wt1jGVO1GagZn5S75U028khL61IkLRlLI8we5QPFITY0lQOz62QOTC
-V6u0dICUaQzewResk7JQlcK9l44s5QBFhHfJFyw6SRxTnbKKGE5jfMEYYcfF
-XliIa26nSjC+xczoYLgpVHpWOiMyw1729EVvRkySzXtcvOhQSlrBwxiih2VE
-U16+1cu1WYPoPDz8Zrbi06egToSyub7bM0P3/3HTlm7gWYneYvnoTEVtXLGD
-q2geMmm6DuHwByyvyIK6FtZLLAVobGWoVMNoyMi6OcNnSAOkhd+i/H5gvsFm
-p7U6Ni1XjxwqVuA0AlWK1/4ADz561DAbjx4pJUsY/qI2ow0bu9SYtA8sN7kR
-He86z9EzNHZVPqFNgODfmwS2lZ+B2GibikKthZcNCCagCPYSwh2DIfc9EYSQ
-thlXU/hTp4D0Gw7/A4rcuJu7LzsHAyyBtgsSI1bt0aOao5E3VRP4LVqGwvhM
-IoQwgR9ZWOoBGSljTInkIueMBPsnah3JETz4snPI+YKJLjzHIt038ty75iUd
-ZoG1FLN70z3d5zCn+/ug+clg3QFhzIahhrhM7BQS6UfPLeQzLbZ7Gih/09GU
-GRgDSyA+UqSPyjWlGQ9kv+w85TKa5rnJtrhOOeJ2TnnJVSKndiniSDvtZRYM
-m8N5DhSzNJbBF/KKYgwDZeud7ynb+Z25x4lIr1llsTho0Gol/aGKY6fxpPb+
-ChrWzIMfzaEMT0JASeFt9UEp3TDwDMA8NomZZLAmiAVEBEoDIXbqG6+9AOHI
-irKvqISrDKaLltyMk2xyA1Z88QXw0Z+rOJfFFeYM6LiCSVYm3YBpdyIkO+++
-u7re6en/5vxCPr8/+c/fnb4/OebnqzfDs7PwoeOeuHpz8d3Zcf2pfnN08e7d
-yfmxvoyrpnWps/Nu+KcdXdnOxeX16cX58GzHCJRqGhbCGojr2KpDxzaone1g
-byZ5PMYXvPNqdPmv/3f/iXl4+Lv3r0cH+/svYEL1y/P9L5/gC7dGZwvqJgDk
-vgO3ZqOco9BpAMHGZSSeFfxfZHcpXFJOmXr0X8iZ/3pkvhpPVvtP/uAucMGt
-i55nrYvCs80rGy8rE7dc2jJN4Gbr+hqn2/QO/9T67vneuPjVHxNm+vr7z//4
-h45Iz7UYhwzO7n7d6leFA3yK4mByfpdzOzLfwXj0FG/1zDU89uMrRS64yBeo
-CO0r5goKZXvq3AQrTO7NGR2wOkBRONGqaDqlT3Eg7qhDkOVMqjoYeiQoW+Xx
-CnQ7TifxKkp6EotwcoFEAYgtAfQRLQdT4B5HdDO2iyiZQTpOBaTIbA0PUU/Y
-ApskKJ0ndKoSnJguCXF4qycUMa7f7QGM53mmgUyks7tClEx5m00UR8oiPZCp
-0Y+CIQxdeF4KqqmYARZQrTi3C0NSxGOoRXC0xLgnYqo4dg0QsYMY/L6OhRy4
-d+GYKJaL/9Qbk4QbZ/Uw5sVY3EbOUYWX4t/EgK8EQju05Dyzmk28970z/o7B
-LpenLqlKi/UAA8r88FB///SJhhB2MNEU5CJemVYcMWxGtg9fuGjjU6fz0bQl
-/uNm4IFrPzhk7e391HzsfESIEP5iHCePPaOSgrca0M6FsNgJ2fieF9g5pL3c
-xbO1II1M9+FBvhafPu1yomaF6eNmWRTXIoRWaeUAI/w/Xxp6NL+dEA/2e+bN
-6fWZgbGNlHmkZgzNlnxs5gJjBjreL54+l/Fr6VTv5a23p3PYns8LL4dfe5aE
-2DSiT+yeHkIp4nSG6Fi/P1EWqKxuDutjT73tpZSTnB6A1Kf4+4Is2eM/yphv
-yHNiSE+/WoWq4OifA9qB1Qlhr/js02cyXKMGHRz0R9NF7G1JRqkx/KoSlNzy
-fT0FThIcLSIA8o/BqmnSsYaogr6X4tlA3jxOqdZQggsSbA4GezCyiNuZmWZ6
-NWD7hwdXT4WGhDQKvAT97SRiFUpimtHF1cmPVxDJfZONJU2tb7L8+umTmmD3
-Vm7nwJGWZkiohw1qWmxniJyf+Ew1lkPeLWIEDAr/C6xzIsFq5urtTXRL+Dop
-GQFsRCXTzBZMBmkwBfh056jJ8lLMInwGLLy4jVxBUqH4wIFdnYGc0KSOFNYK
-iScUeDw86CXPhbX3JHKCQ0VYDWcZShiaTWvGXkckjAZaw+AeraemqQhY+upm
-+tmstmMYkQUaWKtcv8JavQMgNO4rYd2NGpCCa5U4qWgEUDUYVicXCSxtM7AG
-sLDriuW9KwgegGkwt9uC3ug4/SR14FneZYLl2lEiMwuEoW2jxVJ7nXNRUfmt
-yjwgHnSkzrxJEglra2vshUiv6UruAfgvXlpDmJLdSTwYuwCXj2K0hU8pSUja
-lzylKFpccgG7LkahMk4wCWM25am4v3bWg/sMlCQDylbUTwcEPzBXjJIJIJRO
-CpD4S+OW5j323SIrXJqtWAPMYcsG4G27E6ER0roquEsnPTyETgbwkTmCjMhO
-uMQIT5yvxNiNISZYMMcGWFZGQIwRqpkLBGynx7R7KdfABQczRPkSyhvvav1O
-ckZGw3Zq9/Izhm5gvjkfXjrz8+yQ9KZ2npWxPLyRKHD77lLHyyopY4ifwI7Y
-Fi/FuDodIbOT+AawFQS6hIeEbOC9p4Y8Fa0TjLGtryBw1DcjgEAt3jHXQU+M
-oKVquMWJ3GXKYsVeIc42q9JmDtxZJkQjgu7W5oXzKDBELXOanP01MIS4crVK
-YrF1trm7cUo/xHAL2zHwunn62mi92mV0udJtGZmHB1/ExxRRPq+sW8C2h4O/
-mkUxhUD99DITGWZmSrUQ8f3Co99IYTuBgFNM5ugVOTsN6otG12sdBKJOQBNt
-T0QTbz8w1wFrvFaI0JTUxLnULjYnqQToiAD3zHej4XnP/DKKVvDvb/807F9c
-1Qm4fzg538UO0K+Wdd4LMSq8YRytW1ZEKaDEx09rC5DFMbfQx83+TNBVvZ+l
-qJAfqVC4P/Pegj7PQJ2804vE7dUKZ7TJyu/u+WiUndA6SQV8xQo4hVutV9ws
-mrd59fDQrNkLc2+Zm/Gy7qFT662eOj3JtXHIVAz4qmLnhrdKToHUW4aNgu0l
-cvNVD+9hxT36CogueCrxulgVSvcdQjefNdMijQsvt80/z2iQQkaRPNIKaz8O
-dfBxXelV06Sl8J5mOKG9ocwOHoVKPDUCT4+id/aMxoFFXWIGBS/0zy5bvCXx
-LSGjZL+Vbq/mPzDbJLOGmy6GKhrJzaZ9cCW5pQ9F2p4DnAAuKphowjJ8Wg8Y
-+4D0AWn3Wvk4CPciu3OFIs8dIgNdkySJvzAjCVy0gefhCxe3dDrDViyOoOZr
-0x32zHtE+3/9b/+CD/Lvcc+c9Mz3PXMJdeuZV7s9jS+lIjEUjr6XnZY6PLUN
-jiSF7CXefvARnw2GdCMOykNpkQUzX3di8p8z65jyoTHs7xsMXImlZie1Fvwz
-JN/eA4hVydRNRXYtOdmx4AZvJbp1apqRxyRexWSxXNjFVHFe8KUTvtSIZ0Li
-mtutqEqjCObMSgnU6cLoNTjRTzDiU/OVuaNN+jHJyCf/zTmXr8SL52mU/FjQ
-mX+FVTlMBBTyFQAwAzGYkZ9Iz/eeHp8419AN33j30t9dVTkBBa+99dc20uum
-m7OfVNrLIGTlYpfPv1J4ZXymqplzp2OTXC3ccme0b/76T//LjA5MFx8Zi/+5
-iiQLgj1oZ1FGB7uQXOL4eFZnBOPZkSuLup2VvrJ9FQgZsajGBTRFMvMFK6XN
-B0VH3h+IH9dgJbl/uWXAgyBk8um3ht3nQxxZPjQHZ8icxj5emWN9uy/NMbnw
-383xwUtzgo//8/+ZE3z8Xq9+j4+X+9C0SyEW/2J2SdgDk1BhX7qdAfNNXgEP
-KJe6YNPbg0ahq8evfzB7so63+xCLtweYXPpgdNZXB6oBr5qvubz80jKLQZL+
-N7cr1up+Kt4ZFhvwngjMBb9ujVUKQaEUu7pAmkltU224azFwAG5WSiosZXDx
-3itrQGDwUJK0lfjW2YqBeR0ntl9I3yC5v6gfisZFliDMcVPBc0oLXa+uaSy4
-ZVPgMwZsTIyt2C071cT2YLCDdSUJAAMLq9+9P3NDh5Ayzo2vmGCowuk8IoEo
-ugrBtqcmLENA6U9MjOBSfsQ01ON4+tMAJseXSYxPTktjA306rX8/1H0JA6g4
-w+ApsBMfaIcjmCB4pp6hh9gd4OJf/+mfYaLb2iL5wxK+snCWmJhDjXce7rwP
-d9SgW5XJnlMMEGMj1o1/2/6ROijEsYsozV//8R/N9+JhrrTk9l5S0IiG+b94
-GDFKEghGgpSZzW+G95FUP1ymzRfoXOWcd1xbh2coHKc8b0uXGik07e2DxI0C
-nxu5Wd7TIVStInm90fpA9FMGcMPp4G6PmIMM2aXL8HCz0NjMNjYzjc0UVv25
-zmZJEjxfSyH2vDr5+z2VS83pNRNzfLKeoJHcCs+HrFzm0r7rmUfNMrrrI493
-XHZRB+o1X+78ALUDogmcF6uRMy3k9YcMnojHXbKMR56ziOMjZyJMnTTcCpV5
-NnL4cirZjij2Y31J8rzYRW2B2ZLhZWKVbZI+1XoEJBmDDvol193AKFkkv+H+
-LHwZXgx4S4Y6wJUTedIpp9coV0bVRH8Xq1m6vufdkIDVSm/sHhZz60CBVoa7
-osUzh9zI8l3XPVJG94VP5DQcLe0v2C1VRWZQ604QD/rLjQUcmo+C1GsREWzY
-LOKxwO27SlyagQLUX8Up9ca3/HxsFJV17CemFhZSy54RLZfD5zOYZ9zDri0a
-nlw6iSJD2pjxs6uXjR6SOpcsI3jI7RM7HMAbCJodh8y5Ejw6i3Pnt1tloSYv
-uj5NttuujutCnjJf32hKqA2iVG9qQ9jCqhu8foYr52x2AfJn2ZnkUd9vyNWV
-S4bZadMGSPJTzICvN/conLjcSGE19m59yi8p6gg7XW5iWkdkvg1N8tc2Sfp0
-NCSk1dYQ1kJFVumb4a2Fqx+FYTc3/zlnbjQjNRVjvUOve+fMBVWdkfWu9Os4
-CefFAFx9FrBK2eZSLUPnXCEmfLKpoi8c1yVS9l1G0nlZmDnkcJpHcaJiMq9y
-ZyVhndj+0sgzzmKxZM72a1KYu7g54f6eLt3NpdsVjWnKfmqC+J9cC1+sHWjS
-kqUy6yxpq7ckqxMs6hXljU2+szriTNJaM4MkuAvfw1Yfb2p6BxdtW43oC9co
-1pQwFj3ttm4GF1a1uAFT3TgSeOm7VOD+G3muTuc1c0NU/yYpcVovQKIjupE2
-aoJwJS7hD/CW3dEMufw5O2tyKZ9KMMhuGFcZyIsy9FAqJzXJNjA7rno53YE1
-jtJ2h48HBBLbrykGS32KZz6xIPuXv/ylA59kzIWbhn9gCKdSg+rALpqaSfhT
-W8M6meBATV1CA57puebixh8avs9buA703zQlhCg8z7LSu9nNByaxVkyECNfr
-4hpv2Q0aLMh2Utz2TDfHZbcCVNCJfFukmlbcst3c5h04pg3KvQtaKzw68uCE
-SLDYmQ58fJvH0YYrVwvGObvr/n+3A1vdft+vbLtxVsgapZtcCcbeGfpNzlTp
-1rHTGgnoAjfH1sfHiYeixpvRyBnpMLCS2YEtbK+qtn9qETdls05z1aIoVsB7
-ZmeKVQI3aew2lkpzyswGghLspjNKamh2t4pqq7tAxxZT0QRcbukBJ9W9Fhsj
-Gv9wW1Rhr9ces+YPX7fzLY2m90xiHAScdJ2bCzbNxE8sRdFZ3xt03UnA9VzK
-5Gd7HSDINsNN7R3/7usGhCQFuKBQUaHktsl14t3NrW6MG3JjktoKMrCNlg91
-nto3Jm4HqyBvGznOkHQBoSS00h68OKETkNkdkgLBTzcmb/aBhjK3GEZt1fY2
-RaDjttmj9Ri17npnPlWWpZZ8U1hq4OIa/pifasnN8zWCwxtVKvC7F3K69PAO
-uGySWeMYsRIEMkpNc+zgCV1KrWB2l/LAG8tVpXnootzcw2Yizn6YqA2vDUU7
-UOj0+Up91sAo7GCiR7xaZyidlCxk1JrGLq7fcnlAJS2q1jFEev+YzjWgidDE
-q/K8yTWHT7rNhlCp3Uba/rm7uZTfnjOYnC3b1JyIEtyfJJlgztwBiKn5unbF
-myt2FkHyUZIL8+xTxp6pLB81KgLsZvP9S4wmm9oQS8BEsyCdp4xbvIlaF3mo
-qZ4ogNTg6ss158tZ6JTVbKn3bW6uCK8WHCd8TKocXdcm9yO/7bpjJk362nP4
-PIw0iUpVzMf0rs1WF7NKqsLd99ruEE2bHtekp+cDetoqEmu21ZfvpLRB4+vu
-KHUwNbfa1twKNBulAIEics1Z3kIgkxqpgWSrPAL1CFbwYMFm3yV5vYomNwwt
-2Gej2cPaLhSan6RK9puKzDGEr0TeOoDv2UpbDf+uHdEP5MN+EWN/7AovKTUg
-99iJtu+NibRD6Yi68GPQhZ50KDe/E9nEyypxxdkLpsa2w36txzu5l/6VoISh
-udkMP9sCHfbK121CNnRs2+c1Frp1nzmsIRmfV63ct5h6ZpqwKR94Z4yVd+2u
-+bf/Y5bdqfyPwbofnPzytim1vu4Ecq/XqsHs99qg4LC3VoV52muVYditFgox
-5mBvoPO6ykpCxAXyKJl9VVXX90DpipaZ60IKuQavW13QcSB79BSk6xI46D6B
-VRt8RLIO51kkb8Pl+VwvTY2jn5riIunD2uYrY4SJPDiyIMWS8/Dn0qbWByqC
-AvR54aEqu3aZie4jRIqjNNIIKfS6T81rbdV6+MI1aG0cCpBDaGtBnuvvEp2R
-wLHZ7TnQMX2owURHEk0slYRJMCBa4t3Q3yWWQTsm4lCclo6ntVbQnjtTXZ8K
-i6d1I5hPwjp00R3t9uqcNivUjTZgebHuscjtzOaa21lrqQx3YOjd8SnS4DJw
-u70aH/qkoutHq8F6GIJpWG+JGjMy3ULyXBexkNYw3Y0n17M2H+qUb68BahMI
-R2K6Z3sKfbVarWJzdmh8LaQfXOU6n3zaWUlxc01j0ZXu1Zth/+DpMz1lyT38
-dnTluiO/fM4eHmaxVOO35JTUNpCbd3ZM/sPUQXDLH6vC589/rOKeQr2Ub2zk
-nTxaM7Mkmq9R/t62Wmk3UvlHLspyDW1diQX6hNG+maTxiiO5NcGWHtWjz2wW
-Bbqn1r7n0x09s46WoP5tCCV12p4AHDdEaCTUJIpupBbUCj1KI4mpGraE+ors
-L/11exmd940UZCjuSSZKwNH6jkrGWxMxcv9kevD06f4L98ze4QF7Yq9jr+v6
-u04CewoehZsyjcM9F8u4ymAsWKd9PTL8OSMdhZ/YblWyOaOgvxodH5/5rtv9
-PX/OLw57++3Vxbm5miwsf7hHTEw1TuJi4btNef7UdbNfU3C/1zNTPFWot8IL
-sNv7T/yZqiMQRV+pmIUTPd+XY2FQI5YY1cA2LvgXNcMvwNwmAmfqE2e9VhFq
-S4mpURRyArNxGs+FWtpiHY54O6zTayEaIFKW1kLzkFZ5Xaot3bAiNV7wp2F1
-Seq+HBjiZvrcuDuaGAq79sNK2lhCUk/79dzqwbE7oO3QzKoYkm68ZFeOhfnG
-ggBvHNJUq2y6l/f434Uh30a30dUkZ7crT6fpsYxzaMfg58LNRqyTZ3cwI7t6
-uE2SJNgNbO7AnK5NP/bpXNffKBIEkmPtxhmK8mQ8zjNfy3g2Mpm/vm7ttxM3
-rfzUulmLEHOlaaHOo0fnWWm9YlM3TuScztGjR/CdRB+YeMkEtnQiFaHFSkoQ
-Isk+a8syhugNfxNMNKBvHj2izDecWTgiOMAEW/anJ42N7S05Mp/Zki73RI7S
-+S1x5537ckJKjtZoF6J07M5mctntFnZgbl0T2w92PMrvV2UGVPWK8/sWXX8i
-1yWvN/s09cR3e9cbFiGcZz+LJ2xCO4KPg6Bb7bQ9C6jgd/0MxACwpJRfsiGK
-z8qMTQUD4fJ5VBZRHlqYgXpSHgjtajN2jTdaoaxAdkYg7vw3zbpK9bvR5a60
-3NslfWiwEb6E5CtQZHAN7QWTSYV3kWU3RZtc269DqTVZpDgDKFI8lhnMn8TN
-BSUYeIV6UmwcvDhq9JHl21pIur4tpM9uEW2lgFStiKOn4Wg9f1thFn+QVppi
-96Vbnz8EsM1lkjt61KOr7NID65QM7w/lmCv7d3mEYScqbna0uuNukzc+EVZo
-mOQ6c+TUqGsgbJ6Jb9hJb1Jbh5NnbmHaaxF+7AjaRLileuWUcUr8SDOhPj4p
-juTYsJVUIGyHta6VReJK9SYzZ0wcUG6AfjHU9ZADTL6M5PcZAPeT+yLWWDiP
-2K/dOLgvOBGaDogWgj5pBagFFbKZSD9Y/ZpK+lWNLMEqku+FMpxO88ZDC2vy
-iyNqZYtqxp+f8sK/iOeLPuxPfTSq4NnrvV2d6a20KfjeBc7U6uhoFH7gI9k4
-KHiJsxUlbqTa5xBJz+zc6Wn4vQp/TIbDRiHR6H9Nw9UWsrzRG3OvgU+dqERw
-3jhrc7fIkrVsSd3nqR0uofM5bXWJ+hJhNufq993qRzU8UxsFQtmMu0XvVLls
-KgG00zFo//oILvrN1XaE353U6YZ1fALjpe3MxMHAyPr7AY/9t0r3wgc0hRx1
-2zjkpoaZLUV13qR7+twt7jWzeBkY0NRxGXXbOXM9OpHnmW9Nc67Y6WIziViG
-01RUfnlnYN6IoQjt9KLm609JOxL5KwYhICjpNtQXIsIPZ1awo86w0CI0LYrG
-ElXazJE0W87cUeUw5OftzGbO9HNWhxz9plFOWq6k1Vn4KY5FUidSfhZS/4aC
-O3dUU6va/3/6QnMKlzncxmTT6J00A5OQsCppu0BkISeAiXIH5vvw2wXMOqjC
-rPcqN363oulses1EThKNbeI6zjR0hSpcRvdJFoEAx/4xO4RKAgGtL/EkE8sA
-dZqjTlKEo3X9aVww88xd5skxhXXD8+Haqs3DF5JuWT9qFw4NNVIzAhUdGve/
-utH+DY61nLLdiClC8pmBgCSMNAvUwOluQndWNANkvDdXzZMcISfkzw4EAusf
-F/BnBxoZXIQzzjPIr/2METGQJ8PJTZrdJXY6l9MXnYcjjQzt9Osd+YnfnQ3e
-/C2/NSSZv7oDyQcYLQg76PwH4J437jdZAAA=
+H4sIANZlBGsAA819S3Mb17beHL9iX2pgUNWASOpN+ZxzKZKSaVOPiLJd56RS
+VgPYANpsdON0N0jRsk9VJsnNnaUyyDSDDO5/yCw3v+T8kqxvrbUf3Q1KrtxJ
+XGUbBLr3Y+31fu3RaDRosia3h2bnuCyarNhkzY05vUrzTdpkZWHKuTla2KIx
+Jza3C/nunZ2W1azeGaSTSWWv6F15ZOsIO4Np2thFWd0cmqyYl4NZOS3SFc04
+q9J5M6qbdE6j0So2dT1KMVA2Ha3SYkavjexVNrPF1I729gf1ZrLK6prGbG7W
+9P7Z6fsXg2KzmtjqcICnDwfTsqhtUW/qQzNP89oOaHH3B2llU1rkhZ1uKlrc
+zuC6rC4XVblZY+nfn5y9N8/fvNgZXNob+mV2ODAjwwup8WnmN87fb2ZZIx+a
+ZVllv/hfpn73A/kN4wwM/TPf5LlseedCdmveY7vmwuZXaZX+vMOPldUiLXRA
+evSsmNm1pf8UjfxuV2mW0w8tiP3jAt+Op+VqZzAoympFr18RJIx59+L4yeMn
+D93HvfsH+vH+/ftP9ePjB0/vHw4GOJf2m4+fPnCPP3m0v+c/4nH++HTvoXvg
+6aP7PMvZ6GR8ubHL3F5nxWzEkBql1XSZNXbabCrrHppk1eWyzH8ZXdkqm2fp
+JLdy8COCIX1XMwhq93hmm/monmbN9tEKm9dloQOEwxpVdmqzdSPDvB69f/P+
+zSHD0SF8VoyasinNUdNYgimj9ouKzgnocWjoqBq7Al5f7csB+GPlf0Y4sGiY
+dVX+TCuTR5u0WtiGfl02zbo+vHdvkTXLzQTndE9fuJeGee9N8nJyj06yuFev
+7fTe1f692k0/Xs1kTEZxc7B38Ij+PLm4OG1v58SmM3ORrda5pf8tiqxYmFMC
+Z16u7efWz2RBr9zUNF9tztPJl7dQ8zujWt4Z5enk3qyu7ZZ1Xrz5/v039Plh
+e7FHtBSmdHp2FvMWontzpKRFvxydCfupt+9Aqep9OckKc1HSrzvd3y7S1YaG
+N6/Sqip7v75flqu0Nt+k1eznsuj//q4k7tLQy8u0ynq/HttZlU1p+XVO67a1
++ZGws7A3vQdP0l9+Sc3Lytriuixnvd+P6H1zvEyLLb/Yj+YtQQAz3HIwafUx
+uxrTad5LJ/W9g4d7++O9p48eP+gcx0P68/ibo9f90zgr5lVaN9WGCcsQM/id
+gL993d8R5y7Mj7YPtItsmZbmm01aLHq/vc5oczWNZ96lP19uVmnVe+Q0z35O
+CSJVldn+rxe2WRIK/7LlxZdZnmc08ndjOu7ZPLN5/xwISS6JLx/RYVb5zxu3
+wpr4lK3BJR0Edt5XaVGnU2ZUhvD2VUqcqbDm3KYVk947W1uwqx0aFhD//We3
+v7e/v+3sTs5ejE6O3r9qn937JUk3wtCSWB+fnBKT9XRE4piO4uhs9MrOMv5B
+af1zXOGEuGfRVGnOZHgGKYSBXpQbCGbadWLeV5u6iWnU/EiME3t/Cdl6y4Yz
+HWo890Pdm7klj1K35FHD+xqtsK972xggQ6PHA/t7D6rI/98btmGd2/b7+vj4
+zeno6OXp6/cXHV46ndJwFb1KKyG2ao5m5dopbxflvLkmBUgYa9WQvJ1maW7O
+isYSPSygXKmG5/cc82DhykNS7aZ23Zi36dpWu5+D4+uzi/fmNb9G0xzfEP+s
+VfEyxzSBrbCs04+05hyT3wK16+vrcTGdlnZcZHUzXpRX91TA1vdq3dMohZqR
+qeh3cJZv4+VvgSbD8eTNtx2VgAFxUv5cHpojc3JDXIHYOwnRrCoLVgVIzis+
+WfO2KlcEkrMCqwKUSJFIp5c1w+/EzkkRJZEAkjw/f/V7uOnprCQ5VNK7E1vY
+mW2aPvf8NrPmL8ttvPNVRlLoyjyn1RXlVfZ//nPvifPNNDXPLbH4avQdgb/Y
+wkCJA07Ni6yeLrf8+CInmBILJea3+td/qW5ljq9pjrO3F+YkbdLaNgKR53Ta
+S+LoBCB6f3qpjPHB72OMD/Yejffv33940DnMBxBqR69Oz7uMYG6FILqnVJvJ
+DSQ2aUj/5sM4I4FiLpYbqODlVV+5IFj9NTMvtojHbwmzLMmhG1tvEYJT0o5J
+KzlOqzwr+tOekJlAzP5FOsm2DH28rIhiyvXSfGerbT+XxeKGEIgW3h+aJB+x
+XTohW/2S9Ze2FQG+LNPuj/efPNm/v0WmvTh7/eZi9OBgv31835TXpl6Wm3wm
+hljb2jJT0uWITU2rsq5JttUwhfhs/2SGxJxflmREFCk4m9fnE0Om48Yamuqz
+7IsXZG4ZhG28KptsmrKqv6wlz7OirO8Rg1r4sUZzN9Y9Xk99jxa0jT+9On27
+hTURN3olljGxIbGMgeBNOS1z2jq9tGuu9sb3x3sjtq7Ht1guv8Ma/az6H1ug
+92isdW8Lg9GIbOQJKZWkJA0G7yGW2NKOTTiyrQlGxCQr8SiQ9CJVZpqu+UeI
+sg1xl69wxg3tPols8aSDEmwuJcxo8J7TzHhAseVpR5fWIU0DUW4mLJHBvsbO
+qWHSvCQ1blYWX9GLRX1N8goD/pXOSg0U8QGUFWYzZFyR5MUfxOdT2kh+A66z
+TisI0pqYXWE/Ehhn2cxcYzHXRF32I0lEaBK06htzTYAlBY2X7bUWt3njVYU/
+AYpZTUubblgWOeCl9InE6iqDpMymiYHqZEcQUzSFjXw5hIWm3kyXDt5jg3Mh
+s4kOFQMR0NcV6a3VlZ0l5iojLtTgE6C6KeiXMqdfxiQb3W/uZcaomledFYRF
+xCQaAT72O6nKS1v4wxHgXC/Lmia/prMjXkxDyaJoM/id/p4T544gMs8qUgRI
+N4+WsmV65zGS2Qle7DMqFs/ch/BEhsMBTBqomjQaLZXAM7W1QsaDOs3r0sMb
+s0zzNFsZVk51Vg/lwtpZnfC3VZnT82ucTYPxSXvAXo1N/RkQcN3+vcUPBYlx
+JSVayHPGHcIu/K8oG4c9eHNdVg3cJ4Z2McumTTToKl2vsVviWKVohUx+CmR4
+0Go5WNBWxWiMgeCSoNGm4HBjc8YQJGMou3IHwkP9Tl40Fjawymaz3A4Gd6B1
+VuVsw8Q5GBCXVdIkcgXWlpvF0kyXaQabah5R+yFtiKmB9gICXDA3cJ8YrpuJ
+6IG6K0fztPeyzPHljNgK6aLyM3A8m4LuT3EWy3JNoC6IFGkfAnumNOIERNHs
+GMNQnoCJsEEHx+VqRSduP6bwutSHtF1e1JpUVUII1v0wBqHoikENTkf7mPEv
+KR0maVnP8FJYv2G/1ZVlqklnoNgpnQ7QuTAZbYmoA48tyX7Fq5uiUbMEwgm/
+0B+0T6DARrxLz3RZAgFgBn4FXAS/BKh2PrdTJdpZRn/QGP7EmSdawvrKzmTB
+4EnXxL0qO9/UtFfaGzhCRV+kTEkY0vE5YcfKI/Oyxi7rNZy1AhN9w8xJkSLW
+LzPQfBm8vbTgGbHGeaOseE6jJcodlBnTmAtIeGFfhdJyNieAmSUNTl9fyddB
+OBByfvr0RZ/lb795uofJVLmdHOn/T2KJ1LOb2EuQ8UdluUFEEY6s04X3sss+
++Aw/0vbqUk6CniQgKU0ARSeWhyrEXQMsPCOkOBKRxBzHiwNa8/XSAsd0dtr/
+xC5TYt4boEFDSv4slju6ahJGhJ9EzjI/qSArO+5KH/gpyZi0KmPdnDzC2Lwk
+DC6A1pa5md98Fr1I5LI/pmfu3o246d27Mt6KhHUdhF8kB1biaRnR4qeXzLOG
+nz7xCPVvv+0+GxyMaURmqQKO+u7dAM7UMcApiX4wnjqIg7LIIZUsyAy4pGyZ
+zIVURRYbmLkwciwQD9LkPAvPfR9zM015Zt6afgckD64cawE7jBI7TRDFmH1T
+XBYkHHdYKs8g2YvFJquXvGNGfpYizEJ4AEcQHaLDAsNieJUPsEovpmsH8lTQ
+LDov4iBEqnDH1/MbMzzbx8bP9vdpjIfjrt5BY0ZSkLB7amdEQG70yhI5FfV2
+BYMwNwj1hDUixjywgBng5VebRBoEjTpPN3kTaKon4mnzYVG8+UfjSG4m7pDv
+3m1L0DbO1CC4mdP7mAwZ+8CxoJW4X0hTpQen+aZWwOugAvbHAHssX+NJshDt
+MRIWAf/FTDO7YmqHoHUsgfa+IB1vLIp1BHa8UG3AJYiCbWDriSA2/i6YtpmG
+12XGeiQB2bIXU/iSxZqhOuqr4Nod7utGcyDRJXhV3r8tSkSkZtX9Qwpql2ok
+nRdwXnUzEsTGLr1kYKExycvpJYHizh1S4v+6ySpBdXNORu6GZKoA6ZKAds1I
+vfPq+4v3O4n837x+w5/fnf6778/enZ7g88U3R+fn/sNAn7j45s335yfhU3jz
++M2rV6evT+Rl+ta0vhrsvDr6847sbOfN2/dnb14fne8Y1vhjhgo6J/KaWNHI
+6BhEjA3obKZkdFqoaub58dv//T/2H5hPn/7h3Yvjg/39pySh5I8n+48f0B84
+GpnNMzQmmpsB6SU2rTAKOBSZWVmTsmpUw9gmRZxYCXDq7r8HZP7Dofl6Ml3v
+P/ijfoENt750MGt9yTDrf9N7WYC45ast03hotr7vQLq93qM/t/52cI++/PpP
+ORz2o/0nf/rjgLHnPTOzknSJm66029Sq+ItKTyzyd+kOh+Z7YnaJKMyJeU8q
+170LUT0TkdkghPY35oIIyiaiO7CyN70x59BvRL9ggmOqSmczCFHVwg8Hh8GW
+EIkK6ctuBlU4ibazYpqt0zxhAcWSiFmc06RXpNHNysAK9HFibFAc8jlhxxlr
+mTwbzF919IYJW9YCFlQscugsbEGbIRaiCjNbMOye203IgquqUqztVGbXHACe
+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
+RunYvMNOonTtzk7zuf8vUQrbyhWcAAA=
 
 -->
 

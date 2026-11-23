@@ -7,8 +7,8 @@
 <title>Continuity Evaluation of Agent Delegation Records</title>
 <meta content="Staford Titus Selvaraj" name="author">
 <meta content="
-       The AUDIT architecture defines records that capture the user's intent, delegation, authorization state, and the actions that agents take across trust boundaries. Records alone don't answer the question an auditor, an operator, or a relying party asks next: did the executed effect stay within the authority the user delegated? 
-       This document defines a deterministic, three-valued evaluation over such records. The outcomes are preserved, violated, and unresolved, and every non-preserved outcome names the invariant that was broken. The document also defines the claim model that the evaluation needs, the roles permitted to sign each record, a mapping onto the AUDIT record types, and a set of interoperable test vectors. It is derived from the Agentic Mandate Evidence Protocol (AMEP). 
+       The AUDIT architecture defines records that capture the user's intent, delegation, authorization state, and the actions that agents take across trust boundaries. Records alone don't answer the question an auditor, an operator, or a relying party asks next: did what was executed stay within the authority the user delegated? 
+       This document defines a deterministic, three-valued evaluation over such records. The outcomes are preserved, violated, and unresolved. A violated outcome names the invariant that was broken and the party whose own signed record departed from authority first. An unresolved outcome names the evidence that is missing; missing evidence is never treated as success. The document also defines the claim model the evaluation needs, the roles permitted to sign each record, a signed statement of what a call did or did not execute, a portable verdict record, a mapping onto the AUDIT record types, and interoperable test vectors. It is derived from the Agentic Mandate Evidence Protocol (AMEP). 
     " name="description">
 <meta content="xml2rfc 3.35.0" name="generator">
 <meta content="agents" name="keyword">
@@ -1233,7 +1233,7 @@ li > p:last-of-type:only-child {
 </tr></thead>
 <tfoot><tr>
 <td class="left">Selvaraj</td>
-<td class="center">Expires 23 May 2027</td>
+<td class="center">Expires 27 May 2027</td>
 <td class="right">[Page]</td>
 </tr></tfoot>
 </table>
@@ -1246,12 +1246,12 @@ li > p:last-of-type:only-child {
 <dd class="internet-draft">draft-stafordtituss-agentic-mandate-evidence-01</dd>
 <dt class="label-published">Published:</dt>
 <dd class="published">
-<time datetime="2026-11-19" class="published">19 November 2026</time>
+<time datetime="2026-11-23" class="published">23 November 2026</time>
     </dd>
 <dt class="label-intended-status">Intended Status:</dt>
 <dd class="intended-status">Informational</dd>
 <dt class="label-expires">Expires:</dt>
-<dd class="expires"><time datetime="2027-05-23">23 May 2027</time></dd>
+<dd class="expires"><time datetime="2027-05-27">27 May 2027</time></dd>
 <dt class="label-authors">Author:</dt>
 <dd class="authors">
 <div class="author">
@@ -1264,8 +1264,8 @@ li > p:last-of-type:only-child {
 <h1 id="title">Continuity Evaluation of Agent Delegation Records</h1>
 <section id="section-abstract">
       <h2 id="abstract"><a href="#abstract" class="selfRef">Abstract</a></h2>
-<p id="section-abstract-1">The AUDIT architecture defines records that capture the user's intent, delegation, authorization state, and the actions that agents take across trust boundaries. Records alone don't answer the question an auditor, an operator, or a relying party asks next: did the executed effect stay within the authority the user delegated?<a href="#section-abstract-1" class="pilcrow">¶</a></p>
-<p id="section-abstract-2">This document defines a deterministic, three-valued evaluation over such records. The outcomes are preserved, violated, and unresolved, and every non-preserved outcome names the invariant that was broken. The document also defines the claim model that the evaluation needs, the roles permitted to sign each record, a mapping onto the AUDIT record types, and a set of interoperable test vectors. It is derived from the Agentic Mandate Evidence Protocol (AMEP).<a href="#section-abstract-2" class="pilcrow">¶</a></p>
+<p id="section-abstract-1">The AUDIT architecture defines records that capture the user's intent, delegation, authorization state, and the actions that agents take across trust boundaries. Records alone don't answer the question an auditor, an operator, or a relying party asks next: did what was executed stay within the authority the user delegated?<a href="#section-abstract-1" class="pilcrow">¶</a></p>
+<p id="section-abstract-2">This document defines a deterministic, three-valued evaluation over such records. The outcomes are preserved, violated, and unresolved. A violated outcome names the invariant that was broken and the party whose own signed record departed from authority first. An unresolved outcome names the evidence that is missing; missing evidence is never treated as success. The document also defines the claim model the evaluation needs, the roles permitted to sign each record, a signed statement of what a call did or did not execute, a portable verdict record, a mapping onto the AUDIT record types, and interoperable test vectors. It is derived from the Agentic Mandate Evidence Protocol (AMEP).<a href="#section-abstract-2" class="pilcrow">¶</a></p>
 </section>
 <div id="status-of-memo">
 <section id="section-boilerplate.1">
@@ -1286,7 +1286,7 @@ li > p:last-of-type:only-child {
         time. It is inappropriate to use Internet-Drafts as reference
         material or to cite them other than as "work in progress."<a href="#section-boilerplate.1-3" class="pilcrow">¶</a></p>
 <p id="section-boilerplate.1-4">
-        This Internet-Draft will expire on 23 May 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
+        This Internet-Draft will expire on 27 May 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="copyright">
@@ -1334,50 +1334,75 @@ li > p:last-of-type:only-child {
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4">
             <p id="section-toc.1-1.4.1"><a href="#section-4" class="auto internal xref">4</a>.  <a href="#name-claim-model" class="internal xref">Claim Model</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4.2.1">
+                <p id="section-toc.1-1.4.2.1.1"><a href="#section-4.1" class="auto internal xref">4.1</a>.  <a href="#name-limits" class="internal xref">Limits</a></p>
+</li>
+            </ul>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5">
             <p id="section-toc.1-1.5.1"><a href="#section-5" class="auto internal xref">5</a>.  <a href="#name-signer-roles" class="internal xref">Signer Roles</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6">
-            <p id="section-toc.1-1.6.1"><a href="#section-6" class="auto internal xref">6</a>.  <a href="#name-invariants" class="internal xref">Invariants</a></p>
+            <p id="section-toc.1-1.6.1"><a href="#section-6" class="auto internal xref">6</a>.  <a href="#name-call-statements" class="internal xref">Call Statements</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7">
-            <p id="section-toc.1-1.7.1"><a href="#section-7" class="auto internal xref">7</a>.  <a href="#name-evaluation-procedure" class="internal xref">Evaluation Procedure</a></p>
+            <p id="section-toc.1-1.7.1"><a href="#section-7" class="auto internal xref">7</a>.  <a href="#name-invariants" class="internal xref">Invariants</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.8">
-            <p id="section-toc.1-1.8.1"><a href="#section-8" class="auto internal xref">8</a>.  <a href="#name-required-fields" class="internal xref">Required Fields</a></p>
-</li>
-          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.9">
-            <p id="section-toc.1-1.9.1"><a href="#section-9" class="auto internal xref">9</a>.  <a href="#name-test-vectors" class="internal xref">Test Vectors</a></p>
-</li>
-          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10">
-            <p id="section-toc.1-1.10.1"><a href="#section-10" class="auto internal xref">10</a>. <a href="#name-implementation-status" class="internal xref">Implementation Status</a></p>
-</li>
-          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.11">
-            <p id="section-toc.1-1.11.1"><a href="#section-11" class="auto internal xref">11</a>. <a href="#name-security-considerations" class="internal xref">Security Considerations</a></p>
-</li>
-          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12">
-            <p id="section-toc.1-1.12.1"><a href="#section-12" class="auto internal xref">12</a>. <a href="#name-privacy-considerations" class="internal xref">Privacy Considerations</a></p>
-</li>
-          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.13">
-            <p id="section-toc.1-1.13.1"><a href="#section-13" class="auto internal xref">13</a>. <a href="#name-iana-considerations" class="internal xref">IANA Considerations</a></p>
-</li>
-          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.14">
-            <p id="section-toc.1-1.14.1"><a href="#section-14" class="auto internal xref">14</a>. <a href="#name-references" class="internal xref">References</a></p>
+            <p id="section-toc.1-1.8.1"><a href="#section-8" class="auto internal xref">8</a>.  <a href="#name-evaluation-procedure" class="internal xref">Evaluation Procedure</a></p>
 <ul class="compact toc ulBare ulEmpty">
-<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.14.2.1">
-                <p id="section-toc.1-1.14.2.1.1"><a href="#section-14.1" class="auto internal xref">14.1</a>.  <a href="#name-normative-references" class="internal xref">Normative References</a></p>
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.8.2.1">
+                <p id="section-toc.1-1.8.2.1.1"><a href="#section-8.1" class="auto internal xref">8.1</a>.  <a href="#name-approvals" class="internal xref">Approvals</a></p>
 </li>
-              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.14.2.2">
-                <p id="section-toc.1-1.14.2.2.1"><a href="#section-14.2" class="auto internal xref">14.2</a>.  <a href="#name-informative-references" class="internal xref">Informative References</a></p>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.8.2.2">
+                <p id="section-toc.1-1.8.2.2.1"><a href="#section-8.2" class="auto internal xref">8.2</a>.  <a href="#name-results-blame-and-missing-e" class="internal xref">Results: Blame and Missing Evidence</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.8.2.3">
+                <p id="section-toc.1-1.8.2.3.1"><a href="#section-8.3" class="auto internal xref">8.3</a>.  <a href="#name-state-across-packets" class="internal xref">State Across Packets</a></p>
 </li>
             </ul>
 </li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.9">
+            <p id="section-toc.1-1.9.1"><a href="#section-9" class="auto internal xref">9</a>.  <a href="#name-verdict-records" class="internal xref">Verdict Records</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10">
+            <p id="section-toc.1-1.10.1"><a href="#section-10" class="auto internal xref">10</a>. <a href="#name-required-fields" class="internal xref">Required Fields</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.11">
+            <p id="section-toc.1-1.11.1"><a href="#section-11" class="auto internal xref">11</a>. <a href="#name-test-vectors" class="internal xref">Test Vectors</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12">
+            <p id="section-toc.1-1.12.1"><a href="#section-12" class="auto internal xref">12</a>. <a href="#name-implementation-status" class="internal xref">Implementation Status</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.13">
+            <p id="section-toc.1-1.13.1"><a href="#section-13" class="auto internal xref">13</a>. <a href="#name-security-considerations" class="internal xref">Security Considerations</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.14">
+            <p id="section-toc.1-1.14.1"><a href="#section-14" class="auto internal xref">14</a>. <a href="#name-privacy-considerations" class="internal xref">Privacy Considerations</a></p>
+</li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.15">
-            <p id="section-toc.1-1.15.1"><a href="#appendix-A" class="auto internal xref"></a><a href="#name-acknowledgments" class="internal xref">Acknowledgments</a></p>
+            <p id="section-toc.1-1.15.1"><a href="#section-15" class="auto internal xref">15</a>. <a href="#name-iana-considerations" class="internal xref">IANA Considerations</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.16">
-            <p id="section-toc.1-1.16.1"><a href="#appendix-B" class="auto internal xref"></a><a href="#name-authors-address" class="internal xref">Author's Address</a></p>
+            <p id="section-toc.1-1.16.1"><a href="#section-16" class="auto internal xref">16</a>. <a href="#name-references" class="internal xref">References</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.16.2.1">
+                <p id="section-toc.1-1.16.2.1.1"><a href="#section-16.1" class="auto internal xref">16.1</a>.  <a href="#name-normative-references" class="internal xref">Normative References</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.16.2.2">
+                <p id="section-toc.1-1.16.2.2.1"><a href="#section-16.2" class="auto internal xref">16.2</a>.  <a href="#name-informative-references" class="internal xref">Informative References</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.17">
+            <p id="section-toc.1-1.17.1"><a href="#appendix-A" class="auto internal xref"></a><a href="#name-changes-from-00" class="internal xref">Changes from -00</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.18">
+            <p id="section-toc.1-1.18.1"><a href="#appendix-B" class="auto internal xref"></a><a href="#name-acknowledgments" class="internal xref">Acknowledgments</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.19">
+            <p id="section-toc.1-1.19.1"><a href="#appendix-C" class="auto internal xref"></a><a href="#name-authors-address" class="internal xref">Author's Address</a></p>
 </li>
         </ul>
 </nav>
@@ -1403,26 +1428,35 @@ li > p:last-of-type:only-child {
           <p id="section-1-2.4.1">an adapter maps a tool call to an effect that differs from the one declared;<a href="#section-1-2.4.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-1-2.5">
-          <p id="section-1-2.5.1">a decision made after the fact, from an audit log, is presented as if it had prevented the action.<a href="#section-1-2.5.1" class="pilcrow">¶</a></p>
+          <p id="section-1-2.5.1">a gateway refusal is later read as an executed action, or a lost response is read as a failure;<a href="#section-1-2.5.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-1-2.6">
+          <p id="section-1-2.6.1">a decision made after the fact, from an audit log, is presented as if it had prevented the action.<a href="#section-1-2.6.1" class="pilcrow">¶</a></p>
 </li>
       </ul>
-<p id="section-1-3"><span>[<a href="#I-D.kuehlewind-audit-architecture" class="cite xref">I-D.kuehlewind-audit-architecture</a>]</span> defines Interaction, Action, Delegation, and Authorization Transition records, and the propagation of audit context, so that these chains can be reconstructed.<a href="#section-1-3" class="pilcrow">¶</a></p>
-<p id="section-1-4">This document is complementary. Given a set of such records, it specifies:<a href="#section-1-4" class="pilcrow">¶</a></p>
+<p id="section-1-3"><span>[<a href="#I-D.kuehlewind-audit-architecture" class="cite xref">I-D.kuehlewind-audit-architecture</a>]</span> defines Interaction, Action, Delegation, and Authorization Transition records, and the propagation of audit context, so that these chains can be reconstructed. Its Auditor role determines whether recorded behaviour matched the authorization in force at the time.<a href="#section-1-3" class="pilcrow">¶</a></p>
+<p id="section-1-4">This document specifies that determination. Given a set of records, it specifies:<a href="#section-1-4" class="pilcrow">¶</a></p>
 <ol start="1" type="1" class="normal type-1" id="section-1-5">
 <li id="section-1-5.1">
-          <p id="section-1-5.1.1">a <strong>claim model</strong> that makes delegated authority machine-checkable (actions, resources, deny lists, data classes, an effect ceiling, validity, a delegation budget, and an optional risk budget);<a href="#section-1-5.1.1" class="pilcrow">¶</a></p>
+          <p id="section-1-5.1.1">a <strong>claim model</strong> that makes delegated authority machine-checkable (<a href="#claims" class="auto internal xref">Section 4</a>);<a href="#section-1-5.1.1" class="pilcrow">¶</a></p>
 </li>
         <li id="section-1-5.2">
-          <p id="section-1-5.2.1"><strong>signer roles</strong>, so that a record counts as evidence only when it is signed by a party entitled to make it;<a href="#section-1-5.2.1" class="pilcrow">¶</a></p>
+          <p id="section-1-5.2.1"><strong>signer roles</strong>, so that a record counts as evidence only when it is signed by a party entitled to make it (<a href="#roles" class="auto internal xref">Section 5</a>);<a href="#section-1-5.2.1" class="pilcrow">¶</a></p>
 </li>
         <li id="section-1-5.3">
-          <p id="section-1-5.3.1"><strong>invariants</strong> that a chain of records must satisfy (I1 to I11);<a href="#section-1-5.3.1" class="pilcrow">¶</a></p>
+          <p id="section-1-5.3.1"><strong>call statements</strong>, so that "nothing was executed" and "the outcome is unknown" are distinguishable from each other and from an executed action (<a href="#statements" class="auto internal xref">Section 6</a>);<a href="#section-1-5.3.1" class="pilcrow">¶</a></p>
 </li>
         <li id="section-1-5.4">
-          <p id="section-1-5.4.1">a deterministic <strong>evaluation procedure</strong> that returns preserved, violated, or unresolved, together with the deciding invariant;<a href="#section-1-5.4.1" class="pilcrow">¶</a></p>
+          <p id="section-1-5.4.1"><strong>invariants</strong> that a chain of records must satisfy (I1 to I11);<a href="#section-1-5.4.1" class="pilcrow">¶</a></p>
 </li>
         <li id="section-1-5.5">
-          <p id="section-1-5.5.1"><strong>test vectors</strong>, so that independent verifiers can demonstrate that they agree.<a href="#section-1-5.5.1" class="pilcrow">¶</a></p>
+          <p id="section-1-5.5.1">a deterministic <strong>evaluation procedure</strong> that returns preserved, violated, or unresolved, with the deciding invariant, the party at fault, and the missing evidence (<a href="#evaluation" class="auto internal xref">Section 8</a>);<a href="#section-1-5.5.1" class="pilcrow">¶</a></p>
+</li>
+        <li id="section-1-5.6">
+          <p id="section-1-5.6.1">a portable, signed <strong>verdict record</strong>, so that a second auditor can check a first auditor's conclusion (<a href="#verdicts" class="auto internal xref">Section 9</a>);<a href="#section-1-5.6.1" class="pilcrow">¶</a></p>
+</li>
+        <li id="section-1-5.7">
+          <p id="section-1-5.7.1"><strong>test vectors</strong>, so that independent verifiers can demonstrate that they agree.<a href="#section-1-5.7.1" class="pilcrow">¶</a></p>
 </li>
       </ol>
 <p id="section-1-6">The evaluation can run before an effect, when an enforcement point decides on the predicted effect, or after the fact, when an auditor evaluates recorded effects. It never treats missing evidence as success, and it never treats a post-execution decision as a block.<a href="#section-1-6" class="pilcrow">¶</a></p>
@@ -1466,12 +1500,22 @@ appear in all capitals, as shown here.<a href="#section-1.1-1" class="pilcrow">�
           <dd class="break"></dd>
 <dt id="section-1.2-2.9">Observer:</dt>
           <dd style="margin-left: 1.5em" id="section-1.2-2.10">
-            <p id="section-1.2-2.10.1">the party that produced the effect record.<a href="#section-1.2-2.10.1" class="pilcrow">¶</a></p>
+            <p id="section-1.2-2.10.1">the party that produced the effect record or call statement.<a href="#section-1.2-2.10.1" class="pilcrow">¶</a></p>
 </dd>
           <dd class="break"></dd>
-<dt id="section-1.2-2.11">Verifier:</dt>
+<dt id="section-1.2-2.11">Call statement:</dt>
           <dd style="margin-left: 1.5em" id="section-1.2-2.12">
-            <p id="section-1.2-2.12.1">an entity that runs the evaluation in <a href="#evaluation" class="auto internal xref">Section 7</a>.<a href="#section-1.2-2.12.1" class="pilcrow">¶</a></p>
+            <p id="section-1.2-2.12.1">the observer's signed account of one call: what it executed, or that it executed nothing, and how many effect records belong to the call.<a href="#section-1.2-2.12.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-1.2-2.13">Packet:</dt>
+          <dd style="margin-left: 1.5em" id="section-1.2-2.14">
+            <p id="section-1.2-2.14.1">the set of records a verifier evaluates together.<a href="#section-1.2-2.14.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-1.2-2.15">Verifier:</dt>
+          <dd style="margin-left: 1.5em" id="section-1.2-2.16">
+            <p id="section-1.2-2.16.1">an entity that runs the evaluation in <a href="#evaluation" class="auto internal xref">Section 8</a>.<a href="#section-1.2-2.16.1" class="pilcrow">¶</a></p>
 </dd>
         <dd class="break"></dd>
 </dl>
@@ -1507,7 +1551,7 @@ appear in all capitals, as shown here.<a href="#section-1.1-1" class="pilcrow">�
           <tr>
             <td class="text-left" rowspan="1" colspan="1">Approval</td>
             <td class="text-left" rowspan="1" colspan="1">Interaction Record (approval, HITL escalation)</td>
-            <td class="text-left" rowspan="1" colspan="1">binding to the exact effect, I8</td>
+            <td class="text-left" rowspan="1" colspan="1">binding to the exact effect or effects, I8</td>
           </tr>
           <tr>
             <td class="text-left" rowspan="1" colspan="1">Invocation and interpretation</td>
@@ -1520,19 +1564,24 @@ appear in all capitals, as shown here.<a href="#section-1.1-1" class="pilcrow">�
             <td class="text-left" rowspan="1" colspan="1">I2, I5, I9, I10, I11</td>
           </tr>
           <tr>
-            <td class="text-left" rowspan="1" colspan="1">Grant, revocation, status</td>
-            <td class="text-left" rowspan="1" colspan="1">Authorization Transition Record</td>
-            <td class="text-left" rowspan="1" colspan="1">liveness, I6</td>
+            <td class="text-left" rowspan="1" colspan="1">Call statement</td>
+            <td class="text-left" rowspan="1" colspan="1">Action Record (call outcome, including "not executed")</td>
+            <td class="text-left" rowspan="1" colspan="1">I7, I11, binding to the exact invocation</td>
           </tr>
           <tr>
-            <td class="text-left" rowspan="1" colspan="1">Continuity decision</td>
+            <td class="text-left" rowspan="1" colspan="1">Grant, revocation, status</td>
+            <td class="text-left" rowspan="1" colspan="1">Authorization Transition Record</td>
+            <td class="text-left" rowspan="1" colspan="1">liveness at the invocation and at each effect, I6</td>
+          </tr>
+          <tr>
+            <td class="text-left" rowspan="1" colspan="1">Verdict record</td>
             <td class="text-left" rowspan="1" colspan="1">(none)</td>
-            <td class="text-left" rowspan="1" colspan="1">the output of this document, with its phase</td>
+            <td class="text-left" rowspan="1" colspan="1">the output of this document (<a href="#verdicts" class="auto internal xref">Section 9</a>)</td>
           </tr>
         </tbody>
       </table>
-<p id="section-2-2">Mandates and delegations commonly originate in OAuth 2.0 Token Exchange chains <span>[<a href="#RFC8693" class="cite xref">RFC8693</a>]</span>. Records <span class="bcp14">MAY</span> be carried as COSE_Sign1 objects <span>[<a href="#RFC9052" class="cite xref">RFC9052</a>]</span>, and <span class="bcp14">MAY</span> be registered with a transparency service <span>[<a href="#I-D.ietf-scitt-architecture" class="cite xref">I-D.ietf-scitt-architecture</a>]</span>, which makes selective omission of records detectable.<a href="#section-2-2" class="pilcrow">¶</a></p>
-<p id="section-2-3">This document doesn't define new transport or storage. It requires only that records carry the fields listed in <a href="#fields" class="auto internal xref">Section 8</a>, and that records can be linked using the AUDIT audit context: trace, parent, actor, and on-behalf-of.<a href="#section-2-3" class="pilcrow">¶</a></p>
+<p id="section-2-2">Mandates and delegations commonly originate in OAuth 2.0 Token Exchange chains <span>[<a href="#RFC8693" class="cite xref">RFC8693</a>]</span>. Records <span class="bcp14">MAY</span> be carried as COSE_Sign1 objects <span>[<a href="#RFC9052" class="cite xref">RFC9052</a>]</span>, and <span class="bcp14">MAY</span> be registered with a transparency service <span>[<a href="#I-D.ietf-scitt-architecture" class="cite xref">I-D.ietf-scitt-architecture</a>]</span>, which makes selective omission of records detectable. Conversation records such as <span>[<a href="#I-D.birkholz-verifiable-agent-conversations" class="cite xref">I-D.birkholz-verifiable-agent-conversations</a>]</span> can supply the Interaction Records from which mandates, intents and approvals are taken.<a href="#section-2-2" class="pilcrow">¶</a></p>
+<p id="section-2-3">This document doesn't define new transport or storage. It requires only that records carry the fields listed in <a href="#fields" class="auto internal xref">Section 10</a>, and that records can be linked using the AUDIT audit context: trace, parent, actor, and on-behalf-of.<a href="#section-2-3" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="related">
@@ -1543,16 +1592,16 @@ appear in all capitals, as shown here.<a href="#section-1.1-1" class="pilcrow">�
 <p id="section-3-1">Most related work grants or checks authority before an agent acts. This document evaluates whether what was executed stayed within that authority, and the two are complementary.<a href="#section-3-1" class="pilcrow">¶</a></p>
 <ul class="normal">
 <li class="normal" id="section-3-2.1">
-          <p id="section-3-2.1.1">The Delegation Receipt Protocol <span>[<a href="#I-D.nelson-agent-delegation-receipts" class="cite xref">I-D.nelson-agent-delegation-receipts</a>]</span> has the user sign an Authorization Object (scope, time window, an instruction hash, and a model-state commitment) that is anchored before the agent receives control and checked before execution. Such an object can serve as the mandate whose claims this document evaluates.<a href="#section-3-2.1.1" class="pilcrow">¶</a></p>
+          <p id="section-3-2.1.1">The Delegation Receipt Protocol <span>[<a href="#I-D.nelson-agent-delegation-receipts" class="cite xref">I-D.nelson-agent-delegation-receipts</a>]</span> has the user sign an authorization object that is checked before execution. Such an object can serve as the mandate whose claims this document evaluates.<a href="#section-3-2.1.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-3-2.2">
           <p id="section-3-2.2.1">Authenticated delegation for AI agents <span>[<a href="#SOUTH2025" class="cite xref">SOUTH2025</a>]</span> proposes scoped, verifiable delegation credentials that extend OpenID Connect and OAuth 2.0. Those credentials are another source of mandates and delegations. GNAP <span>[<a href="#RFC9635" class="cite xref">RFC9635</a>]</span> negotiates delegated authorization across multiple parties; its grants can likewise be recorded as mandates.<a href="#section-3-2.2.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-3-2.3">
-          <p id="section-3-2.3.1">Work on infrastructure for AI agents <span>[<a href="#CHAN2025" class="cite xref">CHAN2025</a>]</span> identifies attribution and incident response as functions that require shared infrastructure outside the agent. The evaluation in <a href="#evaluation" class="auto internal xref">Section 7</a> supplies one verifiable input to both.<a href="#section-3-2.3.1" class="pilcrow">¶</a></p>
+          <p id="section-3-2.3.1">Work on infrastructure for AI agents <span>[<a href="#CHAN2025" class="cite xref">CHAN2025</a>]</span> identifies attribution and incident response as functions that require shared infrastructure outside the agent. The evaluation in <a href="#evaluation" class="auto internal xref">Section 8</a> supplies one verifiable input to both.<a href="#section-3-2.3.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-3-2.4">
-          <p id="section-3-2.4.1">The DIF threat model for delegated authority <span>[<a href="#DIF-DATM" class="cite xref">DIF-DATM</a>]</span> argues that delegated authority commonly fails at the moment of action rather than at issuance, and asks for execution-time evaluation. <span>[<a href="#DIF-DAE" class="cite xref">DIF-DAE</a>]</span> compares existing authorization specifications (including OAuth, UCAN, zCaps, KYA-OS, and AuthZEN) against a set of criteria. This document addresses the execution-time and after-the-fact evaluation those documents call for, and does not define a new credential format.<a href="#section-3-2.4.1" class="pilcrow">¶</a></p>
+          <p id="section-3-2.4.1">The DIF threat model for delegated authority <span>[<a href="#DIF-DATM" class="cite xref">DIF-DATM</a>]</span> argues that delegated authority commonly fails at the moment of action rather than at issuance, and asks for execution-time evaluation. <span>[<a href="#DIF-DAE" class="cite xref">DIF-DAE</a>]</span> compares existing authorization specifications against a set of criteria. This document addresses the execution-time and after-the-fact evaluation those documents call for, and does not define a new credential format.<a href="#section-3-2.4.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-3-2.5">
           <p id="section-3-2.5.1">The NCCoE concept paper on agent identity and authorization <span>[<a href="#NCCOE-AGENTS" class="cite xref">NCCOE-AGENTS</a>]</span> covers identification, authorization, auditing, and non-repudiation for agents using existing standards. The records and outcomes defined here are one way to make the auditing and non-repudiation goals checkable.<a href="#section-3-2.5.1" class="pilcrow">¶</a></p>
@@ -1568,13 +1617,13 @@ appear in all capitals, as shown here.<a href="#section-1.1-1" class="pilcrow">�
       <h2 id="name-claim-model">
 <a href="#section-4" class="section-number selfRef">4. </a><a href="#name-claim-model" class="section-name selfRef">Claim Model</a>
       </h2>
-<p id="section-4-1">A claim set is C = (A, R, A⁻, R⁻, D, E, V, P, K, B), where:<a href="#section-4-1" class="pilcrow">¶</a></p>
+<p id="section-4-1">A claim set is C = (G, A⁻, R⁻, D, E, V, P, K, B, L), where:<a href="#section-4-1" class="pilcrow">¶</a></p>
 <ul class="normal">
 <li class="normal" id="section-4-2.1">
-          <p id="section-4-2.1.1">A and R are sets of canonical action and resource patterns that are permitted;<a href="#section-4-2.1.1" class="pilcrow">¶</a></p>
+          <p id="section-4-2.1.1">G is the set of grants. Each grant is a pair (A, R) of canonical action and resource patterns, and permits its actions on its resources. A claim set with plain action and resource lists has one grant. A list of grants expresses permissions such as "read the documents, write the reports" that a single product of actions and resources cannot express without also permitting "write the documents";<a href="#section-4-2.1.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-4-2.2">
-          <p id="section-4-2.2.1">A⁻ and R⁻ are sets of action and resource patterns that are denied even when A or R would permit them;<a href="#section-4-2.2.1" class="pilcrow">¶</a></p>
+          <p id="section-4-2.2.1">A⁻ and R⁻ are sets of action and resource patterns that are denied even when a grant would permit them;<a href="#section-4-2.2.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-4-2.3">
           <p id="section-4-2.3.1">D is a set of (data class, recipient class) pairs;<a href="#section-4-2.3.1" class="pilcrow">¶</a></p>
@@ -1592,13 +1641,39 @@ appear in all capitals, as shown here.<a href="#section-1.1-1" class="pilcrow">�
           <p id="section-4-2.7.1">K is the delegation budget (remaining depth);<a href="#section-4-2.7.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-4-2.8">
-          <p id="section-4-2.8.1">B is an <span class="bcp14">OPTIONAL</span> risk budget in points.<a href="#section-4-2.8.1" class="pilcrow">¶</a></p>
+          <p id="section-4-2.8.1">B is an <span class="bcp14">OPTIONAL</span> risk budget in points;<a href="#section-4-2.8.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-4-2.9">
+          <p id="section-4-2.9.1">L is an <span class="bcp14">OPTIONAL</span> list of limits on quantities (<a href="#limits" class="auto internal xref">Section 4.1</a>).<a href="#section-4-2.9.1" class="pilcrow">¶</a></p>
 </li>
       </ul>
-<p id="section-4-3">C1 ⊑ C2 (C1 is equal to or narrower than C2) holds if and only if: every pattern in A1 and R1 is subsumed by some pattern in A2 or R2 respectively; every pattern in A2⁻ and R2⁻ is subsumed by some pattern in A1⁻ or R1⁻ respectively (denies only grow); D1 ⊆ D2; E1 ≤ E2; V1 ⊆ V2; P1 = P2 or P2 is unrestricted; the depth rule holds (if K2 is present, K2 &gt; 0 and K1 &lt; K2); and B1 ≤ B2 when B2 is present.<a href="#section-4-3" class="pilcrow">¶</a></p>
-<p id="section-4-4">The meet C1 ⊓ C2 is taken component-wise, with denies unioned so that no hop and no intent can lift a deny.<a href="#section-4-4" class="pilcrow">¶</a></p>
+<p id="section-4-3">C1 ⊑ C2 (C1 is equal to or narrower than C2) holds if and only if: every grant of C1 lies within a single grant of C2 (its actions subsumed by that grant's actions and its resources by that grant's resources); every pattern in A2⁻ and R2⁻ is subsumed by some pattern in A1⁻ or R1⁻ respectively (denies only grow); D1 ⊆ D2; E1 ≤ E2; V1 ⊆ V2; P1 = P2 or P2 is unrestricted; the depth rule holds (if K2 is present, K2 &gt; 0 and K1 &lt; K2); B1 ≤ B2 when B2 is present; and no limit of C1 is higher than a limit of C2 in the same unit, actions and period. A child <span class="bcp14">MAY</span> add limits.<a href="#section-4-3" class="pilcrow">¶</a></p>
+<p id="section-4-4">The meet C1 ⊓ C2 takes the pairwise intersection of grants and is otherwise taken component-wise, with denies unioned so that no hop and no intent can lift a deny.<a href="#section-4-4" class="pilcrow">¶</a></p>
 <p id="section-4-5">Resource identifiers <span class="bcp14">MUST</span> be canonical. File-system paths <span class="bcp14">MUST</span> be absolute and normalized, with the home directory expanded and ".." collapsed. URLs <span class="bcp14">MUST</span> carry their resolved host class. SaaS objects <span class="bcp14">MUST</span> be identified as <code>provider:type/id</code>. A verifier <span class="bcp14">MUST NOT</span> rely on user-relative forms.<a href="#section-4-5" class="pilcrow">¶</a></p>
-<p id="section-4-6">An effect is x = (a, r, d, e, t). x ⊨ C if and only if a matches A and not A⁻, r matches R and not R⁻, e ≤ E, every released (data class, recipient class) pair is in D, and t ∈ V.<a href="#section-4-6" class="pilcrow">¶</a></p>
+<p id="section-4-6">An effect is x = (a, r, d, e, t, v), where v is an <span class="bcp14">OPTIONAL</span> quantity. x ⊨ C if and only if some grant of C permits both a and r, a matches no pattern of A⁻, r matches no pattern of R⁻, e ≤ E, every released (data class, recipient class) pair is in D, and t ∈ V.<a href="#section-4-6" class="pilcrow">¶</a></p>
+<p id="section-4-7">A claim set that carries a member this document does not define, and that is not an extension member, makes the result unresolved (I7): ignoring a member that narrows authority could widen it.<a href="#section-4-7" class="pilcrow">¶</a></p>
+<div id="limits">
+<section id="section-4.1">
+        <h3 id="name-limits">
+<a href="#section-4.1" class="section-number selfRef">4.1. </a><a href="#name-limits" class="section-name selfRef">Limits</a>
+        </h3>
+<p id="section-4.1-1">A limit caps a quantity of one unit, such as <code>iso4217:EUR</code>, an asset, or <code>count:records</code>, with an <span class="bcp14">OPTIONAL</span> maximum per effect, per call (the total of one invocation's effects), and per period (a total within fixed windows of a stated length, starting at the node's validity start). An effect's quantity is an exact decimal string and a unit. Amounts are compared exactly, never as floating point.<a href="#section-4.1-1" class="pilcrow">¶</a></p>
+<ol start="1" type="1" class="normal type-1" id="section-4.1-2">
+<li id="section-4.1-2.1">
+            <p id="section-4.1-2.1.1">For every node on the chain that carries limits, every limit that applies to an effect is checked before the result is decided. A violation takes precedence over an unresolved check, so the result does not depend on the order in which limits are listed.<a href="#section-4.1-2.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li id="section-4.1-2.2">
+            <p id="section-4.1-2.2.1">A period total is the verifier's running total for the window, including state carried from earlier packets (<a href="#state" class="auto internal xref">Section 8.3</a>). A period total reported by an observer counts only if the limit names that observer as the one that counts all of the node's spending in the unit, and only if the observer's figure states the start of the window it covers and that start equals the limit's window start. An observer's figure for a different window would otherwise understate the limit's total, or blame an honest observer.<a href="#section-4.1-2.2.1" class="pilcrow">¶</a></p>
+</li>
+          <li id="section-4.1-2.3">
+            <p id="section-4.1-2.3.1">Without such a figure and without earlier state for the window, the period total is unknown, and the result is unresolved (I7). A packet's assembler can leave out earlier effects, so a period total is never assumed to start at zero.<a href="#section-4.1-2.3.1" class="pilcrow">¶</a></p>
+</li>
+          <li id="section-4.1-2.4">
+            <p id="section-4.1-2.4.1">An approval that passed I8 authorizes its effect to exceed a limit. The approved amount still counts toward the period total.<a href="#section-4.1-2.4.1" class="pilcrow">¶</a></p>
+</li>
+        </ol>
+</section>
+</div>
 </section>
 </div>
 <div id="roles">
@@ -1629,7 +1704,7 @@ appear in all capitals, as shown here.<a href="#section-1.1-1" class="pilcrow">�
             <td class="text-left" rowspan="1" colspan="1">host</td>
           </tr>
           <tr>
-            <td class="text-left" rowspan="1" colspan="1">Effect</td>
+            <td class="text-left" rowspan="1" colspan="1">Effect, call statement</td>
             <td class="text-left" rowspan="1" colspan="1">observer</td>
           </tr>
           <tr>
@@ -1643,12 +1718,39 @@ appear in all capitals, as shown here.<a href="#section-1.1-1" class="pilcrow">�
         </tbody>
       </table>
 <p id="section-5-3">Without roles, a compromised host key could mint its own mandate or approve its own action.<a href="#section-5-3" class="pilcrow">¶</a></p>
+<p id="section-5-4">Ed25519 <span>[<a href="#RFC8032" class="cite xref">RFC8032</a>]</span> signatures are accepted under one exact rule in every verifier. A verifier <span class="bcp14">MUST</span> reject a signature whose scalar S is not less than the group order, and a public key or commitment R whose encoding is non-canonical or is a point of small order. Libraries otherwise differ on these edge cases (one accepts a signature by the identity key over every message), and two verifiers would then disagree on the same record.<a href="#section-5-4" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="statements">
+<section id="section-6">
+      <h2 id="name-call-statements">
+<a href="#section-6" class="section-number selfRef">6. </a><a href="#name-call-statements" class="section-name selfRef">Call Statements</a>
+      </h2>
+<p id="section-6-1">An effect record says what was executed. It cannot say that nothing was. A <strong>call statement</strong> is the observer's signed account of one call: its disposition (completed, not executed, or failed after the effects it counts), the number of effect records it issued for the call, and OPTIONALLY the digest of the exact signed invocation and of the arguments it received.<a href="#section-6-1" class="pilcrow">¶</a></p>
+<ol start="1" type="1" class="normal type-1" id="section-6-2">
+<li id="section-6-2.1">
+          <p id="section-6-2.1.1">A statement that does not verify, has an unknown disposition, or says "not executed" while counting effects, makes the result unresolved (I7).<a href="#section-6-2.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li id="section-6-2.2">
+          <p id="section-6-2.2.1">A statement or effect record bound to a different invocation (by invocation digest) is not evidence for this one: unresolved (I7). A genuine record for one call therefore cannot be presented for another call that reuses its identifier.<a href="#section-6-2.2.1" class="pilcrow">¶</a></p>
+</li>
+        <li id="section-6-2.3">
+          <p id="section-6-2.3.1">If the arguments the observer received differ from those the host signed, the call was changed in transit: violated (I2), or unresolved (I7) when nothing was executed.<a href="#section-6-2.3.1" class="pilcrow">¶</a></p>
+</li>
+        <li id="section-6-2.4">
+          <p id="section-6-2.4.1">An effect record for a call the observer says was not executed is equivocation: violated (I11).<a href="#section-6-2.4.1" class="pilcrow">¶</a></p>
+</li>
+        <li id="section-6-2.5">
+          <p id="section-6-2.5.1">With no effect records and a verified "not executed" statement, the call provably had no effect, and the result is preserved. For a call at or above <code>write_shared</code>, the statement must come from a party other than the actor; otherwise unresolved (I10).<a href="#section-6-2.5.1" class="pilcrow">¶</a></p>
+</li>
+      </ol>
+<p id="section-6-3">Without a call statement, an invocation with no effect record is unresolved (I7): the effect may have happened. A refusal by a gateway is therefore recorded as a "not executed" statement signed by the gateway, never as an absence of records.<a href="#section-6-3" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="invariants">
-<section id="section-6">
+<section id="section-7">
       <h2 id="name-invariants">
-<a href="#section-6" class="section-number selfRef">6. </a><a href="#name-invariants" class="section-name selfRef">Invariants</a>
+<a href="#section-7" class="section-number selfRef">7. </a><a href="#name-invariants" class="section-name selfRef">Invariants</a>
       </h2>
 <table class="center" id="table-3">
         <caption><a href="#table-3" class="selfRef">Table 3</a></caption>
@@ -1667,7 +1769,7 @@ appear in all capitals, as shown here.<a href="#section-1.1-1" class="pilcrow">�
           </tr>
           <tr>
             <td class="text-left" rowspan="1" colspan="1">I2</td>
-            <td class="text-left" rowspan="1" colspan="1">Every effect matches the declared (or mediated) effect, satisfies the meet of the chain (and of the intent), and stays within risk budgets unless a bound approval covers it</td>
+            <td class="text-left" rowspan="1" colspan="1">Every effect matches the declared (or mediated) effect, satisfies the meet of the chain (and of the intent), and stays within limits and risk budgets unless a bound approval covers it</td>
             <td class="text-left" rowspan="1" colspan="1">violated</td>
           </tr>
           <tr>
@@ -1687,17 +1789,17 @@ appear in all capitals, as shown here.<a href="#section-1.1-1" class="pilcrow">�
           </tr>
           <tr>
             <td class="text-left" rowspan="1" colspan="1">I6</td>
-            <td class="text-left" rowspan="1" colspan="1">No ancestor was revoked, per signed revocation or status evidence, at or before the invocation</td>
-            <td class="text-left" rowspan="1" colspan="1">violated</td>
+            <td class="text-left" rowspan="1" colspan="1">No ancestor was revoked, per signed revocation or status evidence, at or before the invocation or the time of any of its effects</td>
+            <td class="text-left" rowspan="1" colspan="1">violated (unresolved inside a declared propagation window)</td>
           </tr>
           <tr>
             <td class="text-left" rowspan="1" colspan="1">I7</td>
-            <td class="text-left" rowspan="1" colspan="1">All required records are present, well-formed, signed by a permitted role, and fresh where required</td>
+            <td class="text-left" rowspan="1" colspan="1">All required records are present, well-formed, signed by a permitted role, bound to the call they describe, and fresh where required</td>
             <td class="text-left" rowspan="1" colspan="1">unresolved</td>
           </tr>
           <tr>
             <td class="text-left" rowspan="1" colspan="1">I8</td>
-            <td class="text-left" rowspan="1" colspan="1">An approval matches the executed effect (without its time), is within its validity window, unconsumed, and used once</td>
+            <td class="text-left" rowspan="1" colspan="1">An approval matches the executed effect, or each effect of one call, without its time; is within its validity window, unconsumed, and used once</td>
             <td class="text-left" rowspan="1" colspan="1">violated</td>
           </tr>
           <tr>
@@ -1712,7 +1814,7 @@ appear in all capitals, as shown here.<a href="#section-1.1-1" class="pilcrow">�
           </tr>
           <tr>
             <td class="text-left" rowspan="1" colspan="1">I11</td>
-            <td class="text-left" rowspan="1" colspan="1">Every recorded effect links to an authorized invocation, and none exists for an invocation a pre-execution decision denied</td>
+            <td class="text-left" rowspan="1" colspan="1">Every recorded effect links to an authorized invocation, none exists for an invocation a pre-execution decision denied, and none contradicts a "not executed" statement</td>
             <td class="text-left" rowspan="1" colspan="1">violated</td>
           </tr>
         </tbody>
@@ -1720,12 +1822,12 @@ appear in all capitals, as shown here.<a href="#section-1.1-1" class="pilcrow">�
 </section>
 </div>
 <div id="evaluation">
-<section id="section-7">
+<section id="section-8">
       <h2 id="name-evaluation-procedure">
-<a href="#section-7" class="section-number selfRef">7. </a><a href="#name-evaluation-procedure" class="section-name selfRef">Evaluation Procedure</a>
+<a href="#section-8" class="section-number selfRef">8. </a><a href="#name-evaluation-procedure" class="section-name selfRef">Evaluation Procedure</a>
       </h2>
-<p id="section-7-1">For each invocation, in recorded order, a verifier <span class="bcp14">MUST</span> apply the following checks in order and return the first outcome that applies. "Verified" means signed by a key holding a permitted role (<a href="#roles" class="auto internal xref">Section 5</a>).<a href="#section-7-1" class="pilcrow">¶</a></p>
-<div class="alignLeft art-text artwork" id="section-7-2">
+<p id="section-8-1">For each invocation, in recorded order, a verifier <span class="bcp14">MUST</span> apply the following checks in order and return the first outcome that applies, except where a group is marked as checked in full. "Verified" means signed by a key holding a permitted role (<a href="#roles" class="auto internal xref">Section 5</a>).<a href="#section-8-1" class="pilcrow">¶</a></p>
+<div class="alignLeft art-text artwork" id="section-8-2">
 <pre>
 ID   Outcome     Condition
 I4   violated    quarantined content in the influence set,
@@ -1734,20 +1836,30 @@ I7   unresolved  no root mandate
 I7   unresolved  cited intent missing, or a needed record
                  not verified
 I7   unresolved  lineage names an invocation that is not earlier
+I7   unresolved  malformed limits or reserve, or a claim member
+                 the verifier does not implement
 I3   unresolved  no approved interpretation, or a pin mismatch
 I1   violated    a delegation edge where not (child ⊑ parent)
-I6   violated    verified revocation or status shows an
-                 ancestor revoked
+I6   unresolved  revocation inside the revoked node's declared
+                 propagation window
+I6   violated    verified revocation or status shows an ancestor
+                 revoked at or before the invocation
 I7   unresolved  unverified revocation on the chain, or a
                  revocable record without a fresh verified status
 I9   violated    guardrail target
 I4   violated    untrusted influence on a mutation, unconfirmed
                  (unresolved instead if no effect exists)
-I7   unresolved  no effect record
+     Call statements (see Call Statements), rules 1 to 5
+I7   unresolved  no effect record (the call is held; see
+                 State Across Packets)
      For every effect record of the invocation:
-I7   unresolved    record not verified
+I7   unresolved    record not verified, names no observer, or is
+                   bound to a different invocation
 I10  unresolved    e &gt;= write_shared and the actor is absent,
                    the effect is self-observed, or assurance L0
+I6   violated      revoked at or before the effect's own time
+                   (unresolved inside a propagation window, or
+                   when status is not fresh as of that time)
 I2   violated      executed != declared (and != the mediated
                    effect)
 I9   violated      executed resource is a guardrail
@@ -1755,16 +1867,26 @@ I2   violated      x does not satisfy the meet of the chain and
                    intent (I5 when the failure is a release)
 I5   violated      data classes carried in through lineage reach
                    a recipient class the claims do not permit
+I7   violated    more effect records than the call statement counts
+I7   unresolved  fewer effect records than it counts
 I7   unresolved  approval missing or not verified
-I8   violated    approval unbound, outside its window,
-                 consumed, or reused
+I8   violated    approval unbound, outside its window, consumed,
+                 reused, or covering an effect fewer times than
+                 it was executed
+     Limits (see Limits), every applicable limit checked in full:
+I2   violated      over a per-effect, per-call or per-period
+                   limit without a bound approval
+I7   violated      the counting observer's total for the window
+                   is below the effects recorded
+I7   unresolved    period total unknown, or held calls could
+                   take it over the limit
 I7   violated    recorded budget spend != recomputed cost
 I2   violated    risk budget exceeded without a bound approval
 -    preserved   otherwise
-</pre><a href="#section-7-2" class="pilcrow">¶</a>
+</pre><a href="#section-8-2" class="pilcrow">¶</a>
 </div>
-<p id="section-7-3">After all invocations:<a href="#section-7-3" class="pilcrow">¶</a></p>
-<div class="alignLeft art-text artwork" id="section-7-4">
+<p id="section-8-3">After all invocations:<a href="#section-8-3" class="pilcrow">¶</a></p>
+<div class="alignLeft art-text artwork" id="section-8-4">
 <pre>
 ID   Outcome     Condition
 I11  violated    pre-execution deny/hold decision, and an effect
@@ -1772,127 +1894,205 @@ I11  violated    pre-execution deny/hold decision, and an effect
 -    preserved   pre-execution deny/hold decision, no effect,
                  enforcement fail-closed or applied = confirmed
 I11  violated    effect with no invocation
-</pre><a href="#section-7-4" class="pilcrow">¶</a>
+</pre><a href="#section-8-4" class="pilcrow">¶</a>
 </div>
-<p id="section-7-5">Lineage: an effect may record the data classes it read (accessed) and the recipient class of what it sent; an invocation may name the earlier invocations its input came from (derived_from). The data classes an invocation carries are those its own effects read plus those carried by the invocations it derives from, transitively. This detects sensitive data leaving in a later step even when that step declares no release.<a href="#section-7-5" class="pilcrow">¶</a></p>
-<p id="section-7-6">A verifier evaluating a stream of packets <span class="bcp14">MAY</span> carry approval use and risk-budget spending from one packet to the next, so that single use and budgets hold across the stream.<a href="#section-7-6" class="pilcrow">¶</a></p>
-<p id="section-7-7">Decisions carry a phase: pre_execution, post_execution, or simulation. Only pre-execution decisions can confirm or contradict a block. A post-execution decision is detection and <span class="bcp14">MUST NOT</span> be presented as having prevented the action.<a href="#section-7-7" class="pilcrow">¶</a></p>
-<p id="section-7-8">When B is present, the cost of x is base(e) × m(d) × rev(x). The base table is read 0, write_local 1, write_shared 3, external_send 5, destructive 10, financial 20. m(d) is the largest data-class multiplier among the released classes (1, 2, or 5). rev(x) is 1 if the effect is a read, or reversible and not an external send, and 3 otherwise. The cost is charged to every node in the chain. The tables are registries (<a href="#iana" class="auto internal xref">Section 13</a>).<a href="#section-7-8" class="pilcrow">¶</a></p>
+<p id="section-8-5">The packet verdict is the first violated result if there is one, else the first unresolved result, else preserved.<a href="#section-8-5" class="pilcrow">¶</a></p>
+<p id="section-8-6">Lineage: an effect may record the data classes it read (accessed) and the recipient class of what it sent; an invocation may name the earlier invocations its input came from (derived_from). The data classes an invocation carries are those its own effects read plus those carried by the invocations it derives from, transitively. This detects sensitive data leaving in a later step even when that step declares no release.<a href="#section-8-6" class="pilcrow">¶</a></p>
+<p id="section-8-7">Decisions carry a phase: pre_execution, post_execution, or simulation. Only pre-execution decisions can confirm or contradict a block. A post-execution decision is detection and <span class="bcp14">MUST NOT</span> be presented as having prevented the action.<a href="#section-8-7" class="pilcrow">¶</a></p>
+<p id="section-8-8">When B is present, the cost of x is base(e) × m(d) × rev(x). The base table is read 0, write_local 1, write_shared 3, external_send 5, destructive 10, financial 20. m(d) is the largest data-class multiplier among the released classes (1, 2, or 5). rev(x) is 1 if the effect is a read, or reversible and not an external send, and 3 otherwise. The cost is charged to every node in the chain. The tables are registries (<a href="#iana" class="auto internal xref">Section 15</a>).<a href="#section-8-8" class="pilcrow">¶</a></p>
+<div id="approvals">
+<section id="section-8.1">
+        <h3 id="name-approvals">
+<a href="#section-8.1" class="section-number selfRef">8.1. </a><a href="#name-approvals" class="section-name selfRef">Approvals</a>
+        </h3>
+<p id="section-8.1-1">An approval binds the digest of the exact effect it approves: SHA-256 over the JCS <span>[<a href="#RFC8785" class="cite xref">RFC8785</a>]</span> form of the effect without its time and without any observer's running totals, so that it can be issued before execution. An operation approval instead lists the digests of the effects of one call, for example an operation that writes two files. Every executed effect of that call must be listed, and no effect may run more often than it is listed. Either form is single use: a retry that cites it again is violated (I8).<a href="#section-8.1-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="blame">
+<section id="section-8.2">
+        <h3 id="name-results-blame-and-missing-e">
+<a href="#section-8.2" class="section-number selfRef">8.2. </a><a href="#name-results-blame-and-missing-e" class="section-name selfRef">Results: Blame and Missing Evidence</a>
+        </h3>
+<p id="section-8.2-1">Each result carries two further members, derived only from the signed evidence. A verifier <span class="bcp14">MUST NOT</span> infer blame the evidence does not show.<a href="#section-8.2-1" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-8.2-2.1">
+            <p id="section-8.2-2.1.1"><strong>blame</strong> (violated results only) names the party whose own signed record is the first to depart from authority: <code>agent</code> (it asked for or acted on something not allowed), <code>delegator</code> (a delegation widened its parent), <code>host</code> (the host or enforcement point failed at its own role), <code>transport</code> (the arguments received differ from those signed), or <code>server</code> (the executing party's records contradict the authorized call or each other).<a href="#section-8.2-2.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-8.2-2.2">
+            <p id="section-8.2-2.2.1"><strong>gaps</strong> (unresolved results only) lists the evidence that would let the evaluation continue, each as a need and the identifier of the record concerned, for example a missing effect record, a fresh revocation status, an independent observer, or the outcome of a held call.<a href="#section-8.2-2.2.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+</section>
+</div>
+<div id="state">
+<section id="section-8.3">
+        <h3 id="name-state-across-packets">
+<a href="#section-8.3" class="section-number selfRef">8.3. </a><a href="#name-state-across-packets" class="section-name selfRef">State Across Packets</a>
+        </h3>
+<p id="section-8.3-1">A verifier evaluating a stream of packets <span class="bcp14">MAY</span> carry state from one packet to the next: approval use, risk-budget spending, and per-window period totals. Within one stream, state <span class="bcp14">MUST</span> be passed in time order.<a href="#section-8.3-1" class="pilcrow">¶</a></p>
+<p id="section-8.3-2">A verified invocation that ends a packet with no effect record and no "not executed" statement may still have executed. Its outcome is unknown, and the verifier records a <strong>hold</strong> in its state against every period limit on its chain that applies to it: the amount the invocation declared as the most it can move, or an unknown amount if it declared none. In later packets, every hold whose invocation is not in that packet counts toward the same window's total. A total that could exceed the limit with the holds added, or an unknown held amount, makes the result unresolved (I7), never violated, because the held call may not have executed. A later packet that contains the held invocation replaces its hold: its effect records then count as any other, a "not executed" statement releases it, and a hold is never counted twice. Only a verified invocation can be held, so evidence that does not verify cannot place holds.<a href="#section-8.3-2" class="pilcrow">¶</a></p>
+<p id="section-8.3-3">This follows the requirement, raised in a cross-institution example of delegated payment authority <span>[<a href="#FINOS-421" class="cite xref">FINOS-421</a>]</span>, that a slice with an unknown outcome stays counted until reconciliation shows whether it was booked.<a href="#section-8.3-3" class="pilcrow">¶</a></p>
+<p id="section-8.3-4">State is the verifier's own bookkeeping, not evidence. A verifier that relies on it <span class="bcp14">SHOULD</span> publish the state it used alongside its verdict records.<a href="#section-8.3-4" class="pilcrow">¶</a></p>
+</section>
+</div>
+</section>
+</div>
+<div id="verdicts">
+<section id="section-9">
+      <h2 id="name-verdict-records">
+<a href="#section-9" class="section-number selfRef">9. </a><a href="#name-verdict-records" class="section-name selfRef">Verdict Records</a>
+      </h2>
+<p id="section-9-1">A verifier <span class="bcp14">MAY</span> publish what it concluded as a verdict record: the predicate of an in-toto Statement v1 <span>[<a href="#IN-TOTO" class="cite xref">IN-TOTO</a>]</span> whose subject is the SHA-256 of the exact packet bytes evaluated. The predicate gives the SHA-256 of the JCS form of the key set, the packet verdict, and every result in evaluation order, each with its outcome, invariant, blame and gaps. Free-text reasons are excluded, because they differ between implementations.<a href="#section-9-1" class="pilcrow">¶</a></p>
+<p id="section-9-2">Two conforming verifiers given the same packet and key set <span class="bcp14">MUST</span> produce byte-identical JCS forms of the record once the member naming the implementation is removed. A verdict record is therefore re-derivable: a party that trusts neither the agent nor its operator, nor the first auditor, can evaluate the same packet and compare. A signed verdict record is the statement carried in a DSSE envelope <span>[<a href="#DSSE" class="cite xref">DSSE</a>]</span>, signed with Ed25519.<a href="#section-9-2" class="pilcrow">¶</a></p>
+<p id="section-9-3">A verdict record is one verifier's reading of the evidence, not evidence of what the agent did. In a dispute, the packet is the evidence.<a href="#section-9-3" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="fields">
-<section id="section-8">
+<section id="section-10">
       <h2 id="name-required-fields">
-<a href="#section-8" class="section-number selfRef">8. </a><a href="#name-required-fields" class="section-name selfRef">Required Fields</a>
+<a href="#section-10" class="section-number selfRef">10. </a><a href="#name-required-fields" class="section-name selfRef">Required Fields</a>
       </h2>
-<p id="section-8-1">The evaluation needs the following fields from each AUDIT record. Field names are placeholders until the AUDIT data model is defined.<a href="#section-8-1" class="pilcrow">¶</a></p>
+<p id="section-10-1">The evaluation needs the following fields from each AUDIT record. Field names are placeholders until the AUDIT data model is defined.<a href="#section-10-1" class="pilcrow">¶</a></p>
 <ul class="normal">
-<li class="normal" id="section-8-2.1">
-          <p id="section-8-2.1.1">Mandate, Intent, and Delegation: id, parent, issuer, claims (C), signature.<a href="#section-8-2.1.1" class="pilcrow">¶</a></p>
+<li class="normal" id="section-10-2.1">
+          <p id="section-10-2.1.1">Mandate, Intent, and Delegation: id, parent, issuer, claims (C), signature.<a href="#section-10-2.1.1" class="pilcrow">¶</a></p>
 </li>
-        <li class="normal" id="section-8-2.2">
-          <p id="section-8-2.2.1">Invocation: id, authority reference, interpretation reference (adapter and version), declared effect, actor, influence references, approval reference, time.<a href="#section-8-2.2.1" class="pilcrow">¶</a></p>
+        <li class="normal" id="section-10-2.2">
+          <p id="section-10-2.2.1">Invocation: id, authority reference, interpretation reference (adapter and version), declared effect, actor, influence references, approval reference, time; OPTIONALLY the digest of the arguments sent, and the most the call can move (its reserve).<a href="#section-10-2.2.1" class="pilcrow">¶</a></p>
 </li>
-        <li class="normal" id="section-8-2.3">
-          <p id="section-8-2.3.1">Effect: id, invocation reference, executed effect x, observer, assurance level (L0 self-reported to L3 provider-confirmed), signature.<a href="#section-8-2.3.1" class="pilcrow">¶</a></p>
+        <li class="normal" id="section-10-2.3">
+          <p id="section-10-2.3.1">Effect: id, invocation reference, <span class="bcp14">OPTIONAL</span> invocation digest, executed effect x, observer, assurance level (L0 self-reported to L3 provider-confirmed), signature. A quantity carries an amount, a unit, and OPTIONALLY the observer's own totals, each with the start of the window it covers.<a href="#section-10-2.3.1" class="pilcrow">¶</a></p>
 </li>
-        <li class="normal" id="section-8-2.4">
-          <p id="section-8-2.4.1">Approval: id, effect digest (SHA-256 over the JCS <span>[<a href="#RFC8785" class="cite xref">RFC8785</a>]</span> form of x without its time), presence (webauthn, chat_user, host_ui, or none), validity window, consumed flag, signature.<a href="#section-8-2.4.1" class="pilcrow">¶</a></p>
+        <li class="normal" id="section-10-2.4">
+          <p id="section-10-2.4.1">Call statement: id, invocation reference, observer, disposition, effect count, time, <span class="bcp14">OPTIONAL</span> invocation digest and arguments digest, signature.<a href="#section-10-2.4.1" class="pilcrow">¶</a></p>
 </li>
-        <li class="normal" id="section-8-2.5">
-          <p id="section-8-2.5.1">Revocation and revocation status: target, time (or as-of time and revocation time), signature.<a href="#section-8-2.5.1" class="pilcrow">¶</a></p>
+        <li class="normal" id="section-10-2.5">
+          <p id="section-10-2.5.1">Approval: id, effect digest or list of effect digests, presence (webauthn, chat_user, host_ui, or none), validity window, consumed flag, signature.<a href="#section-10-2.5.1" class="pilcrow">¶</a></p>
 </li>
-        <li class="normal" id="section-8-2.6">
-          <p id="section-8-2.6.1">Continuity decision: invocation reference, mode, phase, outcome, enforcement context (enforcement point, fail mode, what was returned to the host, whether an effect record confirms it), signature.<a href="#section-8-2.6.1" class="pilcrow">¶</a></p>
+        <li class="normal" id="section-10-2.6">
+          <p id="section-10-2.6.1">Revocation and revocation status: target, time (or as-of time and revocation time), <span class="bcp14">OPTIONAL</span> propagation window on the revocable node, signature.<a href="#section-10-2.6.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-10-2.7">
+          <p id="section-10-2.7.1">Continuity decision: invocation reference, mode, phase, outcome, enforcement context (enforcement point, fail mode, what was returned to the host, whether an effect record confirms it), signature.<a href="#section-10-2.7.1" class="pilcrow">¶</a></p>
 </li>
       </ul>
-<p id="section-8-3">Records are canonicalized with JCS <span>[<a href="#RFC8785" class="cite xref">RFC8785</a>]</span> and signed with Ed25519 <span>[<a href="#RFC8032" class="cite xref">RFC8032</a>]</span>. Times are numbers of seconds since the epoch or RFC 3339 <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> strings. A CDDL <span>[<a href="#RFC8610" class="cite xref">RFC8610</a>]</span> definition and JSON Schemas are published in <span>[<a href="#AMEP" class="cite xref">AMEP</a>]</span>.<a href="#section-8-3" class="pilcrow">¶</a></p>
+<p id="section-10-3">Records are canonicalized with JCS <span>[<a href="#RFC8785" class="cite xref">RFC8785</a>]</span> and signed with Ed25519 <span>[<a href="#RFC8032" class="cite xref">RFC8032</a>]</span> over a domain-separated signing input. Times are numbers of seconds since the epoch or RFC 3339 <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> strings. A CDDL <span>[<a href="#RFC8610" class="cite xref">RFC8610</a>]</span> definition and JSON Schemas are published in <span>[<a href="#AMEP" class="cite xref">AMEP</a>]</span>.<a href="#section-10-3" class="pilcrow">¶</a></p>
+<p id="section-10-4">A packet that is not well-formed I-JSON <span>[<a href="#RFC7493" class="cite xref">RFC7493</a>]</span> within the bounds the specification sets (duplicate member names, numbers outside the safe-integer range, lone surrogates, excessive nesting) makes every invocation in it unresolved (I7): such a packet cannot be canonicalized to the same bytes by every verifier. Values whose exact identity matters, such as amounts and identifiers, <span class="bcp14">SHOULD</span> be strings.<a href="#section-10-4" class="pilcrow">¶</a></p>
+<p id="section-10-5">A packet <span class="bcp14">MAY</span> declare the version of the rules it was produced for. A verifier <span class="bcp14">MUST</span> treat a packet declaring a version it does not implement as malformed.<a href="#section-10-5" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="test-vectors">
-<section id="section-9">
+<section id="section-11">
       <h2 id="name-test-vectors">
-<a href="#section-9" class="section-number selfRef">9. </a><a href="#name-test-vectors" class="section-name selfRef">Test Vectors</a>
+<a href="#section-11" class="section-number selfRef">11. </a><a href="#name-test-vectors" class="section-name selfRef">Test Vectors</a>
       </h2>
-<p id="section-9-1"><span>[<a href="#AMEP" class="cite xref">AMEP</a>]</span> publishes 114 vectors: 33 positive and 81 must-reject. The must-reject vectors cover all eleven invariants, signer roles, revocation status, decision phase, deny lists, data lineage, state across packets, risk-budget accounting, and a deny that an executed effect contradicts. Each vector is a packet of signed records, with the expected outcome and invariant. Two implementations written separately by the author (Python, and JavaScript run under Node.js and in a browser) agree on all 114. Implementations by other parties are invited.<a href="#section-9-1" class="pilcrow">¶</a></p>
-<p id="section-9-2">A conforming verifier <span class="bcp14">MUST</span> return the expected outcome and invariant for every vector.<a href="#section-9-2" class="pilcrow">¶</a></p>
+<p id="section-11-1"><span>[<a href="#AMEP" class="cite xref">AMEP</a>]</span> publishes three suites of signed packets, each with an expected outcome and invariant: 233 core vectors (62 positive and 171 must-reject), 16 approval-path vectors, and 20 delegation-continuity vectors, 269 in all. The must-reject vectors cover all eleven invariants, signer roles, the Ed25519 acceptance rule, malformed I-JSON, revocation at the time of each effect, call statements and binding, operation approvals, grants, limits checked independently of their order, observer totals for the wrong window, held calls across packets, decision phase, deny lists, data lineage, and state across packets.<a href="#section-11-1" class="pilcrow">¶</a></p>
+<p id="section-11-2">Two implementations written separately by the author (Python, and JavaScript run under Node.js and in a browser) agree on all 269, on the outcome, invariant, blame and gaps of every result, and produce byte-identical verdict records. Implementations by other parties are invited. A conformance tool runs any verifier that can be invoked from a command line against all three suites.<a href="#section-11-2" class="pilcrow">¶</a></p>
+<p id="section-11-3">A conforming verifier <span class="bcp14">MUST</span> return the expected outcome and invariant for every vector.<a href="#section-11-3" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="implementation-status">
-<section id="section-10">
+<section id="section-12">
       <h2 id="name-implementation-status">
-<a href="#section-10" class="section-number selfRef">10. </a><a href="#name-implementation-status" class="section-name selfRef">Implementation Status</a>
+<a href="#section-12" class="section-number selfRef">12. </a><a href="#name-implementation-status" class="section-name selfRef">Implementation Status</a>
       </h2>
-<p id="section-10-1"><strong>Note to the RFC Editor:</strong> please remove this section before publication, per <span>[<a href="#RFC7942" class="cite xref">RFC7942</a>]</span>.<a href="#section-10-1" class="pilcrow">¶</a></p>
+<p id="section-12-1"><strong>Note to the RFC Editor:</strong> please remove this section before publication, per <span>[<a href="#RFC7942" class="cite xref">RFC7942</a>]</span>.<a href="#section-12-1" class="pilcrow">¶</a></p>
 <ul class="normal">
-<li class="normal" id="section-10-2.1">
-          <p id="section-10-2.1.1"><strong>AMEP reference verifiers.</strong> Two implementations, both by the author: Python, and JavaScript (run as a Node.js command-line tool and as an offline browser page using WebCrypto). Both evaluate the procedure in <a href="#evaluation" class="auto internal xref">Section 7</a> and agree on all 114 published vectors. License: Apache 2.0. Location: https://github.com/stafordtituss/amep. Maturity: prototype.<a href="#section-10-2.1.1" class="pilcrow">¶</a></p>
+<li class="normal" id="section-12-2.1">
+          <p id="section-12-2.1.1"><strong>AMEP reference verifiers.</strong> Two implementations, both by the author: Python (package amep-protocol 0.3.0a2) and JavaScript (package @stafordtituss/amep 0.3.0-alpha.2, published with build provenance), the latter also run as an offline browser page using WebCrypto. Both evaluate the procedure in <a href="#evaluation" class="auto internal xref">Section 8</a>, agree on all 269 published vectors, and produce byte-identical verdict records. License: Apache 2.0. Location: https://github.com/stafordtituss/amep. Maturity: prototype.<a href="#section-12-2.1.1" class="pilcrow">¶</a></p>
 </li>
-        <li class="normal" id="section-10-2.2">
-          <p id="section-10-2.2.1"><strong>Natsar control plane</strong> (agent-authority enforcement for coding-agent hosts and MCP). It emits decision records before tool execution from host hooks. Maturity: pre-release.<a href="#section-10-2.2.1" class="pilcrow">¶</a></p>
+        <li class="normal" id="section-12-2.2">
+          <p id="section-12-2.2.1"><strong>AMEP conformance tool and import profiles.</strong> It runs a verifier against the suites, and re-expresses records of other formats as evidence after checking them by their own rules: AER-1 receipts, OpenID action receipts, and Provared permission books. It also compares AMEP's results with the published test vectors of the Delegation Receipt Protocol and of EMILIA Protocol authorization receipts. Location: as above.<a href="#section-12-2.2.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-12-2.3">
+          <p id="section-12-2.3.1"><strong>AMEP MCP server.</strong> Exposes the verifier and the suites to MCP clients; listed in the MCP Registry. Location: as above.<a href="#section-12-2.3.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-12-2.4">
+          <p id="section-12-2.4.1"><strong>Natsar control plane</strong> (agent-authority enforcement for coding-agent hosts and MCP). It emits decision records before tool execution from host hooks. Maturity: pre-release.<a href="#section-12-2.4.1" class="pilcrow">¶</a></p>
 </li>
       </ul>
-<p id="section-10-3">Implementation experience motivated several parts of this document: canonical resource identifiers (absolute-path forms bypassed relative-prefix rules); recording the enforcement context and phase (hosts differ in whether they support "ask" and whether hook failures block); and treating an effect that contradicts a deny as evidence of bypass.<a href="#section-10-3" class="pilcrow">¶</a></p>
+<p id="section-12-3">Use and review by other parties, each in a public record:<a href="#section-12-3" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-12-4.1">
+          <p id="section-12-4.1.1"><strong>AER-1 (Brennan Zambo).</strong> An import run over twelve live receipts from a production MCP server, with the implementer's own tool map. It found that a gateway refusal was imported as an executed effect; the importer was corrected. A later run over two re-issued records was blind, with the expected results committed before either side ran it, and both sides' results matched.<a href="#section-12-4.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-12-4.2">
+          <p id="section-12-4.2.1"><strong>Verifiable Agent Trust Envelope (Takao Sato).</strong> The maintainer verified the signatures of five published verdict records for a lost-response and recovery case, matched each to its packet by digest, and reviewed a reference example of the case.<a href="#section-12-4.2.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-12-4.3">
+          <p id="section-12-4.3.1"><strong>Payments review (Carlos Vendrell Felici, Zealynx Security).</strong> Two rounds of review of the quantity limits, with signed test packets run through both verifiers. They led to the per-call and per-effect limits, per-observer counting of effects, the counting observer, integer amounts for on-chain assets, independent totals per limit, order-independent evaluation of limits, and observer totals that name their window.<a href="#section-12-4.3.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-12-4.4">
+          <p id="section-12-4.4.1"><strong>AUDIT mailing list review (Cliff Singletary).</strong> Led to evaluating revocation and status freshness at the time of each effect, not only at the invocation.<a href="#section-12-4.4.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+<p id="section-12-5">Implementation experience motivated several parts of this document: canonical resource identifiers (absolute-path forms bypassed relative-prefix rules); recording the enforcement context and phase (hosts differ in whether they support "ask" and whether hook failures block); treating an effect that contradicts a deny as evidence of bypass; and the call statement, without which a refusal and a lost response are indistinguishable from each other.<a href="#section-12-5" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="security-considerations">
-<section id="section-11">
+<section id="section-13">
       <h2 id="name-security-considerations">
-<a href="#section-11" class="section-number selfRef">11. </a><a href="#name-security-considerations" class="section-name selfRef">Security Considerations</a>
+<a href="#section-13" class="section-number selfRef">13. </a><a href="#name-security-considerations" class="section-name selfRef">Security Considerations</a>
       </h2>
 <ul class="normal">
-<li class="normal" id="section-11-1.1">
-          <p id="section-11-1.1.1"><strong>Adversarial models:</strong> the guarantees <span class="bcp14">MUST</span> hold even if every model in the chain is adversarial. Semantic analysis <span class="bcp14">MAY</span> raise a decision level, but <span class="bcp14">MUST NOT</span> mint authority or lower a decision.<a href="#section-11-1.1.1" class="pilcrow">¶</a></p>
+<li class="normal" id="section-13-1.1">
+          <p id="section-13-1.1.1"><strong>Adversarial models:</strong> the guarantees <span class="bcp14">MUST</span> hold even if every model in the chain is adversarial. Semantic analysis <span class="bcp14">MAY</span> raise a decision level, but <span class="bcp14">MUST NOT</span> mint authority or lower a decision.<a href="#section-13-1.1.1" class="pilcrow">¶</a></p>
 </li>
-        <li class="normal" id="section-11-1.2">
-          <p id="section-11-1.2.1"><strong>Self-reporting:</strong> records produced by the actor alone are insufficient for high-impact effects (I10).<a href="#section-11-1.2.1" class="pilcrow">¶</a></p>
+        <li class="normal" id="section-13-1.2">
+          <p id="section-13-1.2.1"><strong>Self-reporting:</strong> records produced by the actor alone are insufficient for high-impact effects, including a statement that nothing was executed (I10).<a href="#section-13-1.2.1" class="pilcrow">¶</a></p>
 </li>
-        <li class="normal" id="section-11-1.3">
-          <p id="section-11-1.3.1"><strong>Key compromise:</strong> signer roles (<a href="#roles" class="auto internal xref">Section 5</a>) limit what one stolen key can forge.<a href="#section-11-1.3.1" class="pilcrow">¶</a></p>
+        <li class="normal" id="section-13-1.3">
+          <p id="section-13-1.3.1"><strong>Key compromise:</strong> signer roles (<a href="#roles" class="auto internal xref">Section 5</a>) limit what one stolen key can forge.<a href="#section-13-1.3.1" class="pilcrow">¶</a></p>
 </li>
-        <li class="normal" id="section-11-1.4">
-          <p id="section-11-1.4.1"><strong>Evidence omission:</strong> a missing record, status or signature yields unresolved. Omission of whole invocations is detected only against an independent effect log (I11).<a href="#section-11-1.4.1" class="pilcrow">¶</a></p>
+        <li class="normal" id="section-13-1.4">
+          <p id="section-13-1.4.1"><strong>Evidence omission:</strong> a missing record, status or signature yields unresolved. A call with no outcome is held across packets (<a href="#state" class="auto internal xref">Section 8.3</a>), so leaving its outcome out of later packets cannot make a later total look clean. Omission of whole invocations is detected only against an independent effect log (I11).<a href="#section-13-1.4.1" class="pilcrow">¶</a></p>
 </li>
-        <li class="normal" id="section-11-1.5">
-          <p id="section-11-1.5.1"><strong>Canonicalization:</strong> non-canonical resource forms enable bypasses. Canonicalization is therefore normative.<a href="#section-11-1.5.1" class="pilcrow">¶</a></p>
+        <li class="normal" id="section-13-1.5">
+          <p id="section-13-1.5.1"><strong>Record substitution:</strong> binding effect records and call statements to the digest of the exact invocation prevents a genuine record for one call from being presented for another.<a href="#section-13-1.5.1" class="pilcrow">¶</a></p>
 </li>
-        <li class="normal" id="section-11-1.6">
-          <p id="section-11-1.6.1"><strong>Approval replay and time-of-check/time-of-use:</strong> approvals bind the exact effect and are single use (I8).<a href="#section-11-1.6.1" class="pilcrow">¶</a></p>
+        <li class="normal" id="section-13-1.6">
+          <p id="section-13-1.6.1"><strong>Canonicalization:</strong> non-canonical resource forms and non-canonical JSON enable bypasses and disagreement between verifiers. Canonicalization is therefore normative.<a href="#section-13-1.6.1" class="pilcrow">¶</a></p>
 </li>
-        <li class="normal" id="section-11-1.7">
-          <p id="section-11-1.7.1"><strong>Fail-open enforcement:</strong> an enforcement point that errors <span class="bcp14">MUST</span> return a deny decision, not a transport error. Hosts commonly treat transport errors as non-blocking, and some treat an unsupported "ask" as a hook failure and run the action. A verifier <span class="bcp14">SHOULD</span> treat an effect that contradicts a pre-execution deny as evidence of bypass.<a href="#section-11-1.7.1" class="pilcrow">¶</a></p>
+        <li class="normal" id="section-13-1.7">
+          <p id="section-13-1.7.1"><strong>Approval replay and time-of-check/time-of-use:</strong> approvals bind the exact effect or effects and are single use (I8). Liveness is checked at the time of each effect, not only at the invocation (I6).<a href="#section-13-1.7.1" class="pilcrow">¶</a></p>
 </li>
-        <li class="normal" id="section-11-1.8">
-          <p id="section-11-1.8.1"><strong>Guardrail tampering:</strong> agent writes to hook configuration, keys, instruction files, or the audit store are violations (I9).<a href="#section-11-1.8.1" class="pilcrow">¶</a></p>
+        <li class="normal" id="section-13-1.8">
+          <p id="section-13-1.8.1"><strong>Fail-open enforcement:</strong> an enforcement point that errors <span class="bcp14">MUST</span> return a deny decision, not a transport error. A verifier <span class="bcp14">SHOULD</span> treat an effect that contradicts a pre-execution deny as evidence of bypass.<a href="#section-13-1.8.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-13-1.9">
+          <p id="section-13-1.9.1"><strong>Guardrail tampering:</strong> agent writes to hook configuration, keys, instruction files, or the audit store are violations (I9).<a href="#section-13-1.9.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-13-1.10">
+          <p id="section-13-1.10.1"><strong>Verdict records:</strong> a verdict record is a claim by its signer. Relying parties <span class="bcp14">SHOULD</span> re-derive it from the packet, which the determinism in <a href="#verdicts" class="auto internal xref">Section 9</a> allows.<a href="#section-13-1.10.1" class="pilcrow">¶</a></p>
 </li>
       </ul>
 </section>
 </div>
 <div id="privacy-considerations">
-<section id="section-12">
+<section id="section-14">
       <h2 id="name-privacy-considerations">
-<a href="#section-12" class="section-number selfRef">12. </a><a href="#name-privacy-considerations" class="section-name selfRef">Privacy Considerations</a>
+<a href="#section-14" class="section-number selfRef">14. </a><a href="#name-privacy-considerations" class="section-name selfRef">Privacy Considerations</a>
       </h2>
-<p id="section-12-1">Effect records can contain personal data. Verifiers need only canonical actions, resource identifiers, data-class labels, and digests. Payloads <span class="bcp14">SHOULD</span> be detached and hashed, following the AUDIT selective-disclosure work.<a href="#section-12-1" class="pilcrow">¶</a></p>
+<p id="section-14-1">Effect records can contain personal data. Verifiers need only canonical actions, resource identifiers, data-class labels, quantities, and digests. Payloads <span class="bcp14">SHOULD</span> be detached and hashed, following the AUDIT selective-disclosure work. A verdict record names packets by digest and carries no payload.<a href="#section-14-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="iana">
-<section id="section-13">
+<section id="section-15">
       <h2 id="name-iana-considerations">
-<a href="#section-13" class="section-number selfRef">13. </a><a href="#name-iana-considerations" class="section-name selfRef">IANA Considerations</a>
+<a href="#section-15" class="section-number selfRef">15. </a><a href="#name-iana-considerations" class="section-name selfRef">IANA Considerations</a>
       </h2>
-<p id="section-13-1">This document proposes registries for effect classes, data classes, recipient classes, signer roles, and the risk-cost tables, with the registration policy Specification Required. The registries are to be defined in a later revision.<a href="#section-13-1" class="pilcrow">¶</a></p>
+<p id="section-15-1">This document proposes registries for effect classes, data classes, recipient classes, signer roles, call statement dispositions, blame values, gap names, and the risk-cost tables, with the registration policy Specification Required. The registries are to be defined in a later revision.<a href="#section-15-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="sec-combined-references">
-<section id="section-14">
+<section id="section-16">
       <h2 id="name-references">
-<a href="#section-14" class="section-number selfRef">14. </a><a href="#name-references" class="section-name selfRef">References</a>
+<a href="#section-16" class="section-number selfRef">16. </a><a href="#name-references" class="section-name selfRef">References</a>
       </h2>
 <div id="sec-normative-references">
-<section id="section-14.1">
+<section id="section-16.1">
         <h3 id="name-normative-references">
-<a href="#section-14.1" class="section-number selfRef">14.1. </a><a href="#name-normative-references" class="section-name selfRef">Normative References</a>
+<a href="#section-16.1" class="section-number selfRef">16.1. </a><a href="#name-normative-references" class="section-name selfRef">Normative References</a>
         </h3>
 <dl class="references">
 <dt id="RFC2119">[RFC2119]</dt>
@@ -1902,6 +2102,10 @@ I11  violated    effect with no invocation
 <dt id="RFC3339">[RFC3339]</dt>
         <dd>
 <span class="refAuthor">Klyne, G.</span> and <span class="refAuthor">C. Newman</span>, <span class="refTitle">"Date and Time on the Internet: Timestamps"</span>, <span class="seriesInfo">RFC 3339</span>, <span class="seriesInfo">DOI 10.17487/RFC3339</span>, <time datetime="2002-07" class="refDate">July 2002</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc3339">https://www.rfc-editor.org/rfc/rfc3339</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC7493">[RFC7493]</dt>
+        <dd>
+<span class="refAuthor">Bray, T., Ed.</span>, <span class="refTitle">"The I-JSON Message Format"</span>, <span class="seriesInfo">RFC 7493</span>, <span class="seriesInfo">DOI 10.17487/RFC7493</span>, <time datetime="2015-03" class="refDate">March 2015</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc7493">https://www.rfc-editor.org/rfc/rfc7493</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="RFC8032">[RFC8032]</dt>
         <dd>
@@ -1919,9 +2123,9 @@ I11  violated    effect with no invocation
 </section>
 </div>
 <div id="sec-informative-references">
-<section id="section-14.2">
+<section id="section-16.2">
         <h3 id="name-informative-references">
-<a href="#section-14.2" class="section-number selfRef">14.2. </a><a href="#name-informative-references" class="section-name selfRef">Informative References</a>
+<a href="#section-16.2" class="section-number selfRef">16.2. </a><a href="#name-informative-references" class="section-name selfRef">Informative References</a>
         </h3>
 <dl class="references">
 <dt id="AGENTDOJO">[AGENTDOJO]</dt>
@@ -1930,7 +2134,7 @@ I11  violated    effect with no invocation
 <dd class="break"></dd>
 <dt id="AMEP">[AMEP]</dt>
         <dd>
-<span class="refAuthor">Selvaraj, S. T.</span>, <span class="refTitle">"Agentic Mandate Evidence Protocol (AMEP) v0.2"</span>, <time datetime="2026" class="refDate">2026</time>, <span>&lt;<a href="https://github.com/stafordtituss/amep">https://github.com/stafordtituss/amep</a>&gt;</span>. </dd>
+<span class="refAuthor">Selvaraj, S. T.</span>, <span class="refTitle">"Agentic Mandate Evidence Protocol (AMEP) v0.3.0-draft.1"</span>, <time datetime="2026" class="refDate">2026</time>, <span>&lt;<a href="https://github.com/stafordtituss/amep">https://github.com/stafordtituss/amep</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="CAMEL">[CAMEL]</dt>
         <dd>
@@ -1948,6 +2152,18 @@ I11  violated    effect with no invocation
         <dd>
 <span class="refAuthor">Decentralized Identity Foundation, Trusted AI Agents Working Group</span>, <span class="refTitle">"Threat Model for Delegated Authority in AI-Mediated Systems"</span>, <time datetime="2026" class="refDate">2026</time>, <span>&lt;<a href="https://identity.foundation/delegated-authority-threat-model/">https://identity.foundation/delegated-authority-threat-model/</a>&gt;</span>. </dd>
 <dd class="break"></dd>
+<dt id="DSSE">[DSSE]</dt>
+        <dd>
+<span class="refAuthor">Secure Systems Lab</span>, <span class="refTitle">"Dead Simple Signing Envelope"</span>, <time datetime="2026" class="refDate">2026</time>, <span>&lt;<a href="https://github.com/secure-systems-lab/dsse">https://github.com/secure-systems-lab/dsse</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="FINOS-421">[FINOS-421]</dt>
+        <dd>
+<span class="refAuthor">FINOS AI Governance Framework contributors</span>, <span class="refTitle">"How should agent authorization carry across institutions? (AI Governance Framework, issue 421)"</span>, <time datetime="2026" class="refDate">2026</time>, <span>&lt;<a href="https://github.com/finos/ai-governance-framework/issues/421">https://github.com/finos/ai-governance-framework/issues/421</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="I-D.birkholz-verifiable-agent-conversations">[I-D.birkholz-verifiable-agent-conversations]</dt>
+        <dd>
+<span class="refAuthor">Birkholz, H.</span>, <span class="refAuthor">Heldt, T.</span>, and <span class="refAuthor">O. Steele</span>, <span class="refTitle">"Verifiable Agent Conversation Records"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-birkholz-verifiable-agent-conversations-01</span>, <time datetime="2026-08-31" class="refDate">31 August 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-birkholz-verifiable-agent-conversations-01">https://datatracker.ietf.org/doc/html/draft-birkholz-verifiable-agent-conversations-01</a>&gt;</span>. </dd>
+<dd class="break"></dd>
 <dt id="I-D.ietf-scitt-architecture">[I-D.ietf-scitt-architecture]</dt>
         <dd>
 <span class="refAuthor">Birkholz, H.</span>, <span class="refAuthor">Delignat-Lavaud, A.</span>, <span class="refAuthor">Fournet, C.</span>, <span class="refAuthor">Deshpande, Y.</span>, and <span class="refAuthor">S. Lasker</span>, <span class="refTitle">"An Architecture for Trustworthy and Transparent Digital Supply Chains"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ietf-scitt-architecture-22</span>, <time datetime="2025-10-10" class="refDate">10 October 2025</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ietf-scitt-architecture-22">https://datatracker.ietf.org/doc/html/draft-ietf-scitt-architecture-22</a>&gt;</span>. </dd>
@@ -1959,6 +2175,10 @@ I11  violated    effect with no invocation
 <dt id="I-D.nelson-agent-delegation-receipts">[I-D.nelson-agent-delegation-receipts]</dt>
         <dd>
 <span class="refAuthor">Nelson, R.</span>, <span class="refTitle">"Agent Delegation Receipts"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-nelson-agent-delegation-receipts-15</span>, <time datetime="2026-10-21" class="refDate">21 October 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-nelson-agent-delegation-receipts-15">https://datatracker.ietf.org/doc/html/draft-nelson-agent-delegation-receipts-15</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="IN-TOTO">[IN-TOTO]</dt>
+        <dd>
+<span class="refAuthor">in-toto project</span>, <span class="refTitle">"in-toto Attestation Framework: Statement v1"</span>, <time datetime="2026" class="refDate">2026</time>, <span>&lt;<a href="https://github.com/in-toto/attestation/blob/main/spec/v1/statement.md">https://github.com/in-toto/attestation/blob/main/spec/v1/statement.md</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="NCCOE-AGENTS">[NCCOE-AGENTS]</dt>
         <dd>
@@ -1993,16 +2213,53 @@ I11  violated    effect with no invocation
 </div>
 </section>
 </div>
-<div id="acknowledgments">
+<div id="changes-from-00">
 <section id="appendix-A">
+      <h2 id="name-changes-from-00">
+<a href="#name-changes-from-00" class="section-name selfRef">Changes from -00</a>
+      </h2>
+<ul class="normal">
+<li class="normal" id="appendix-A-1.1">
+          <p id="appendix-A-1.1.1">Claim model: grants (a union of action and resource products) and limits on quantities (<a href="#claims" class="auto internal xref">Section 4</a>).<a href="#appendix-A-1.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="appendix-A-1.2">
+          <p id="appendix-A-1.2.1">Call statements: a signed "not executed", effect counts, and binding of records to the exact invocation and arguments (<a href="#statements" class="auto internal xref">Section 6</a>).<a href="#appendix-A-1.2.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="appendix-A-1.3">
+          <p id="appendix-A-1.3.1">I6 at the time of each effect, with an optional propagation window.<a href="#appendix-A-1.3.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="appendix-A-1.4">
+          <p id="appendix-A-1.4.1">Operation approvals over the effects of one call (<a href="#approvals" class="auto internal xref">Section 8.1</a>).<a href="#appendix-A-1.4.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="appendix-A-1.5">
+          <p id="appendix-A-1.5.1">Blame and missing evidence on every result (<a href="#blame" class="auto internal xref">Section 8.2</a>).<a href="#appendix-A-1.5.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="appendix-A-1.6">
+          <p id="appendix-A-1.6.1">Holds for calls whose outcome is unknown, across packets (<a href="#state" class="auto internal xref">Section 8.3</a>).<a href="#appendix-A-1.6.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="appendix-A-1.7">
+          <p id="appendix-A-1.7.1">Verdict records (<a href="#verdicts" class="auto internal xref">Section 9</a>).<a href="#appendix-A-1.7.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="appendix-A-1.8">
+          <p id="appendix-A-1.8.1">Ed25519 acceptance rule; malformed I-JSON handling; versioning.<a href="#appendix-A-1.8.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="appendix-A-1.9">
+          <p id="appendix-A-1.9.1">Test vectors: 269 in three suites; Implementation Status updated with use and review by other parties.<a href="#appendix-A-1.9.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+</section>
+</div>
+<div id="acknowledgments">
+<section id="appendix-B">
       <h2 id="name-acknowledgments">
 <a href="#name-acknowledgments" class="section-name selfRef">Acknowledgments</a>
       </h2>
-<p id="appendix-A-1">This document is derived from the Agentic Mandate Evidence Protocol (AMEP), designed and written by the author.<a href="#appendix-A-1" class="pilcrow">¶</a></p>
+<p id="appendix-B-1">This document is derived from the Agentic Mandate Evidence Protocol (AMEP), designed and written by the author.<a href="#appendix-B-1" class="pilcrow">¶</a></p>
+<p id="appendix-B-2">The author thanks Cliff Singletary for the review on the AUDIT mailing list that led to evaluating liveness at the time of each effect; Carlos Vendrell Felici for two rounds of review of the quantity limits; Brennan Zambo for the AER-1 runs, including the blind run; Takao Sato for verifying the verdict records of the lost-response case and the review behind operation approvals; and the participants in the FINOS AI Governance Framework discussion of cross-institution authorization, whose requirement for unknown outcomes led to holds.<a href="#appendix-B-2" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="authors-addresses">
-<section id="appendix-B">
+<section id="appendix-C">
       <h2 id="name-authors-address">
 <a href="#name-authors-address" class="section-name selfRef">Author's Address</a>
       </h2>
