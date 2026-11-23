@@ -2,7 +2,16 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
-## Held approvals (unreleased, 2026-11-23)
+## Packages amep-protocol 0.3.0a3, @stafordtituss/amep 0.3.0-alpha.3, amep-mcp 0.1.0a4 (2026-11-23)
+
+They carry the three changes below that were marked unreleased:
+- **held approvals**, from VATE case 2;
+- **signature gaps say why**, from the W3C AIKR case library;
+- **a call that provably didn't run says so**, in its reason text.
+
+amep-mcp 0.1.0a4 bundles the 238-vector core suite and needs amep-protocol 0.3.0a3. Outcomes on every earlier vector are unchanged.
+
+## Held approvals (2026-11-23)
 
 - **An approval cited by a call whose outcome is unknown is held** (spec 5.10, held approvals). That's a call that has neither receipts nor a `not_executed` statement.
   - **While the approval is held,** another call under it is `unresolved` (I7), with gap `held_outcome` naming the first call, instead of `preserved`.
@@ -17,7 +26,7 @@ Specification drafts, conformance-suite versions and package versions are listed
   - no existing vector changes its verdict;
   - both verifiers produce byte-identical statements on all 274.
 
-## Signature gaps say why (unreleased, 2026-11-23)
+## Signature gaps say why (2026-11-23)
 
 - A gap for a refused signature (`signature`, `receipt_signature`, `call_statement_signature`, `revocation_signature`) now carries `cause`:
   - `missing`: no proof;
@@ -49,7 +58,7 @@ Specification drafts, conformance-suite versions and package versions are listed
   Its Implementation Status lists the outside use and review: the AER-1 runs, the VATE verification, the payments review and the AUDIT list review. The XML is xml2rfc v3.
 - The README's citation entry now names -01 and the draft's actual title, "Continuity Evaluation of Agent Delegation Records".
 
-## Reasons: a call that provably didn't run says so (unreleased, 2026-11-23)
+## Reasons: a call that provably didn't run says so (2026-11-23)
 
 - A call whose observer signed a `not_executed` statement was `preserved` with the generic reason "continuity preserved", which reads as "within authority". It now says "nothing executed: <observer> signed a not_executed call statement", in both verifiers. Outcomes are unchanged; only that reason text differs.
 - Found while building an audit exercise, in which a reviewer reading the verifier's result for a refused call could have taken it for an approved one.

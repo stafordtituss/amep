@@ -5,5 +5,5 @@ export { evaluate, evaluateText, verdict, canon, digest, approvalDigest, signing
 export { sigOk, verifyPacket, Key, keyset, ROLES } from "./node.mjs";
 export * as sdk from "./sdk.mjs";
 export * as verdicts from "./verdict.mjs";
-export const VERSION = "0.3.0-alpha.2";
+export const VERSION = "0.3.0-alpha.3";
 export const SPEC_VERSION = "0.3.0-draft.1";
