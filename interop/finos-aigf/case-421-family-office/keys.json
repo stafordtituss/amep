@@ -1,0 +1,42 @@
+{
+ "client-7": {
+  "kid": "client-7",
+  "alg": "Ed25519",
+  "x": "4539a271bdb05e47ba04066e701468b7c6a8c9496f43407b75275981c663a512",
+  "roles": [
+   "issuer"
+  ]
+ },
+ "family-office-orchestrator": {
+  "kid": "family-office-orchestrator",
+  "alg": "Ed25519",
+  "x": "5075625682ea2c92c80861419009a1e437100c476ced1cdf43451b41c2dac7d0",
+  "roles": [
+   "host"
+  ]
+ },
+ "inst:bank-a.example": {
+  "kid": "inst:bank-a.example",
+  "alg": "Ed25519",
+  "x": "9ebbd98fea38150c3ac7b93c9f5d6bc7d7fed660a5cbeff8293e202724c2a39a",
+  "roles": [
+   "observer"
+  ]
+ },
+ "inst:bank-b.example": {
+  "kid": "inst:bank-b.example",
+  "alg": "Ed25519",
+  "x": "b22b1994f02255a6355db86cec369b542c8b273e40d7e40798adc32bc2e23a1b",
+  "roles": [
+   "observer"
+  ]
+ },
+ "inst:broker-c.example": {
+  "kid": "inst:broker-c.example",
+  "alg": "Ed25519",
+  "x": "8533be95510ab49ab7e3cd5348bd08f57edf0a3ffd792d890dff6ce249c3d1cb",
+  "roles": [
+   "observer"
+  ]
+ }
+}

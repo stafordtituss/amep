@@ -1,0 +1,75 @@
+[
+ {
+  "phase": "1-within-mandate",
+  "title": "Legs of 6M at bank A and 4M at bank B, both booked",
+  "outcome": "preserved",
+  "invariant": "-",
+  "blame": null,
+  "gaps": [],
+  "reason": "continuity preserved"
+ },
+ {
+  "phase": "2-over-partitioned",
+  "title": "Slices of 6M and 6M, each narrower than 10M; bookings of 6M and 5M exceed the mandate",
+  "outcome": "violated",
+  "invariant": "I2",
+  "blame": "agent",
+  "gaps": [],
+  "reason": "period total 11000000 iso4217:USD exceeds the per-period limit 10000000.00 of m-1"
+ },
+ {
+  "phase": "3-leg-outside-mandate",
+  "title": "The plan changes: a 4M leg is delegated to a broker the client never authorized",
+  "outcome": "violated",
+  "invariant": "I1",
+  "blame": "delegator",
+  "gaps": [],
+  "reason": "d-c: resources widened"
+ },
+ {
+  "phase": "4-lost-response",
+  "title": "Leg A booked; leg B's 4M instruction was sent and no response came back",
+  "outcome": "unresolved",
+  "invariant": "I7",
+  "blame": null,
+  "gaps": [
+   {
+    "need": "receipt",
+    "ref": "i-b1"
+   }
+  ],
+  "reason": "no executed-effect receipt"
+ },
+ {
+  "phase": "5-retried-after-loss",
+  "title": "As 4, and the agent retried leg B, which booked",
+  "outcome": "unresolved",
+  "invariant": "I7",
+  "blame": null,
+  "gaps": [
+   {
+    "need": "receipt",
+    "ref": "i-b1"
+   }
+  ],
+  "reason": "no executed-effect receipt"
+ },
+ {
+  "phase": "6-reconciled-booked",
+  "title": "Reconciliation: bank B's records show the first instruction booked too (14M in all)",
+  "outcome": "violated",
+  "invariant": "I2",
+  "blame": "agent",
+  "gaps": [],
+  "reason": "period total 14000000 iso4217:USD exceeds the per-period limit 10000000.00 of m-1"
+ },
+ {
+  "phase": "7-reconciled-not-booked",
+  "title": "Reconciliation: bank B signs that the first instruction never booked (10M in all)",
+  "outcome": "preserved",
+  "invariant": "-",
+  "blame": null,
+  "gaps": [],
+  "reason": "continuity preserved"
+ }
+]

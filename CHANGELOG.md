@@ -2,6 +2,18 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## Worked example for FINOS AIGF #421 (unreleased, 2026-11-23)
+
+- **`interop/finos-aigf/case-421-family-office/`:** the family-office example of finos/ai-governance-framework#421 as seven signed packets. A client's USD 10M mandate is split across two banks; each bank signs what it booked and counts its own leg, and the client's verifier holds the total. The phases:
+  - a plan within the mandate (`preserved`);
+  - slices that each fit but together over-book (`violated` I2);
+  - a leg delegated to an institution the client never named (`violated` I1, blame `delegator`);
+  - a lost response, before and after a retry (`unresolved` I7);
+  - reconciliation either way: the first instruction booked (`violated` I2, 14M) or never booked (`preserved`).
+
+  Both reference verifiers agree on every phase, and the generator asserts each verdict. The FINOS mapping links it.
+- **Known limitation, recorded in the example's README:** across packets, verifier state does not yet carry an instruction with an unknown outcome forward, so a later packet can be `preserved` while an earlier slice is still unknown. Within one packet the verdict is already `unresolved`.
+
 ## Comparison with EMILIA Protocol's vectors (unreleased, 2026-11-23)
 
 - **EP profile** (`packages/conformance/src/profiles/ep.mjs`) and **`interop/ep/`:** AMEP beside two of EP's published suites (draft-schrock-ep-authorization-receipts).

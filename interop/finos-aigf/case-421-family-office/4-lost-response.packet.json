@@ -1,0 +1,202 @@
+{
+ "amep_version": "0.3",
+ "mandates": [
+  {
+   "id": "m-1",
+   "kind": "mandate",
+   "principal": "client:7",
+   "claims": {
+    "actions": [
+     "trade.book"
+    ],
+    "resources": [
+     "inst:bank-a.example/*",
+     "inst:bank-b.example/*"
+    ],
+    "ceiling": "financial",
+    "nbf": 0,
+    "exp": 1000,
+    "limits": [
+     {
+      "unit": "iso4217:USD",
+      "per_period": "10000000.00",
+      "period": 1000
+     }
+    ]
+   },
+   "proof": {
+    "kid": "client-7",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "2b5173772e4ea9cac57c90e7ff8ef5f5273aa748a7936beb311077d4c083d04d4026e8e3eabea567a3f971a4b322b4e767dc5d924660be95dca41a88f4789b09"
+   }
+  }
+ ],
+ "delegations": [
+  {
+   "id": "d-a",
+   "kind": "delegation",
+   "parent": "m-1",
+   "claims": {
+    "actions": [
+     "trade.book"
+    ],
+    "resources": [
+     "inst:bank-a.example/*"
+    ],
+    "ceiling": "financial",
+    "nbf": 0,
+    "exp": 1000,
+    "depth": 0,
+    "limits": [
+     {
+      "unit": "iso4217:USD",
+      "per_period": "6000000.00",
+      "period": 1000,
+      "counted_by": "inst:bank-a.example"
+     }
+    ]
+   },
+   "proof": {
+    "kid": "family-office-orchestrator",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "0a7611d8ddb239611d586558e4da31a2f13f641d23825a5e54c60c7849167af1cc7a6b8c58e04b960b3408087ec09af083b3c7282c1cebb3a1c9da83e702d209"
+   }
+  },
+  {
+   "id": "d-b",
+   "kind": "delegation",
+   "parent": "m-1",
+   "claims": {
+    "actions": [
+     "trade.book"
+    ],
+    "resources": [
+     "inst:bank-b.example/*"
+    ],
+    "ceiling": "financial",
+    "nbf": 0,
+    "exp": 1000,
+    "depth": 0,
+    "limits": [
+     {
+      "unit": "iso4217:USD",
+      "per_period": "4000000.00",
+      "period": 1000,
+      "counted_by": "inst:bank-b.example"
+     }
+    ]
+   },
+   "proof": {
+    "kid": "family-office-orchestrator",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "a3d16fb00e5a60c9ea30515e66d561b7f2c6264146de32532e3939061cc53ded15f52e06d21c6fca063ba354f94ef66e26e767a0770b63dc2db4a5f5c1ca1909"
+   }
+  }
+ ],
+ "interpretations": [
+  {
+   "id": "a-1",
+   "kind": "interpretation",
+   "source": "curated",
+   "adapter": "booking-api",
+   "version": "v1",
+   "proof": {
+    "kid": "family-office-orchestrator",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "f824a4e3609a1b2ce926128b061330398dbae2d393de49b9f19de8ddbee8c562333c10fa0703e0c7bea1bf310628eefdaf7375bc470b20d7f904cb6e40687506"
+   }
+  }
+ ],
+ "invocations": [
+  {
+   "id": "i-a1",
+   "kind": "invocation",
+   "authority_ref": "d-a",
+   "interpretation_ref": "a-1",
+   "actor": "agent:leg-a",
+   "t": 10,
+   "declared": {
+    "action": "trade.book",
+    "resource": "inst:bank-a.example/portfolio/client-7",
+    "effect": "financial"
+   },
+   "proof": {
+    "kid": "family-office-orchestrator",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "15041a7eeaefe5b9bff49cf9a4dc639a9dc98c5f816e626a63063323e75ded10b46c2bd3ba40fa25722d1561f7fb84987fdf8d78dbf2843243b3d6058f1b0e0e"
+   }
+  },
+  {
+   "id": "i-b1",
+   "kind": "invocation",
+   "authority_ref": "d-b",
+   "interpretation_ref": "a-1",
+   "actor": "agent:leg-b",
+   "t": 20,
+   "declared": {
+    "action": "trade.book",
+    "resource": "inst:bank-b.example/portfolio/client-7",
+    "effect": "financial"
+   },
+   "proof": {
+    "kid": "family-office-orchestrator",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "8b047551b4bec38394234a312bd2012d222efba08b50179ffa8725f6c1becb40bfd18e1703219ead655207660fc17b655736f13c00478f6cc3926e86cbe7e100"
+   }
+  }
+ ],
+ "effects": [
+  {
+   "id": "e-a1",
+   "kind": "effect",
+   "invocation": "i-a1",
+   "observed_by": "inst:bank-a.example",
+   "assurance": "L3",
+   "invocation_digest": "e2d418e62d854ff9f5ad8c58f8f2e17fe89110295ae2978864742073311dbeb6",
+   "executed": {
+    "action": "trade.book",
+    "resource": "inst:bank-a.example/portfolio/client-7",
+    "effect": "financial",
+    "released": [],
+    "t": 11,
+    "value": {
+     "amount": "6000000.00",
+     "unit": "iso4217:USD",
+     "period_spent": {
+      "1000": "6000000.00"
+     }
+    }
+   },
+   "proof": {
+    "kid": "inst:bank-a.example",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "452f18e98c7c5b5df50c4a9802e9c86f5587f367da04512a6c270af6f0a4309736f29c3d7fad3cfcf7e05db559369cc07f4109bdbd343b5ee7e624203a8be50e"
+   }
+  }
+ ],
+ "call_statements": [
+  {
+   "id": "c-a1",
+   "kind": "call_statement",
+   "invocation": "i-a1",
+   "observed_by": "inst:bank-a.example",
+   "disposition": "completed",
+   "effect_count": 1,
+   "t": 12,
+   "invocation_digest": "e2d418e62d854ff9f5ad8c58f8f2e17fe89110295ae2978864742073311dbeb6",
+   "proof": {
+    "kid": "inst:bank-a.example",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "353679156af0f31c414a8b1081c172a0da64c6e22a76de1c54830b7b66426a4c659bb0658fd47032b636533c18ed6874758b54018cfd193b459e9e875077d70a"
+   }
+  }
+ ]
+}
