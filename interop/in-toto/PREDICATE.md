@@ -106,7 +106,7 @@ Free-text reasons aren't part of the record, because they differ between impleme
 python3 interop/in-toto/make_example.py
 ```
 
-To sign and check a verdict yourself, with either reference CLI (in `main`; not yet in a released package):
+To sign and check a verdict yourself, with either reference CLI (released in `amep-protocol` 0.3.0a2 and `@stafordtituss/amep` 0.3.0-alpha.2):
 
 ```bash
 amep-protocol verify packet.json --keys keys.json --verdict-out verdict.dsse.json --sign-with verifier.key --sign-kid verifier-1
@@ -119,7 +119,9 @@ amep-protocol verify packet.json --keys keys.json --verdict-out verdict.dsse.jso
 - Python: `amep-protocol` (PyPI), `amep_protocol.verdicts`.
 - JavaScript: `@stafordtituss/amep` (npm), `@stafordtituss/amep/verdict`.
 
-`tools/compare_verifiers.py` checks that the two produce byte-identical statements over every AMEP conformance vector (all three suites).
+`tools/compare_verifiers.py` checks that the two produce byte-identical statements over all 269 AMEP conformance vectors (all three suites). Both implementations are by the same author.
+
+Outside use: in the Verifiable Agent Trust Envelope project, signed verdict envelopes for a lost-response and recovery case are kept under `reference/amep/case-01-lost-response/`. Its maintainer re-ran the pinned Python verifier on them and reported that all five verdicts matched ([VATE PR #138](https://github.com/Poke-nushi/Verifiable-Agent-Trust-Envelope/pull/138)).
 
 ## Changelog
 
