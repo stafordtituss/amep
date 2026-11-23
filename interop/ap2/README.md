@@ -22,6 +22,13 @@ Payments are evaluated as they settle, one packet per payment, with verifier sta
 
 ## Results
 
+**For a crosswalk:** [verdicts.json](verdicts.json) is AMEP's column, regenerated and checked by `node interop/ap2/verdicts.mjs [--check]`.
+- **It gives, for every bundle:**
+  - each payment's outcome, deciding invariant, blame and named gaps;
+  - which AP2 artifact checks failed.
+- **It's pinned** to the SHA-256 of the exact fixture files it was computed from.
+- **To compare implementations,** join on the bundle name.
+
 The table is in [COMPARISON.md](COMPARISON.md), regenerated and checked by `node interop/ap2/compare.mjs [--check]`. The three scenarios where AMEP adds most:
 - **`s6-budget`:** two payments, each within `amount_range`, that together exceed the budget. AMEP finds the second payment `violated` (I2), using past spend it derives from the processors' signed receipts.
   - AP2's SDK evaluates a budget cumulatively only when the verifier supplies past spend itself (`MandateContext.total_amount`). Without that, it reports "Missing mandate context required to evaluate budget".
