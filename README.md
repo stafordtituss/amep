@@ -133,9 +133,9 @@ The IETF Internet-Draft:
 ```bibtex
 @techreport{selvaraj2026amepdraft,
   author      = {Selvaraj, Staford Titus},
-  title       = {Agentic Mandate Evidence Protocol ({AMEP})},
+  title       = {Continuity Evaluation of Agent Delegation Records},
   type        = {Internet-Draft},
-  number      = {draft-stafordtituss-agentic-mandate-evidence-00},
+  number      = {draft-stafordtituss-agentic-mandate-evidence-01},
   institution = {Internet Engineering Task Force},
   year        = {2026},
   month       = nov,

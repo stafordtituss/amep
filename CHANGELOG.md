@@ -2,6 +2,22 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## Internet-Draft -01 posted (2026-11-23)
+
+- **draft-stafordtituss-agentic-mandate-evidence-01** is posted to the IETF repository (https://datatracker.ietf.org/doc/draft-stafordtituss-agentic-mandate-evidence/), rewritten from v0.3.0-draft.1. It adds:
+  - grants and limits;
+  - call statements and binding;
+  - liveness at each effect's time;
+  - operation approvals;
+  - blame and missing evidence;
+  - holds;
+  - signed, re-derivable verdict records;
+  - the exact Ed25519 acceptance rule;
+  - the 269 vectors.
+
+  Its Implementation Status lists the outside use and review: the AER-1 runs, the VATE verification, the payments review and the AUDIT list review. The XML is xml2rfc v3.
+- The README's citation entry now names -01 and the draft's actual title, "Continuity Evaluation of Agent Delegation Records".
+
 ## Reasons: a call that provably didn't run says so (unreleased, 2026-11-23)
 
 - A call whose observer signed a `not_executed` statement was `preserved` with the generic reason "continuity preserved", which reads as "within authority". It now says "nothing executed: <observer> signed a not_executed call statement", in both verifiers. Outcomes are unchanged; only that reason text differs.
