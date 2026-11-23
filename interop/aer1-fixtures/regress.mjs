@@ -17,12 +17,13 @@
 // Usage, from the repository root, after `(cd packages/conformance && npm install)`:
 //   node interop/aer1-fixtures/regress.mjs            fetch the pinned inputs
 //   node interop/aer1-fixtures/regress.mjs --dir D    use local copies in D
+//   ... --amep 0.3.0-alpha.2   require that released verifier (installed from npm)
 // Exit status: 0 all expectations hold; 1 a regression; 2 an input changed;
-// 3 an input could not be fetched.
+// 3 an input or the required verifier is missing.
 
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -132,11 +133,29 @@ async function loadInputs() {
 }
 
 const dir = await loadInputs();
-const js = JSON.parse(readFileSync(join(root, "packages/js/package.json"), "utf8"));
+
+// The verifier the importer actually resolves: the in-repo package (a file: link)
+// or a released one installed from npm. `--amep VERSION` requires a released
+// version, so a run can be pinned to exactly what users install.
+const modDir = join(root, "packages/conformance/node_modules/@stafordtituss/amep");
+let resolved;
+try {
+  resolved = JSON.parse(readFileSync(join(modDir, "package.json"), "utf8")).version;
+} catch {
+  console.error("@stafordtituss/amep is not installed: run (cd packages/conformance && npm install) first");
+  process.exit(3);
+}
+const linked = realpathSync(modDir) === resolve(root, "packages/js");
+const source = linked ? "in-repo packages/js" : "installed from npm";
+const want = process.argv.includes("--amep") ? process.argv[process.argv.indexOf("--amep") + 1] : null;
+if (want && (linked || resolved !== want)) {
+  console.error(`expected the released @stafordtituss/amep ${want}, found ${resolved} (${source})`);
+  process.exit(3);
+}
 const commit = spawnSync("git", ["rev-parse", "--short", "HEAD"], { cwd: root, encoding: "utf8" });
 console.log(
-  `importer: packages/conformance at ${commit.stdout.trim() || "unknown commit"}, ` +
-    `@stafordtituss/amep ${js.version}, Node.js ${process.version}\n`,
+  `importer: packages/conformance at ${commit.stdout?.trim() || "unknown commit"}, ` +
+    `@stafordtituss/amep ${resolved} (${source}), Node.js ${process.version}\n`,
 );
 
 let failures = 0;

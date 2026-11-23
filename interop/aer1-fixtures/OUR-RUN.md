@@ -83,4 +83,4 @@ node interop/aer1-fixtures/regress.mjs --dir DIR  # or uses local copies
 
 - The inputs are pinned by the SHA-256 values above. If a fixture or the tool map changes upstream, the check stops with exit status 2 and names it, because the expectations were written for those bytes. Exit status 1 is a regression.
 - It was tested against a mutant importer that imports the refusal as an effect: the check fails on `38a410ab` with exit status 1.
-- It runs the importer from this repository (`amep-conformance` isn't published yet) on top of `@stafordtituss/amep` 0.3.0-alpha.2, and prints the commit and versions it used.
+- The importer (`amep-conformance`) runs from this repository, because it isn't published yet. The verifier it uses can be pinned to the release: install `@stafordtituss/amep@0.3.0-alpha.2` from npm in `packages/conformance` and pass `--amep 0.3.0-alpha.2`. The check then refuses to run on anything else, including the in-repo package. It prints the commit and the verifier version and source it used. Both ways pass on 2026-11-23.
