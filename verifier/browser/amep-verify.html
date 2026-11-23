@@ -85,9 +85,9 @@ class Malformed extends Error {}
 // spec 10.5 (v0.3): a violation names the party whose own signed record departs from authority; an unresolved result
 // names the one piece of evidence that would let the evaluation continue
 class Stop {
-  constructor(outcome, invariant, reason, { blame, need, ref } = {}) {
+  constructor(outcome, invariant, reason, { blame, need, ref, cause } = {}) {
     Object.assign(this, { outcome, invariant, reason, blame: outcome === "violated" ? blame ?? null : null,
-      gaps: outcome === "unresolved" && need ? [{ need, ref: String(ref) }] : [] });
+      gaps: outcome === "unresolved" && need ? [{ need, ref: String(ref), ...(cause ? { cause } : {}) }] : [] });
   }
 }
 const check = (cond, outcome, invariant, reason, tags) => { if (cond) throw new Stop(outcome, invariant, reason, tags); };
@@ -499,6 +499,17 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     if (!ed25519StrictOk(k.x, o.proof.sig)) return false;
     try { return sigOk(o, k); } catch { return false; }
   };
+  // spec 10.5.1 (v0.3): why a refused signature was refused, in a fixed order every verifier shares
+  const sigCause = o => {
+    if (!o || typeof o !== "object" || Array.isArray(o) || !o.proof || typeof o.proof !== "object" || Array.isArray(o.proof)) return "missing";
+    const kid = o.proof.kid;
+    const k = typeof kid === "string" && Object.hasOwn(keys, kid) ? keys[kid] : null;
+    if (!k || typeof k !== "object" || Array.isArray(k)) return "unknown_key";
+    const roles = Array.isArray(k.roles) ? k.roles.filter(r => typeof r === "string") : [];
+    if (!roles.some(r => (SIGNER_ROLES[o.kind] || []).includes(r))) return "role";
+    return "invalid";
+  };
+  const firstCause = os => { const o = os.find(x => !verify(x)); return os.some(x => !verify(x)) ? sigCause(o) : undefined; };
   const objs = {};
   for (const kind of ["mandates", "delegations", "intents", "interpretations", "invocations", "effects", "approvals", "findings"])
     for (const o of pk[kind] || []) if (o && typeof o === "object" && "id" in o) objs[o.id] = o;
@@ -557,7 +568,7 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       check(!intent || intent.kind !== "intent", "unresolved", "I7", "cited intent not found", { need: "intent", ref: inv.intent_ref ?? "-" });
       needed.push(intent);
     }
-    check(needed.some(o => !verify(o)), "unresolved", "I7", "missing or invalid signature, or signer lacks the role", { need: "signature", ref: id });
+    check(needed.some(o => !verify(o)), "unresolved", "I7", "missing or invalid signature, or signer lacks the role", { need: "signature", ref: id, cause: firstCause(needed) });
     check((inv.derived_from || []).some(j => (order.get(j) ?? order.get(id)) >= order.get(id)), "unresolved", "I7", "lineage reference not found among earlier invocations", { need: "lineage", ref: id });
     // claim members (spec 16, v0.3): an unknown claim member may be a constraint this verifier cannot enforce, so it
     // is never ignored. Limits are validated wherever they appear.
@@ -615,7 +626,7 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
         check(!sts.some(s => s.target === c.id && toTime(s.as_of) >= t), "unresolved", "I7", `no signed revocation status for ${c.id} as of ${what}`, { need: "revocation_status", ref: c.id });
     };
     liveness(tInv, "invocation");
-    check(revs.some(r => !verify(r)), "unresolved", "I7", "unverifiable revocation on the chain", { need: "revocation_signature", ref: id });
+    check(revs.some(r => !verify(r)), "unresolved", "I7", "unverifiable revocation on the chain", { need: "revocation_signature", ref: id, cause: firstCause(revs) });
     freshStatus(tInv, "the invocation");
     check(isGuardrail(inv.declared.resource, extraProtected), "violated", "I9", "targets guardrail/evidence store", { blame: "agent" });
     // influence (spec 5.11): trusted only if the finding exists, is signed and is labelled trusted
@@ -628,7 +639,7 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     const invDigest = digest(inv);
     const stmts = (pk.call_statements || []).filter(c => c && typeof c === "object" && c.invocation === id);
     for (const c of stmts) {
-      check(!verify(c), "unresolved", "I7", "call statement unsigned or signer lacks the role", { need: "call_statement_signature", ref: c.id ?? "?" });
+      check(!verify(c), "unresolved", "I7", "call statement unsigned or signer lacks the role", { need: "call_statement_signature", ref: c.id ?? "?", cause: firstCause([c]) });
       check(!DISPOSITIONS.includes(c.disposition), "unresolved", "I7", "call statement with an unknown disposition", { need: "call_statement", ref: c.id ?? "?" });
       check(!Number.isInteger(c.effect_count) || c.effect_count < 0, "unresolved", "I7", "call statement effect_count must be a non-negative integer", { need: "call_statement", ref: c.id ?? "?" });
       check(c.disposition === "not_executed" && c.effect_count !== 0, "unresolved", "I7", "call statement says not executed but counts effects", { need: "call_statement", ref: c.id ?? "?" });
@@ -665,7 +676,7 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     const ap = "approval_ref" in inv ? objs[inv.approval_ref] : undefined;
     const byObserver = new Map();   // observer -> effect identity digest -> its receipts, in packet order
     for (const e of mine) {
-      check(!verify(e), "unresolved", "I7", "effect receipt unsigned or signer lacks the role", { need: "receipt_signature", ref: e.id ?? "?" });
+      check(!verify(e), "unresolved", "I7", "effect receipt unsigned or signer lacks the role", { need: "receipt_signature", ref: e.id ?? "?", cause: firstCause([e]) });
       check(typeof e.observed_by !== "string", "unresolved", "I7", `receipt ${e.id ?? "?"} names no observer`, { need: "receipt_observer", ref: e.id ?? "?" });
       check("invocation_digest" in e && e.invocation_digest !== invDigest, "unresolved", "I7", `receipt ${e.id ?? "?"} is bound to a different invocation (invocation_digest mismatch)`, { need: "receipt_binding", ref: e.id ?? "?" });
       if (highImpact) {

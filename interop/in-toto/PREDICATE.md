@@ -73,6 +73,7 @@ The predicates compose. Both reference verifiers also publish the verdict as an 
 // <outcome>: "preserved" | "violated" | "unresolved"
 // <party>:   "agent" | "delegator" | "host" | "transport" | "server"
 // <gap>:     { "need": "<need>", "ref": "<id>" }   (needs listed in AMEP Section 10.5.1)
+//              signature gaps add "cause": "missing" | "unknown_key" | "role" | "invalid"
 ```
 
 ## Parsing rules
@@ -92,7 +93,7 @@ The predicates compose. Both reference verifiers also publish the verdict as an 
 | `verdict.outcome` | string | yes | Packet verdict (AMEP Section 10.5): the first `violated` result, else the first `unresolved` one, else `preserved`. An empty packet is `unresolved`. |
 | `verdict.invariant` | string | yes | The deciding invariant, `I1`–`I11`, or `-` when all results are preserved. |
 | `verdict.blame` | string or null | yes | The party whose own signed record first departs from authority. |
-| `verdict.gaps` | array | yes | Evidence that would let evaluation continue: `{need, ref}`. |
+| `verdict.gaps` | array | yes | Evidence that would let evaluation continue: `{need, ref}`. A gap for a refused signature also carries `cause`: `missing`, `unknown_key`, `role` or `invalid` (AMEP Section 10.5.1). |
 | `results[]` | array | yes | One entry per result, in evaluation order. `id` is the invocation id, or `-` for a packet-level result. |
 | `verifier` | object | no | The implementation. It's the only member that may differ between conforming verifiers. |
 

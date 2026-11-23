@@ -2,6 +2,17 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## Signature gaps say why (unreleased, 2026-11-23)
+
+- A gap for a refused signature (`signature`, `receipt_signature`, `call_statement_signature`, `revocation_signature`) now carries `cause`:
+  - `missing`: no proof;
+  - `unknown_key`: the key id isn't in the key set;
+  - `role`: the key can't sign that kind of object;
+  - `invalid`: anything else.
+
+  Both verifiers determine it in the same fixed order (spec 10.5.1). Before, an attacker's key, a host key minting a mandate and a tampered body all gave the same gap. Outcomes and invariants are unchanged. Verdict statements gain the member on those gaps, and both verifiers still produce byte-identical statements over all 269 vectors.
+- Found while filling in AMEP's row for UC-03 of the W3C AIKR case library (w3c-cg/aikr#45).
+
 ## AER-1 regression check (2026-11-23)
 
 - `interop/aer1-fixtures/regress.mjs` reruns Brennan Zambo's two AER-1 fixtures, pinned by hash, against the expectations committed in `5f59f88` before either side ran them. Above all, a gateway refusal must never be imported as an executed action. Asked for in amep#17.

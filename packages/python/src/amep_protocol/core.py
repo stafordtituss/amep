@@ -304,6 +304,21 @@ def verify_sig(obj, keys: dict, require_v2: bool = False) -> bool:
         return False
 
 
+def sig_cause(obj, keys: dict) -> str:
+    """Why a required signature was not accepted (spec 10.5.1, v0.3): for a signature gap's `cause`. Called only
+    after verify_sig has refused the object; the order is fixed so that every verifier gives the same cause."""
+    if not isinstance(obj, dict) or not isinstance(obj.get("proof"), dict):
+        return "missing"
+    kid = obj["proof"].get("kid")
+    k = keys.get(kid) if isinstance(kid, str) else None
+    if not isinstance(k, dict):
+        return "unknown_key"
+    roles = k.get("roles") if isinstance(k.get("roles"), list) else []
+    if not set(r for r in roles if isinstance(r, str)) & SIGNER_ROLES.get(obj.get("kind"), set()):
+        return "role"
+    return "invalid"
+
+
 # ---------------- claim algebra (spec 6.3, 7) ----------------
 def pat_match(value: str, pattern: str) -> bool:
     return pattern == "*" or value == pattern or (pattern.endswith("*") and value.startswith(pattern[:-1]))
@@ -542,16 +557,17 @@ class Result:
 
 
 class Stop(Exception):
-    def __init__(self, outcome, invariant, reason, blame=None, need=None, ref=None):
+    def __init__(self, outcome, invariant, reason, blame=None, need=None, ref=None, cause=None):
         # spec 10.5 (v0.3): a violation names the party whose own signed record departs from authority; an
         # unresolved result names the one piece of evidence that would let the evaluation continue
         self.r = (outcome, invariant, reason, blame if outcome == "violated" else None,
-                  [{"need": need, "ref": str(ref)}] if outcome == "unresolved" and need else [])
+                  [dict({"need": need, "ref": str(ref)}, **({"cause": cause} if cause else {}))]
+                  if outcome == "unresolved" and need else [])
 
 
-def _check(cond, outcome, invariant, reason, blame=None, need=None, ref=None):
+def _check(cond, outcome, invariant, reason, blame=None, need=None, ref=None, cause=None):
     if cond:
-        raise Stop(outcome, invariant, reason, blame, need, ref)
+        raise Stop(outcome, invariant, reason, blame, need, ref, cause)
 
 
 SUPPORTED_VERSIONS = (None, "0.2", "0.3")
@@ -578,6 +594,8 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
         return _all_unresolved(packet, f"unsupported amep_version {version!r}")
     v03 = version == "0.3"
     vsig = lambda o: verify_sig(o, keys, require_v2=v03)   # noqa: E731
+    # spec 10.5.1 (v0.3): the cause of the first refused signature among objects, for a signature gap
+    first_cause = lambda os_: next((sig_cause(o, keys) for o in os_ if not vsig(o)), None)   # noqa: E731
     # Object ids are unique within a packet (spec 5.2, v0.3): two objects with one id would let a receipt or a
     # statement be read as evidence for the wrong one.
     seen_ids = set()
@@ -630,7 +648,7 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
             for f in d.get("quarantined", []):
                 quarantined[f] = min(quarantined.get(f, len(invocations)), order[d["invocation"]])
     ctx = {"v03": v03, "totals": totals, "prior_windows": prior_windows,
-           "held": {d: h for d, h in held_in.items() if d not in present}, "new_held": {}}
+           "held": {d: h for d, h in held_in.items() if d not in present}, "new_held": {}, "first_cause": first_cause}
     for n, inv in enumerate(invocations):
         rid = inv.get("id", "?")
         try:
@@ -736,6 +754,7 @@ def _check_limit(n, i, lim, x, v, unit, amt, obs, appr, call_sum, ctx):
 
 def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects, spent, approval_use, extra_protected, order, taint, ctx):
     rid, t_inv = inv["id"], to_time(inv["t"])
+    first_cause = ctx["first_cause"]
     # 1. chain
     chain, node, seen = [], objs.get(inv.get("authority_ref")), set()
     while node and node["id"] not in seen:
@@ -750,7 +769,8 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         intent = objs.get(inv["intent_ref"])
         _check(not intent or intent.get("kind") != "intent", "unresolved", "I7", "cited intent not found", need="intent", ref=inv.get("intent_ref") or "-")
         needed.append(intent)
-    _check(any(not vsig(o) for o in needed), "unresolved", "I7", "missing or invalid signature, or signer lacks the role", need="signature", ref=rid)
+    _check(any(not vsig(o) for o in needed), "unresolved", "I7", "missing or invalid signature, or signer lacks the role", need="signature", ref=rid,
+           cause=first_cause(needed))
     _check(any(order.get(j, order[rid]) >= order[rid] for j in inv.get("derived_from", [])),
            "unresolved", "I7", "lineage reference not found among earlier invocations", need="lineage", ref=rid)
     # claim members (spec 16, v0.3): an unknown claim member may be a constraint this verifier cannot enforce, so
@@ -817,7 +837,8 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
                 _check(not fresh, "unresolved", "I7", f"no signed revocation status for {n['id']} as of {what}", need="revocation_status", ref=n['id'])
 
     liveness(t_inv, "invocation")
-    _check(any(not vsig(r) for r in revs), "unresolved", "I7", "unverifiable revocation on the chain", need="revocation_signature", ref=rid)
+    _check(any(not vsig(r) for r in revs), "unresolved", "I7", "unverifiable revocation on the chain", need="revocation_signature", ref=rid,
+           cause=first_cause(revs))
     fresh_status(t_inv, "the invocation")
     # 7. self-protection on the declared target
     _check(is_guardrail(inv["declared"]["resource"], extra_protected), "violated", "I9", "targets guardrail/evidence store", blame="agent")
@@ -833,7 +854,8 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
     inv_digest = digest(inv)
     stmts = [c for c in packet.get("call_statements", []) if isinstance(c, dict) and c.get("invocation") == rid]
     for c in stmts:
-        _check(not vsig(c), "unresolved", "I7", "call statement unsigned or signer lacks the role", need="call_statement_signature", ref=c.get('id', '?'))
+        _check(not vsig(c), "unresolved", "I7", "call statement unsigned or signer lacks the role", need="call_statement_signature", ref=c.get('id', '?'),
+               cause=first_cause([c]))
         _check(c.get("disposition") not in DISPOSITIONS, "unresolved", "I7", "call statement with an unknown disposition", need="call_statement", ref=c.get('id', '?'))
         n_eff = c.get("effect_count")
         _check(isinstance(n_eff, bool) or not isinstance(n_eff, (int, float)) or n_eff != int(n_eff) or n_eff < 0,
@@ -880,7 +902,8 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
     # 11-15. every receipt for this invocation is checked (spec 10.2)
     by_observer: dict = {}   # observer -> effect identity digest -> its receipts, in packet order
     for e in mine:
-        _check(not vsig(e), "unresolved", "I7", "effect receipt unsigned or signer lacks the role", need="receipt_signature", ref=e.get('id', '?'))
+        _check(not vsig(e), "unresolved", "I7", "effect receipt unsigned or signer lacks the role", need="receipt_signature", ref=e.get('id', '?'),
+               cause=first_cause([e]))
         _check(not isinstance(e.get("observed_by"), str), "unresolved", "I7", f"receipt {e.get('id', '?')} names no observer", need="receipt_observer", ref=e.get('id', '?'))
         _check("invocation_digest" in e and e["invocation_digest"] != inv_digest, "unresolved", "I7",
                f"receipt {e.get('id', '?')} is bound to a different invocation (invocation_digest mismatch)", need="receipt_binding", ref=e.get('id', '?'))

@@ -172,3 +172,25 @@ test("holds: a lost instruction is held at its reserve, released when resolved, 
   const bad = verdict(evaluate(load("1-within-mandate.packet.json"), keys, sigOk, [], { ...load("state.json"), held: { d: { invocation: "i-x", amounts: { k: 5 } } } }));
   assert.deepEqual([bad.outcome, bad.invariant], ["unresolved", "I7"]);
 });
+
+test("a signature gap says why the signature was refused (spec 10.5.1)", () => {
+  const keys = JSON.parse(readFileSync(join(VECTORS, "keys.json"), "utf8"));
+  const gaps = p => evaluate(p, keys, sigOk).flatMap(r => r.gaps);
+  const cases = {
+    "must-reject/unsigned-invocation.json": ["signature", "missing"],
+    "must-reject/forged-mandate--attacker-key.json": ["signature", "unknown_key"],
+    "must-reject/mandate-minted-by-host-key.json": ["signature", "role"],
+    "must-reject/receipt-signature-with-s----l--malleated.json": ["receipt_signature", "invalid"],
+    "must-reject/call-statement-signed-by-a-host-key.json": ["call_statement_signature", "role"],
+    "must-reject/unsigned-revocation-on-the-chain.json": ["revocation_signature", "missing"],
+  };
+  for (const [name, [need, cause]] of Object.entries(cases)) {
+    const g = gaps(JSON.parse(readFileSync(join(VECTORS, name), "utf8")).packet);
+    assert.ok(g.some(x => x.need === need && x.cause === cause), name);
+  }
+  const v = JSON.parse(readFileSync(join(VECTORS, "must-reject/payment-over-the-per-call-limit-without-approval.json"), "utf8"));
+  const p = structuredClone(v.packet); p.mandates[0].principal = "user:mallory";
+  assert.deepEqual(gaps(p), [{ need: "signature", ref: "i-1", cause: "invalid" }]);
+  const s = JSON.parse(readFileSync(join(VECTORS, "must-reject/self-approval-signed-by-host-key.json"), "utf8"));
+  assert.ok(gaps(s.packet).every(x => !("cause" in x)));
+});

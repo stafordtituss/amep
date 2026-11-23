@@ -258,3 +258,34 @@ class Holds(unittest.TestCase):
         r = verdict(evaluate(self.load("1-within-mandate.packet.json"), self.load("keys.json"),
                              state={**self.load("state.json"), "held": {"d": {"invocation": "i-x", "amounts": {"k": 5}}}}))
         self.assertEqual((r.outcome, r.invariant), ("unresolved", "I7"))
+
+
+class SignatureCause(unittest.TestCase):
+    """Spec 10.5.1 (v0.3): a signature gap says why the signature was refused."""
+    CASES = {
+        "must-reject/unsigned-invocation.json": ("signature", "missing"),
+        "must-reject/forged-mandate--attacker-key.json": ("signature", "unknown_key"),
+        "must-reject/mandate-minted-by-host-key.json": ("signature", "role"),
+        "must-reject/receipt-signature-with-s----l--malleated.json": ("receipt_signature", "invalid"),
+        "must-reject/call-statement-signed-by-a-host-key.json": ("call_statement_signature", "role"),
+        "must-reject/unsigned-revocation-on-the-chain.json": ("revocation_signature", "missing"),
+    }
+
+    def gaps(self, packet):
+        keys = json.load(open(os.path.join(VECTORS, "keys.json")))
+        return [g for r in evaluate(packet, keys) for g in r.gaps]
+
+    def test_causes(self):
+        for name, (need, cause) in self.CASES.items():
+            v = json.load(open(os.path.join(VECTORS, name)))
+            self.assertIn({"need": need, "ref": self.gaps(v["packet"])[0]["ref"], "cause": cause}, self.gaps(v["packet"]), name)
+
+    def test_altered_body_under_a_known_key_is_invalid(self):
+        v = json.load(open(os.path.join(VECTORS, "must-reject/payment-over-the-per-call-limit-without-approval.json")))
+        p = json.loads(json.dumps(v["packet"]))
+        p["mandates"][0]["principal"] = "user:mallory"
+        self.assertEqual(self.gaps(p), [{"need": "signature", "ref": "i-1", "cause": "invalid"}])
+
+    def test_other_gaps_carry_no_cause(self):
+        v = json.load(open(os.path.join(VECTORS, "must-reject/self-approval-signed-by-host-key.json")))
+        self.assertTrue(all("cause" not in g for g in self.gaps(v["packet"])))

@@ -895,7 +895,7 @@ Each result carries two further members. Both are derived only from the signed e
 | `transport` | The call the server received differs from the one the host signed. | `args_digest` mismatch (Section 5.14) |
 | `server` | The executing party's own records contradict the authorized call, or each other. | Declared ≠ executed, or mediated ≠ executed (I2); receipts contradicting `not_executed` (I11); more receipts than its call statement counts, or an inconsistent period total (I7) |
 
-**`gaps`** (on `unresolved` results; otherwise empty) lists the evidence that would let the evaluation continue, as `{need, ref}`. `ref` is the id of the object concerned, or `-`. Values of `need`:
+**`gaps`** (on `unresolved` results; otherwise empty) lists the evidence that would let the evaluation continue, as `{need, ref}`, with `cause` on signature gaps (below). `ref` is the id of the object concerned, or `-`. Values of `need`:
 
 | Value | Meaning |
 |---|---|
@@ -913,6 +913,17 @@ Each result carries two further members. Both are derived only from the signed e
 | `held_outcome` | An earlier invocation's outcome, which verifier state holds against this period total, is needed: its receipts or a `not_executed` statement (Section 7.6, rule 6). *(v0.3)* |
 | `reserve` | The invocation's `reserve` is malformed (Section 5.8). *(v0.3)* |
 | `verifier_support` | The packet uses a claim member this Verifier does not implement (Section 16). |
+
+**`cause`** *(v0.3)*. A gap whose `need` is `signature`, `receipt_signature`, `call_statement_signature` or `revocation_signature` also carries `cause`, saying why the signature was refused. No other gap carries it. When several objects' signatures are refused, it is the cause for the first of them, in the order the evaluation checks them. A Verifier MUST determine it in this order:
+
+| Value | Condition |
+|---|---|
+| `missing` | The object is absent, or has no `proof` object. |
+| `unknown_key` | The proof's `kid` is not a string naming a key in the key set. |
+| `role` | The key holds no role permitted to sign this kind of object (Section 12.5). |
+| `invalid` | Anything else: the algorithm, the proof version, the encoding, the strict acceptance rule (Section 12.2), or the signature itself fails. |
+
+A signature under a key the verifier was not given, such as an attacker's own key, is `unknown_key`. A key substituted in the key set itself cannot be detected from the packet; that is the key set's provenance (Section 12.4).
 
 Both reference verifiers return identical `blame` and `gaps` for every result of every conformance vector, which `tools/compare_verifiers.py` checks.
 
