@@ -2,6 +2,19 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## Packages amep-protocol 0.3.0a2, @stafordtituss/amep 0.3.0-alpha.2, amep-mcp 0.1.0a3 (prepared 2026-11-23, not yet published)
+
+They carry every change below, down to "Operation approvals", in both reference verifiers. In order, newest first:
+- limits that are order-independent, and observer totals that name their window (amep#10 rerun);
+- holds for unknown outcomes (FINOS AIGF #421);
+- the FINOS #421 worked example;
+- the EMILIA Protocol and Delegation Receipt Protocol comparisons;
+- grants;
+- the coverage matrix and the Provared import;
+- operation approvals.
+
+amep-mcp 0.1.0a3 bundles the 233-vector suite and needs amep-protocol 0.3.0a2.
+
 ## Limits: order-independent, and observer totals name their window (unreleased, 2026-11-23)
 
 From Carlos Vendrell Felici's rerun of his payments review against this draft (stafordtituss/amep#10, 23 Nov 2026). He found three problems.
