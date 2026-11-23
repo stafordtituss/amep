@@ -2,7 +2,7 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
-## Packages amep-protocol 0.3.0a2, @stafordtituss/amep 0.3.0-alpha.2, amep-mcp 0.1.0a3 (prepared 2026-11-23, not yet published)
+## Packages amep-protocol 0.3.0a2, @stafordtituss/amep 0.3.0-alpha.2, amep-mcp 0.1.0a3 (released 2026-11-23)
 
 They carry every change below, down to "Operation approvals", in both reference verifiers. In order, newest first:
 - limits that are order-independent, and observer totals that name their window (amep#10 rerun);
