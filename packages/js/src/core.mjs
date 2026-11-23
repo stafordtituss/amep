@@ -336,6 +336,29 @@ function checkLimits(lims) {
   }
   return lims;
 }
+// The running-total key of one limit window (spec 7.6): one total per limit, so limits that differ only in their actions
+// are separate caps (amep#10).
+function periodKey(node, lim, unit, t) {
+  const anchor = "nbf" in node.claims ? toTime(node.claims.nbf) : 0;
+  const window = Math.floor((toTime(t) - anchor) / lim.period);
+  return `${node.id}|${unit}|${lim.period}|${window}` + ("actions" in lim ? `|${[...lim.actions].sort().join(",")}` : "");
+}
+// An invocation's reserve (spec 5.8, v0.3): {amount, unit}, the most the call can move in the unit.
+function checkReserve(r) {
+  if (!r || typeof r !== "object" || Array.isArray(r) || Object.keys(r).sort().join() !== "amount,unit")
+    throw new Malformed("reserve must be an object with exactly amount and unit");
+  amountUnits(r.amount, unitOf(r.unit));
+  return r;
+}
+// Verifier state's holds (spec 10.7, v0.3): invocation digest -> {invocation, amounts: {period key: amount | null}}.
+function heldOf(state) {
+  const h = "held" in state ? state.held : {};
+  const ok = h && typeof h === "object" && !Array.isArray(h) && Object.values(h).every(v =>
+    v && typeof v === "object" && typeof v.invocation === "string" && v.amounts && typeof v.amounts === "object" && !Array.isArray(v.amounts)
+    && Object.values(v.amounts).every(a => a === null || (typeof a === "string" && AMOUNT.test(a))));
+  if (!ok) throw new Malformed("state.held must map invocation digests to {invocation, amounts}");
+  return h;
+}
 // A limit with `actions` applies to effects whose action matches; without, to every financial effect.
 const limitApplies = (lim, x) => ("actions" in lim) ? lim.actions.some(p => patMatch(x.action, p)) : x.effect === "financial";
 // I1 for limits: a child may add limits, but never raise one the parent sets for the same unit and period.
@@ -403,6 +426,13 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   const spent = { ...(state.spent || {}) };
   const totals = new Map(Object.entries(state.period_totals || {}).map(([k, v]) => [k, amountUnits(v)]));
   const priorWindows = new Set(totals.keys());
+  // spec 7.6 rule 6 (v0.3): holds for earlier invocations whose outcome was unknown. A packet that contains a held
+  // invocation decides it afresh, so its hold is set aside while this packet is evaluated, and never counted twice.
+  let heldIn;
+  try { heldIn = heldOf(state); } catch (e) { return allUnresolved(pk, `malformed verifier state: ${e.message}`); }
+  const present = new Set();
+  for (const i of pk.invocations || []) { try { present.add(digest(i)); } catch { /* reported by its own evaluation */ } }
+  const held = Object.fromEntries(Object.entries(heldIn).filter(([d]) => !present.has(d))), newHeld = {};
   const approvalUse = Object.fromEntries(Object.entries(state.approvals_used || {}).map(([k, v]) => [k, [...v]]));
   let out = [];
   const invocations = pk.invocations || [];
@@ -458,6 +488,10 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     // producer meant to narrow, so an unversioned packet that uses them is malformed instead.
     if (!v03) for (const x of nodes)
       check("grants" in x.claims, "unresolved", "I7", `${x.id}: grants require amep_version 0.3`, { need: "well_formed_evidence", ref: x.id });
+    if (v03 && "reserve" in inv) {
+      try { checkReserve(inv.reserve); }
+      catch (e) { if (!(e instanceof Malformed)) throw e; check(true, "unresolved", "I7", `${id}: ${e.message}`, { need: "reserve", ref: id }); }
+    }
     if (v03) for (const x of nodes) {
       let unknown = Object.keys(x.claims).filter(k => !CLAIM_MEMBERS.has(k) && !isExtensionMember(k)).sort();
       check(unknown.length > 0, "unresolved", "I7", `${x.id}: claim member not understood (${unknown.join(", ")})`, { need: "verifier_support", ref: x.id });
@@ -532,6 +566,15 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       check(hi && stmts.filter(c => c.disposition === "not_executed").every(c => c.observed_by === inv.actor),
         "unresolved", "I10", "high-impact call reported not executed only by the actor itself", { need: "independent_observer", ref: id });
       return;
+    }
+    // effect receipts. With none and no not_executed statement, the call may still have moved value: hold its reserve (or
+    // an unknown amount) against every period limit on its chain that applies to it (spec 7.6 rule 6).
+    if (!mine.length) {
+      const reserve = v03 ? inv.reserve : undefined, amounts = {};
+      for (const node of limited) for (const lim of node.claims.limits)
+        if ("per_period" in lim && limitApplies(lim, inv.declared))
+          amounts[periodKey(node, lim, lim.unit, inv.t)] = reserve !== undefined && reserve.unit === lim.unit ? reserve.amount : null;
+      if (Object.keys(amounts).length) newHeld[invDigest] = { invocation: id, amounts };
     }
     check(!mine.length, "unresolved", "I7", "no executed-effect receipt", { need: "receipt", ref: id });
     const highImpact = CEILING.indexOf(inv.declared.effect) >= CEILING.indexOf("write_shared");
@@ -647,10 +690,7 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
           check("per_call" in lim && callSum.get(i) > amountUnits(lim.per_call) && !ap, "violated", "I2",
             `this call moves ${unitsStr(callSum.get(i))} ${unit}, over the per-call limit ${lim.per_call} of ${node.id}`, { blame: "agent" });
           if (!("per_period" in lim)) continue;
-          const anchor = "nbf" in node.claims ? toTime(node.claims.nbf) : 0;
-          const window = Math.floor((toTime(x.t) - anchor) / lim.period);
-          // one running total per limit (amep#10): limits that differ only in their actions are separate caps
-          const key = `${node.id}|${unit}|${lim.period}|${window}` + ("actions" in lim ? `|${[...lim.actions].sort().join(",")}` : "");
+          const key = periodKey(node, lim, unit, x.t);
           let total = (totals.get(key) ?? 0n) + amt;
           // An observer's total is the principal's total only when that observer sees all of this node's spending in
           // the unit: the limit names it in counted_by (amep#10). Other observers' totals never count.
@@ -663,6 +703,19 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
             `period total ${unitsStr(total)} ${unit} exceeds the per-period limit ${lim.per_period} of ${node.id}`, { blame: "agent" });
           check(counted === undefined && !priorWindows.has(key), "unresolved", "I7",
             `period total for ${node.id} cannot be established: no total from its counting observer and no earlier state`, { need: "period_total", ref: node.id });
+          // holds (spec 7.6 rule 6): an earlier call with an unknown outcome may already have spent part of this window
+          // An approval that passed I8 authorizes going over the limit for its effect, so holds don't block it.
+          const holds = Object.values(held).filter(h => key in h.amounts).map(h => [h.invocation, h.amounts[key]]);
+          if (holds.length && !ap) {
+            const unknown = holds.filter(([, a]) => a === null).map(([i]) => i);
+            check(unknown.length > 0, "unresolved", "I7",
+              `the outcome of ${unknown[0] ?? ""} is unknown, so the period total of ${node.id} cannot be bounded`,
+              { need: "held_outcome", ref: unknown[0] ?? "-" });
+            const heldSum = holds.reduce((s, [, a]) => s + amountUnits(a, unit), 0n);
+            check(total + heldSum > amountUnits(lim.per_period), "unresolved", "I7",
+              `period total ${unitsStr(total)} ${unit} plus ${unitsStr(heldSum)} held for ${holds.map(([i]) => i).join(", ")} would exceed the per-period limit ${lim.per_period} of ${node.id}`,
+              { need: "held_outcome", ref: holds[0][0] });
+          }
           totals.set(key, total);
         }
       }
@@ -688,6 +741,8 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   state.spent = spent;
   state.approvals_used = approvalUse;
   if (totals.size) state.period_totals = Object.fromEntries([...totals].map(([k, v]) => [k, unitsStr(v)]));
+  const heldOut = { ...held, ...newHeld };
+  if (Object.keys(heldOut).length || "held" in state) state.held = heldOut;
   return out;
 }
 

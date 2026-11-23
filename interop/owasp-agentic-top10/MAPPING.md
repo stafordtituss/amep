@@ -20,7 +20,7 @@ AMEP (Agentic Mandate Evidence Protocol) answers that question with signed evide
 
 AMEP is a detection and accountability layer, not a prevention control. It is complementary to the mitigations in the Top 10.
 
-Vector names refer to three suites in https://github.com/stafordtituss/amep: `vectors/` (core, 221 vectors), `interop/approval-path-attacks/` (16) and `interop/w3c-agent-identity/delegation-continuity/` (20). Each can be run with `amep-protocol check-suite`, opened in the offline browser verifier, or run against any verifier with `amep-conformance verify`. The [results table](#results-of-the-cited-vectors) below is generated from the reference verifier.
+Vector names refer to three suites in https://github.com/stafordtituss/amep: `vectors/` (core, 228 vectors), `interop/approval-path-attacks/` (16) and `interop/w3c-agent-identity/delegation-continuity/` (20). Each can be run with `amep-protocol check-suite`, opened in the offline browser verifier, or run against any verifier with `amep-conformance verify`. The [results table](#results-of-the-cited-vectors) below is generated from the reference verifier.
 
 ## Mapping
 

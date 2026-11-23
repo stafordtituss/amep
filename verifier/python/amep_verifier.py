@@ -841,6 +841,61 @@ def vectors():
         grants(p, I, H, O, mandate={"grants": []}))
     add("unversioned packet with grants", ("unresolved", "I7"), lambda p, I, H, O, X:
         grants(p, I, H, O, mandate={"grants": [{"actions": ["fs.read"], "resources": ["repo:app/docs/*"]}], "keep": True}, versioned=False))
+
+    # 9. Holds for unknown outcomes (spec 7.6 rule 6, v0.3). From the cross-institution example of
+    # finos/ai-governance-framework#421: "a slice with an unknown outcome stays counted until reconciliation shows it was
+    # booked or not booked". An earlier call (i-0, reserve 250.00 EUR) had no outcome; verifier state holds it.
+    from amep_protocol.core import digest   # noqa: E402
+    HKEY = "m-1|iso4217:EUR|2592000|0"
+
+    def held_case(p, state, held_amount="250.00", earlier=None, reserve=None, approved=False):
+        """earlier: None (i-0 only in state), "not_executed" or "executed" (i-0 is in this packet with that outcome)."""
+        claims = {"actions": ["payments.send"], "resources": ["payee:*"], "ceiling": "financial", "exp": 100,
+                  "limits": [{"unit": "iso4217:EUR", "per_period": "500.00", "period": MONTH}]}
+        p.clear()
+        p["amep_version"] = "0.3"
+        p["mandates"] = [I.sign({"id": "m-1", "kind": "mandate", "principal": "user:alice", "claims": claims}, v=2)]
+        p["interpretations"] = [H.sign({"id": "a-1", "kind": "interpretation", "source": "curated", "adapter": "bank_api", "version": "v3"}, v=2)]
+        decl = {"action": "payments.send", "resource": "payee:city-utility", "effect": "financial"}
+        i0 = H.sign({"id": "i-0", "kind": "invocation", "authority_ref": "m-1", "interpretation_ref": "a-1",
+                     "actor": "agent:payments-assistant", "t": 5, "declared": decl,
+                     "reserve": {"amount": "250.00", "unit": "iso4217:EUR"}}, v=2)
+        i1 = {"id": "i-1", "kind": "invocation", "authority_ref": "m-1", "interpretation_ref": "a-1",
+              "actor": "agent:payments-assistant", "t": 19, "declared": decl}
+        if reserve is not None:
+            i1["reserve"] = reserve
+        body1 = {**decl, "released": [], "t": 20, "value": {"amount": "100.00", "unit": "iso4217:EUR"}}
+        if approved:   # the principal approved this payment over the limit (I8), so the hold doesn't block it
+            p["approvals"] = [I.sign({"id": "ap-1", "kind": "approval", "effect_digest": approval_digest(body1),
+                                      "presence": "webauthn", "expiry": 90}, v=2)]
+            i1["approval_ref"] = "ap-1"
+        i1 = H.sign(i1, v=2)
+        pay1 = B.sign({"id": "e-1", "kind": "effect", "invocation": "i-1", "observed_by": "service:bank.example", "assurance": "L3",
+                       "executed": body1}, v=2)
+        p["invocations"], p["effects"] = [i1], [pay1]
+        if earlier == "executed":
+            p["invocations"] = [i0, i1]
+            p["effects"] = [B.sign({"id": "e-0", "kind": "effect", "invocation": "i-0", "observed_by": "service:bank.example",
+                                    "assurance": "L3", "invocation_digest": digest(i0),
+                                    "executed": {**decl, "released": [], "t": 6, "value": {"amount": "250.00", "unit": "iso4217:EUR"}}}, v=2), pay1]
+        elif earlier == "not_executed":
+            p["invocations"] = [i0, i1]
+            p["call_statements"] = [B.sign({"id": "c-0", "kind": "call_statement", "invocation": "i-0", "observed_by": "service:bank.example",
+                                            "disposition": "not_executed", "effect_count": 0, "t": 8, "invocation_digest": digest(i0)}, v=2)]
+        state.update({"period_totals": {HKEY: "200.00"}, "spent": {}, "approvals_used": {},
+                      "held": {digest(i0): {"invocation": "i-0", "amounts": {HKEY: held_amount}}}})
+
+    def held(name, expect, **kw):
+        st = {}
+        add(name, expect, lambda p, *a: held_case(p, st, **kw), state=st)
+
+    held("held call within the period limit", ("preserved", "-"), held_amount="150.00")
+    held("earlier call with an unknown outcome holds the period limit", ("unresolved", "I7"))
+    held("held call without a reserve leaves the period total unbounded", ("unresolved", "I7"), held_amount=None)
+    held("held call later reported not executed releases its hold", ("preserved", "-"), earlier="not_executed")
+    held("held call later shown executed counts toward the limit", ("violated", "I2"), earlier="executed")
+    held("reserve with a numeric amount", ("unresolved", "I7"), held_amount="150.00", reserve={"amount": 100, "unit": "iso4217:EUR"})
+    held("approved payment is not blocked by a held call", ("preserved", "-"), held_amount=None, approved=True)
     return keys, V
 
 

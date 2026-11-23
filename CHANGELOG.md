@@ -2,6 +2,25 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## Holds: an unknown outcome stays counted across packets (unreleased, 2026-11-23)
+
+- **Spec 7.6 rule 6, 5.8 and 10.7:** an invocation may carry `reserve` (`{amount, unit}`), the most the call can move. When a verified invocation ends a packet with no receipt and no `not_executed` statement, the verifier's state holds it against every period limit on its chain: at its `reserve`, or at an unknown amount without one. In later packets:
+  - a period total that could exceed its limit with the holds added is `unresolved` (I7), gap `held_outcome`;
+  - an unknown held amount is also `unresolved`;
+  - it is never `violated`, because the held call may not have executed.
+
+  A later packet that contains the held invocation replaces its hold: its receipts count like any others, a `not_executed` statement releases it, and a hold is never counted twice.
+- **The gap it closes:** a lost instruction in one packet left no trace in verifier state, so a later packet holding only the retry was `preserved` though the principal could be over the limit. Found while building the FINOS AIGF #421 example below, whose thread set the rule: "a slice with an unknown outcome stays counted until reconciliation shows it was booked or not booked".
+- **Compatible:**
+  - every earlier vector and every `verify` output is unchanged;
+  - a packet evaluated with state that has no `held` member is decided as before;
+  - a well-formed `reserve` changes no packet's own verdict;
+  - a verifier without the rule ignores `reserve`.
+
+  Both verifiers write identical state, and the package tests check it against the example's committed state.
+- An approval that passed I8 authorizes its effect to go over the limit, so holds don't block it (a vector covers it).
+- Suite v0.3.0 is now 228 vectors (62 positive, 166 must-reject), 7 of them new; both verifiers agree on all 264 vectors of the three suites. JSON Schema and CDDL gain `reserve`.
+
 ## Worked example for FINOS AIGF #421 (unreleased, 2026-11-23)
 
 - **`interop/finos-aigf/case-421-family-office/`:** the family-office example of finos/ai-governance-framework#421 as seven signed packets. A client's USD 10M mandate is split across two banks; each bank signs what it booked and counts its own leg, and the client's verifier holds the total. The phases:
@@ -12,7 +31,7 @@ Specification drafts, conformance-suite versions and package versions are listed
   - reconciliation either way: the first instruction booked (`violated` I2, 14M) or never booked (`preserved`).
 
   Both reference verifiers agree on every phase, and the generator asserts each verdict. The FINOS mapping links it.
-- **Known limitation, recorded in the example's README:** across packets, verifier state does not yet carry an instruction with an unknown outcome forward, so a later packet can be `preserved` while an earlier slice is still unknown. Within one packet the verdict is already `unresolved`.
+- **A gap it found, now closed by holds (above):** across packets, verifier state didn't carry an instruction with an unknown outcome forward. Phases 8 and 9 now show the lost instruction held in a later batch, and then released by the bank's statement.
 
 ## Comparison with EMILIA Protocol's vectors (unreleased, 2026-11-23)
 

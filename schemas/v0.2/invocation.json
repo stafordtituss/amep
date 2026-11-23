@@ -66,6 +66,23 @@
    "type": "string",
    "pattern": "^[0-9a-f]{64}$"
   },
+  "reserve": {
+   "description": "The most this call can move in the unit (spec 5.8, 7.6 rule 6; v0.3).",
+   "type": "object",
+   "required": [
+    "amount",
+    "unit"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "amount": {
+     "$ref": "common.json#/$defs/amount"
+    },
+    "unit": {
+     "$ref": "common.json#/$defs/unit"
+    }
+   }
+  },
   "correlation": {
    "type": "object",
    "additionalProperties": false,

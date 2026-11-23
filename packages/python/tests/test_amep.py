@@ -222,3 +222,39 @@ class SvrStatementTest(unittest.TestCase):
             verdicts.verify_envelope(env, pub)
         both = (verdicts.PREDICATE_TYPE, verdicts.SVR_TYPE)
         self.assertEqual(verdicts.verify_envelope(env, pub, both)["predicateType"], verdicts.SVR_TYPE)
+
+
+class Holds(unittest.TestCase):
+    """Spec 7.6 rule 6 (v0.3): a call with an unknown outcome is held in verifier state until a later packet resolves it."""
+    CASE = os.path.join(HERE, "..", "..", "..", "interop", "finos-aigf", "case-421-family-office")
+
+    def load(self, name):
+        with open(os.path.join(self.CASE, name)) as fh:
+            return json.load(fh)
+
+    def test_lost_instruction_is_held_at_its_reserve(self):
+        st = self.load("state.json")
+        evaluate(self.load("4-lost-response.packet.json"), self.load("keys.json"), state=st)
+        self.assertEqual(st, self.load("8.state.json"))   # the same state the JavaScript verifier writes
+
+    def test_a_resolved_instruction_releases_its_hold(self):
+        st = self.load("9.state.json")
+        r = verdict(evaluate(self.load("9-next-batch-reconciled.packet.json"), self.load("keys.json"), state=st))
+        self.assertEqual((r.outcome, r.invariant), ("preserved", "-"))
+        self.assertEqual(st["held"], {})
+
+    def test_without_a_reserve_the_hold_is_unknown(self):
+        with open(os.path.join(VECTORS, "must-reject", "period-limit-carried-across-packets-in-verifier-state.json")) as fh:
+            v = json.load(fh)
+        with open(os.path.join(VECTORS, "keys.json")) as fh:
+            keys = json.load(fh)
+        p = {**v["packet"], "effects": []}
+        st = json.loads(json.dumps(v["state"]))
+        evaluate(p, keys, state=st)
+        (hold,) = st["held"].values()
+        self.assertEqual(hold, {"invocation": "i-1", "amounts": {"m-1|iso4217:EUR|2592000|0": None}})
+
+    def test_malformed_state_is_unresolved(self):
+        r = verdict(evaluate(self.load("1-within-mandate.packet.json"), self.load("keys.json"),
+                             state={**self.load("state.json"), "held": {"d": {"invocation": "i-x", "amounts": {"k": 5}}}}))
+        self.assertEqual((r.outcome, r.invariant), ("unresolved", "I7"))

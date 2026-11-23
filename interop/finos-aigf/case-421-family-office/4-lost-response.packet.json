@@ -119,6 +119,10 @@
    "interpretation_ref": "a-1",
    "actor": "agent:leg-a",
    "t": 10,
+   "reserve": {
+    "amount": "6000000.00",
+    "unit": "iso4217:USD"
+   },
    "declared": {
     "action": "trade.book",
     "resource": "inst:bank-a.example/portfolio/client-7",
@@ -128,7 +132,7 @@
     "kid": "family-office-orchestrator",
     "alg": "Ed25519",
     "v": 2,
-    "sig": "15041a7eeaefe5b9bff49cf9a4dc639a9dc98c5f816e626a63063323e75ded10b46c2bd3ba40fa25722d1561f7fb84987fdf8d78dbf2843243b3d6058f1b0e0e"
+    "sig": "95b7f5884e7152bc5ba918b13a9d0a70a9fcd5bdf315b3dbcfdb5eab602323b80257aa3ab314f8302001d7b28c32bb789c28b1321438cb18a82c1960bcbbaf0c"
    }
   },
   {
@@ -138,6 +142,10 @@
    "interpretation_ref": "a-1",
    "actor": "agent:leg-b",
    "t": 20,
+   "reserve": {
+    "amount": "4000000.00",
+    "unit": "iso4217:USD"
+   },
    "declared": {
     "action": "trade.book",
     "resource": "inst:bank-b.example/portfolio/client-7",
@@ -147,7 +155,7 @@
     "kid": "family-office-orchestrator",
     "alg": "Ed25519",
     "v": 2,
-    "sig": "8b047551b4bec38394234a312bd2012d222efba08b50179ffa8725f6c1becb40bfd18e1703219ead655207660fc17b655736f13c00478f6cc3926e86cbe7e100"
+    "sig": "e79e5ef35a82024e3b929e7b343ce332be7d1d62939830713938d23442cf1c3bada561dfbe064635e60fc3f0b593f74357a37d4e3fcb52d554aa50da4cffc40f"
    }
   }
  ],
@@ -158,7 +166,7 @@
    "invocation": "i-a1",
    "observed_by": "inst:bank-a.example",
    "assurance": "L3",
-   "invocation_digest": "e2d418e62d854ff9f5ad8c58f8f2e17fe89110295ae2978864742073311dbeb6",
+   "invocation_digest": "abab4832c500808ed5dcb643d634fc695d43e435702df8c8aa71dc8157e6d414",
    "executed": {
     "action": "trade.book",
     "resource": "inst:bank-a.example/portfolio/client-7",
@@ -177,7 +185,7 @@
     "kid": "inst:bank-a.example",
     "alg": "Ed25519",
     "v": 2,
-    "sig": "452f18e98c7c5b5df50c4a9802e9c86f5587f367da04512a6c270af6f0a4309736f29c3d7fad3cfcf7e05db559369cc07f4109bdbd343b5ee7e624203a8be50e"
+    "sig": "563d63b2fd86f9705f4ce3f9e08ddceed02b26dc34d9bdc4ed7c389278035a7bcb809deee4097124ff5f23c763043318c3307347140fefb4cd8f30a020d2c003"
    }
   }
  ],
@@ -190,12 +198,12 @@
    "disposition": "completed",
    "effect_count": 1,
    "t": 12,
-   "invocation_digest": "e2d418e62d854ff9f5ad8c58f8f2e17fe89110295ae2978864742073311dbeb6",
+   "invocation_digest": "abab4832c500808ed5dcb643d634fc695d43e435702df8c8aa71dc8157e6d414",
    "proof": {
     "kid": "inst:bank-a.example",
     "alg": "Ed25519",
     "v": 2,
-    "sig": "353679156af0f31c414a8b1081c172a0da64c6e22a76de1c54830b7b66426a4c659bb0658fd47032b636533c18ed6874758b54018cfd193b459e9e875077d70a"
+    "sig": "23ba8a12097594fd53defa2437681c26999ae17ae1d9f46f9e3e4713e63f773e4b82512653b720c6fd790c90ce83bf1d722f5b6b4d9e81c59d86ba67a5299d0e"
    }
   }
  ]

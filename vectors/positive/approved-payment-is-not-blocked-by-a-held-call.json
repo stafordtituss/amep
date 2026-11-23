@@ -1,0 +1,133 @@
+{
+ "name": "approved payment is not blocked by a held call",
+ "expect": {
+  "outcome": "preserved",
+  "invariant": "-"
+ },
+ "packet": {
+  "amep_version": "0.3",
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "payments.send"
+     ],
+     "resources": [
+      "payee:*"
+     ],
+     "ceiling": "financial",
+     "exp": 100,
+     "limits": [
+      {
+       "unit": "iso4217:EUR",
+       "per_period": "500.00",
+       "period": 2592000
+      }
+     ]
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "1a8d0b187ef7e67a9fb3f594c506513971bfe6817149fc28542b3fb4dee033e926240cdab3f86c0cf125bdeb45575bc7e05dd68c90a88799bc4974c730d01300"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "bank_api",
+    "version": "v3",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "5ef3ab9b00c0c17c6be94a9e2b23ec77097f763f0846dbf0939e36bfc7725c93a6392b0ee8ecc9c67d090be777cbba8877cfc4cdba4ad45cf00edd7e8686390b"
+    }
+   }
+  ],
+  "approvals": [
+   {
+    "id": "ap-1",
+    "kind": "approval",
+    "effect_digest": "af5d2abccbaa10c4c4399baf80573b7cfce5d62ff50aca0d0ed49006b79154e1",
+    "presence": "webauthn",
+    "expiry": 90,
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "ba631086c70a5e298b9ecbd9983e6b8fc279c129ccd34803c9ca3c3a045339bb98c278d30b4810406b11b7ad0702a21491cd3de7891e66594cf6782545c96a0f"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "m-1",
+    "interpretation_ref": "a-1",
+    "actor": "agent:payments-assistant",
+    "t": 19,
+    "declared": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial"
+    },
+    "approval_ref": "ap-1",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "dad91c4e9bb9dc44b22de143fa8e199f7afb5a43f9e3f9f3a689ecd951673b33a5e47a074f79855ee5aa6443656091cc125df1910efdfb92cb593eaa6648d404"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "service:bank.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial",
+     "released": [],
+     "t": 20,
+     "value": {
+      "amount": "100.00",
+      "unit": "iso4217:EUR"
+     }
+    },
+    "proof": {
+     "kid": "bank-observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "dfa777f79354b699c7dafe95682a7697cb39965aa0000331774a9bf03893686388a7e79e5af541c89345434dfb15e28ae9bc04f2b5ac65e7a866e6e4ede5d905"
+    }
+   }
+  ]
+ },
+ "state": {
+  "period_totals": {
+   "m-1|iso4217:EUR|2592000|0": "200.00"
+  },
+  "spent": {},
+  "approvals_used": {},
+  "held": {
+   "9ff5bc0f5f79905d42737c0bb3dc464e079f708a37454b9e7836e3f9c3110cfb": {
+    "invocation": "i-0",
+    "amounts": {
+     "m-1|iso4217:EUR|2592000|0": null
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,20 @@
+{
+ "period_totals": {
+  "m-1|iso4217:USD|1000|0": "6000000",
+  "d-a|iso4217:USD|1000|0": "6000000"
+ },
+ "spent": {
+  "m-1": 60,
+  "d-a": 60
+ },
+ "approvals_used": {},
+ "held": {
+  "59ca474ad7b7e1227dbdbbab153874955aa958c4ae776fff4210b6e66439951f": {
+   "invocation": "i-b1",
+   "amounts": {
+    "m-1|iso4217:USD|1000|0": "4000000.00",
+    "d-b|iso4217:USD|1000|0": "4000000.00"
+   }
+  }
+ }
+}

@@ -33,11 +33,14 @@ The verdict comes from the institutions' signed records:
 | `5-retried-after-loss` | As 4, and the agent retried leg B, which booked | MI-24 | `unresolved` I7, gap `receipt` for `i-b1`: the retry doesn't resolve the first instruction |
 | `6-reconciled-booked` | Reconciliation: bank B's records show the first instruction booked too | RI-24, MI-24 | `violated` I2: 14,000,000 in all |
 | `7-reconciled-not-booked` | Reconciliation: bank B signs that the first instruction never booked | MI-24 | `preserved`: 10,000,000 in all |
+| `8-next-batch-retry` | Checked in batches: phase 4 was one batch, and this later batch has only the retry. The verifier's state still holds the lost instruction at its 4M `reserve` | MI-24 | `unresolved` I7, gap `held_outcome` for `i-b1`: 10M booked plus 4M held could exceed 10M |
+| `9-next-batch-reconciled` | The next batch carries bank B's signed statement that the lost instruction never booked, which releases its hold | MI-24 | `preserved` |
 
-Phases 4 to 7 are the thread's confirm, reconcile and resolve lifecycle:
+Phases 4 to 9 are the thread's confirm, reconcile and resolve lifecycle:
 - **Confirm:** a leg counts as executed only with the institution's signed record, bound to the exact instruction.
 - **Unknown stays open:** phases 4 and 5 can't be `preserved` while an instruction has no outcome, even after a retry that booked.
 - **Resolve:** each outcome comes from the institution's record. If the first instruction booked, the retry made it 14M (phase 6). If it didn't, the client is at exactly 10M (phase 7).
+- **Unknown stays counted across batches:** when evidence arrives in batches, the lost instruction is held at the most it could move (its signed `reserve`) until a later batch resolves it (phases 8 and 9).
 
 The retry in phase 5 is also why the thread sends breaks to operations rather than to an automatic retry: phase 6 is what an automatic retry costs when the first instruction did book.
 
@@ -51,11 +54,14 @@ The retry in phase 5 is also why the thread sends breaks to operations rather th
   - over-allocation without over-spending is common and permitted (slices are allowances, not reservations, unless the mandate says otherwise);
   - a packet's assembler can leave a sibling delegation out, so a sum over the delegations present could pass when the real sum doesn't.
 - **A receiving institution's check** of its own slice (scoped, single-leg delegation, MI-22) is per hop, as in phase 3.
-- **Known limitation, across packets.**
-  - Within one packet, an instruction with no outcome keeps the verdict `unresolved`, as phases 4 and 5 show.
-  - Across packets, AMEP's verifier state does not yet carry the unknown instruction forward. If phase 4 is evaluated alone and the retry then arrives in a later packet on its own, the later packet is `preserved`, though the first instruction may have booked.
+- **Unknown outcomes across batches** (spec 7.6, rule 6). Building this example showed a gap.
+  - Within one packet, an instruction with no outcome already kept the verdict `unresolved`.
+  - Across packets, verifier state forgot it: a later packet holding only the retry came out `preserved`, though the first instruction might have booked.
 
-  That falls short of "a slice with an unknown outcome stays counted until reconciliation", and is to be fixed in AMEP's verifier state.
+  The thread's rule, "a slice with an unknown outcome stays counted until reconciliation", is now AMEP's:
+  - the verifier holds the instruction's `reserve` (or, without one, an unknown amount) against every period limit on its chain;
+  - a later total that could exceed the limit is `unresolved`, with gap `held_outcome`;
+  - the institution's receipt or `not_executed` statement releases the hold.
 
 ## Check it
 
@@ -65,7 +71,11 @@ From the repository root:
 python3 -I interop/finos-aigf/case-421-family-office/generate.py
 ```
 
-It regenerates every packet, `keys.json`, `state.json` and `verdicts.json`, and asserts each verdict. Each phase can also be checked on its own with either reference verifier:
+It regenerates every packet, `keys.json`, `verdicts.json` and the state each phase starts from, and asserts each verdict:
+- `state.json` for phases 1 to 7;
+- `8.state.json` and `9.state.json`, the state the verifier wrote after evaluating phase 4.
+
+Both reference verifiers write exactly that state. Each phase can also be checked on its own with either reference verifier. Use `8.state.json` or `9.state.json` for phases 8 and 9:
 
 ```bash
 amep-protocol verify interop/finos-aigf/case-421-family-office/2-over-partitioned.packet.json \

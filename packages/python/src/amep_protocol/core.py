@@ -464,6 +464,32 @@ def check_limits(lims) -> list:
     return lims
 
 
+def period_key(n: dict, lim: dict, unit: str, t) -> str:
+    """The running-total key of one limit window (spec 7.6): one total per limit, so limits that differ only in their
+    actions are separate caps (amep#10)."""
+    anchor = to_time(n["claims"]["nbf"]) if "nbf" in n["claims"] else 0
+    window = int((to_time(t) - anchor) // lim["period"])
+    return f"{n['id']}|{unit}|{lim['period']}|{window}" + (f"|{','.join(sorted(lim['actions']))}" if "actions" in lim else "")
+
+
+def check_reserve(r) -> dict:
+    """An invocation's reserve (spec 5.8, v0.3): {amount, unit}, the most the call can move in the unit."""
+    if not isinstance(r, dict) or set(r) != {"amount", "unit"}:
+        raise Malformed("reserve must be an object with exactly amount and unit")
+    amount_units(r["amount"], _unit(r["unit"]))
+    return r
+
+
+def held_of(state: dict) -> dict:
+    """Verifier state's holds (spec 10.7, v0.3): invocation digest -> {invocation, amounts: {period key: amount | None}}."""
+    h = state.get("held", {})
+    if not isinstance(h, dict) or not all(
+            isinstance(v, dict) and isinstance(v.get("invocation"), str) and isinstance(v.get("amounts"), dict)
+            and all(a is None or (isinstance(a, str) and AMOUNT.match(a)) for a in v["amounts"].values()) for v in h.values()):
+        raise Malformed("state.held must map invocation digests to {invocation, amounts}")
+    return h
+
+
 def limit_applies(lim: dict, x: dict) -> bool:
     """A limit with `actions` applies to effects whose action matches; without, to every financial effect."""
     if "actions" in lim:
@@ -553,6 +579,18 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
     spent: dict[str, int] = dict(state.get("spent", {}))
     totals: dict[str, int] = {k: amount_units(v) for k, v in state.get("period_totals", {}).items()}
     prior_windows = set(totals)
+    # spec 7.6 rule 6 (v0.3): holds for earlier invocations whose outcome was unknown. A packet that contains a held
+    # invocation decides it afresh, so its hold is set aside while this packet is evaluated, and never counted twice.
+    try:
+        held_in = held_of(state)
+    except Malformed as e:
+        return _all_unresolved(packet, f"malformed verifier state: {e}")
+    present = set()
+    for i in packet.get("invocations", []):
+        try:
+            present.add(digest(i))
+        except Exception:   # a malformed invocation is reported by its own evaluation
+            pass
     # approval id -> (invocation id, body digest) of its first use, including uses in earlier packets
     approval_use: dict[str, tuple] = {k: tuple(v) for k, v in state.get("approvals_used", {}).items()}
     out: list[Result] = []
@@ -573,7 +611,8 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
         if d.get("mode") == "quarantine" and d.get("phase") == "pre_execution" and d.get("invocation") in order:
             for f in d.get("quarantined", []):
                 quarantined[f] = min(quarantined.get(f, len(invocations)), order[d["invocation"]])
-    ctx = {"v03": v03, "totals": totals, "prior_windows": prior_windows}
+    ctx = {"v03": v03, "totals": totals, "prior_windows": prior_windows,
+           "held": {d: h for d, h in held_in.items() if d not in present}, "new_held": {}}
     for n, inv in enumerate(invocations):
         rid = inv.get("id", "?")
         try:
@@ -608,6 +647,9 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
     state["approvals_used"] = {k: list(v) for k, v in approval_use.items()}
     if totals:
         state["period_totals"] = {k: _units_str(v) for k, v in totals.items()}
+    held_out = {**ctx["held"], **ctx["new_held"]}
+    if held_out or "held" in state:
+        state["held"] = held_out
     return out
 
 
@@ -664,6 +706,11 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         for n in chain + ([intent] if intent else []):
             _check("grants" in n["claims"], "unresolved", "I7", f"{n['id']}: grants require amep_version 0.3",
                    need="well_formed_evidence", ref=n['id'])
+    if ctx["v03"] and "reserve" in inv:
+        try:
+            check_reserve(inv["reserve"])
+        except Malformed as e:
+            _check(True, "unresolved", "I7", f"{rid}: {e}", need="reserve", ref=rid)
     if ctx["v03"]:
         for n in chain + ([intent] if intent else []):
             unknown = sorted(k for k in n["claims"] if k not in CLAIM_MEMBERS and not is_extension_member(k))
@@ -750,7 +797,18 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         _check(hi and all(c.get("observed_by") == inv.get("actor") for c in stmts if c["disposition"] == "not_executed"),
                "unresolved", "I10", "high-impact call reported not executed only by the actor itself", need="independent_observer", ref=rid)
         return
-    # 11. effect receipts
+    # 11. effect receipts. With none and no not_executed statement, the call may still have moved value: hold its
+    # reserve (or an unknown amount) against every period limit on its chain that applies to it (spec 7.6 rule 6).
+    if not mine:
+        reserve = inv.get("reserve") if ctx["v03"] else None
+        amounts = {}
+        for n in limited:
+            for lim in n["claims"]["limits"]:
+                if "per_period" in lim and limit_applies(lim, inv["declared"]):
+                    same = reserve is not None and reserve["unit"] == lim["unit"]
+                    amounts[period_key(n, lim, lim["unit"], inv["t"])] = reserve["amount"] if same else None
+        if amounts:
+            ctx["new_held"][inv_digest] = {"invocation": rid, "amounts": amounts}
     _check(not mine, "unresolved", "I7", "no executed-effect receipt", need="receipt", ref=rid)
     high_impact = CEILING.index(inv["declared"]["effect"]) >= CEILING.index("write_shared")
     eff_claims = chain[0]["claims"]
@@ -862,10 +920,7 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
                        f"this call moves {_units_str(call_sum[i])} {unit}, over the per-call limit {lim.get('per_call')} of {n['id']}", blame="agent")
                 if "per_period" not in lim:
                     continue
-                anchor = to_time(n["claims"]["nbf"]) if "nbf" in n["claims"] else 0
-                window = int((to_time(x["t"]) - anchor) // lim["period"])
-                # one running total per limit (amep#10): limits that differ only in their actions are separate caps
-                key = f"{n['id']}|{unit}|{lim['period']}|{window}" + (f"|{','.join(sorted(lim['actions']))}" if "actions" in lim else "")
+                key = period_key(n, lim, unit, x["t"])
                 total = ctx["totals"].get(key, 0) + amt
                 # An observer's total is the principal's total only when that observer sees all of this node's spending
                 # in the unit: the limit names it in counted_by (amep#10). Other observers' totals never count.
@@ -878,6 +933,18 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
                        f"period total {_units_str(total)} {unit} exceeds the per-period limit {lim['per_period']} of {n['id']}", blame="agent")
                 _check(counted is None and key not in ctx["prior_windows"], "unresolved", "I7",
                        f"period total for {n['id']} cannot be established: no total from its counting observer and no earlier state", need="period_total", ref=n['id'])
+                # holds (spec 7.6 rule 6): an earlier call with an unknown outcome may already have spent part of this window
+                # An approval that passed I8 authorizes going over the limit for its effect, so holds don't block it.
+                holds = [(h["invocation"], h["amounts"][key]) for h in ctx["held"].values() if key in h["amounts"]]
+                if holds and not appr:
+                    unknown = [i for i, a in holds if a is None]
+                    _check(bool(unknown), "unresolved", "I7",
+                           f"the outcome of {unknown[0] if unknown else ''} is unknown, so the period total of {n['id']} cannot be bounded",
+                           need="held_outcome", ref=unknown[0] if unknown else "-")
+                    held_sum = sum(amount_units(a, unit) for _, a in holds)
+                    _check(total + held_sum > amount_units(lim["per_period"]), "unresolved", "I7",
+                           f"period total {_units_str(total)} {unit} plus {_units_str(held_sum)} held for {', '.join(i for i, _ in holds)} "
+                           f"would exceed the per-period limit {lim['per_period']} of {n['id']}", need="held_outcome", ref=holds[0][0])
                 ctx["totals"][key] = total
     # 17. risk budget: recorded spend must match receipts; over budget needs a bound approval
     c = sum(cost(x) for x, _, _ in effects_of)

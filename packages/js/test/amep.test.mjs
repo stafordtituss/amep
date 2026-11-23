@@ -152,3 +152,23 @@ test("SVR statement: preserved gets AMEP_VERDICT_PRESERVED, others none; signs a
   assert.throws(() => verdicts.verifyEnvelope(env, pub)); // by default only AMEP verdict statements are accepted
   assert.equal(verdicts.verifyEnvelope(env, pub, [verdicts.PREDICATE_TYPE, verdicts.SVR_TYPE]).predicateType, verdicts.SVR_TYPE);
 });
+
+// Spec 7.6 rule 6 (v0.3): a call with an unknown outcome is held in verifier state until a later packet resolves it.
+test("holds: a lost instruction is held at its reserve, released when resolved, unknown without a reserve", () => {
+  const CASE = join(here, "..", "..", "..", "interop", "finos-aigf", "case-421-family-office");
+  const load = f => JSON.parse(readFileSync(join(CASE, f), "utf8"));
+  const keys = load("keys.json");
+  const st = load("state.json");
+  evaluate(load("4-lost-response.packet.json"), keys, sigOk, [], st);
+  assert.deepEqual(st, load("8.state.json"));   // the same state the Python verifier writes
+  const st9 = load("9.state.json");
+  const r = verdict(evaluate(load("9-next-batch-reconciled.packet.json"), keys, sigOk, [], st9));
+  assert.deepEqual([r.outcome, r.invariant], ["preserved", "-"]);
+  assert.deepEqual(st9.held, {});
+  const v = JSON.parse(readFileSync(join(VECTORS, "must-reject", "period-limit-carried-across-packets-in-verifier-state.json"), "utf8"));
+  const sv = structuredClone(v.state);
+  evaluate({ ...v.packet, effects: [] }, JSON.parse(readFileSync(join(VECTORS, "keys.json"), "utf8")), sigOk, [], sv);
+  assert.deepEqual(Object.values(sv.held), [{ invocation: "i-1", amounts: { "m-1|iso4217:EUR|2592000|0": null } }]);
+  const bad = verdict(evaluate(load("1-within-mandate.packet.json"), keys, sigOk, [], { ...load("state.json"), held: { d: { invocation: "i-x", amounts: { k: 5 } } } }));
+  assert.deepEqual([bad.outcome, bad.invariant], ["unresolved", "I7"]);
+});

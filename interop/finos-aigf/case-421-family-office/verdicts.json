@@ -71,5 +71,28 @@
   "blame": null,
   "gaps": [],
   "reason": "continuity preserved"
+ },
+ {
+  "phase": "8-next-batch-retry",
+  "title": "A later batch with only the retry: the lost 4M instruction is still held against both totals",
+  "outcome": "unresolved",
+  "invariant": "I7",
+  "blame": null,
+  "gaps": [
+   {
+    "need": "held_outcome",
+    "ref": "i-b1"
+   }
+  ],
+  "reason": "period total 10000000 iso4217:USD plus 4000000 held for i-b1 would exceed the per-period limit 10000000.00 of m-1"
+ },
+ {
+  "phase": "9-next-batch-reconciled",
+  "title": "A later batch with bank B's statement that the lost instruction never booked, and the retry",
+  "outcome": "preserved",
+  "invariant": "-",
+  "blame": null,
+  "gaps": [],
+  "reason": "continuity preserved"
  }
 ]

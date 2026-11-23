@@ -17,10 +17,16 @@ Phases (expected verdicts are asserted as the files are written):
   5-retried-after-loss    as 4, and the agent retried leg B, which booked               unresolved I7 (receipt)
   6-reconciled-booked     institution B's record shows the first instruction booked too  violated I2
   7-reconciled-not-booked institution B signs that the first instruction never booked    preserved
+  8-next-batch-retry      checked in batches: phase 4 was one batch, and this one has only the retry.
+                          The lost instruction is still held at its 4M reserve               unresolved I7 (held_outcome)
+  9-next-batch-reconciled the next batch carries bank B's statement that the lost
+                          instruction never booked, which releases its hold                 preserved
 
 Run from the repository root:  python3 -I interop/finos-aigf/case-421-family-office/generate.py
-It writes the packets, their verifier state, keys.json and verdicts.json, and fails if any verdict is not the expected
-one. All keys are deterministic test keys.
+It writes the packets, keys.json, verdicts.json and the verifier state each phase starts from: state.json for phases 1
+to 7 (the client's verifier holds every leg from the start of the window), and 8.state.json and 9.state.json, which are
+the state the verifier wrote after evaluating phase 4. It fails if any verdict is not the expected one. All keys are
+deterministic test keys.
 """
 from __future__ import annotations
 
@@ -62,9 +68,9 @@ def build():
                                        "limits": [{"unit": USD, "per_period": cap, "period": PERIOD,
                                                    "counted_by": INST[inst]}]}}, v=2)
 
-    def instruction(n, under, inst, t):
+    def instruction(n, under, inst, t, reserve):
         return office.sign({"id": f"i-{n}", "kind": "invocation", "authority_ref": under, "interpretation_ref": "a-1",
-                            "actor": f"agent:leg-{inst}", "t": t,
+                            "actor": f"agent:leg-{inst}", "t": t, "reserve": {"amount": reserve, "unit": USD},
                             "declared": {"action": "trade.book", "resource": f"{INST[inst]}/portfolio/client-7",
                                          "effect": "financial"}}, v=2)
 
@@ -95,7 +101,7 @@ def build():
                 "invocations": invocations, "effects": effects, "call_statements": statements}
 
     dA, dB = leg("a", "a", LEG_A), leg("b", "b", LEG_B)
-    iA, iB = instruction("a1", "d-a", "a", 10), instruction("b1", "d-b", "b", 20)
+    iA, iB = instruction("a1", "d-a", "a", 10, LEG_A), instruction("b1", "d-b", "b", 20, LEG_B)
     bookedA, bookedB = booked(iA, "a", LEG_A, LEG_A), booked(iB, "b", LEG_B, LEG_B)
 
     # 2: each slice is narrower than the mandate on its own, but the slices add up to more than it
@@ -104,10 +110,10 @@ def build():
 
     # 3: the plan changes, and a leg is delegated to an institution the client never named
     dC = leg("c", "c", LEG_B)
-    iC = instruction("c1", "d-c", "c", 20)
+    iC = instruction("c1", "d-c", "c", 20, LEG_B)
 
     # 4 to 7: leg B's first instruction gets no response; the agent retries it
-    iB2 = instruction("b2", "d-b", "b", 40)
+    iB2 = instruction("b2", "d-b", "b", 40, LEG_B)
     retryB = booked(iB2, "b", LEG_B, LEG_B)                    # institution B's total, counting only the retry
     bothB = booked(iB, "b", LEG_B, LEG_B)                      # the first instruction did book, at t 21
     retryB_after = booked(iB2, "b", LEG_B, "8000000.00")       # so B's own total after the retry is 8M
@@ -127,6 +133,11 @@ def build():
          packet([dA, dB], [iA, iB, iB2], [bookedA, bothB, retryB_after]), ("violated", "I2")),
         ("7-reconciled-not-booked", "Reconciliation: bank B signs that the first instruction never booked (10M in all)",
          packet([dA, dB], [iA, iB, iB2], [bookedA, never_booked(iB, "b"), retryB]), ("preserved", "-")),
+        # Batches: phase 4 is evaluated first, and these start from the state that evaluation wrote (spec 7.6 rule 6)
+        ("8-next-batch-retry", "A later batch with only the retry: the lost 4M instruction is still held against both totals",
+         packet([dA, dB], [iB2], [retryB]), ("unresolved", "I7")),
+        ("9-next-batch-reconciled", "A later batch with bank B's statement that the lost instruction never booked, and the retry",
+         packet([dA, dB], [iB, iB2], [never_booked(iB, "b"), retryB]), ("preserved", "-")),
     ]
     return keys, phases
 
@@ -144,12 +155,21 @@ def main():
     with open(os.path.join(HERE, "state.json"), "w") as fh:
         json.dump(state(), fh, indent=1)
         fh.write("\n")
+    # the state the client's verifier writes after evaluating phase 4 as one batch: it holds the lost instruction
+    after4 = state()
+    phase4 = next(p for n, _, p, _ in phases if n == "4-lost-response")
+    evaluate(json.loads(json.dumps(phase4)), keys, state=after4)
+    starts = {"8-next-batch-retry": after4, "9-next-batch-reconciled": after4}
+    for name, st in starts.items():
+        with open(os.path.join(HERE, f"{name.split('-')[0]}.state.json"), "w") as fh:
+            json.dump(st, fh, indent=1)
+            fh.write("\n")
     summary = []
     for name, title, p, expected in phases:
         text = json.dumps(p, indent=1) + "\n"
         with open(os.path.join(HERE, f"{name}.packet.json"), "w") as fh:
             fh.write(text)
-        results = evaluate(json.loads(text), keys, state=state())
+        results = evaluate(json.loads(text), keys, state=json.loads(json.dumps(starts.get(name, state()))))
         v = verdict(results)
         assert (v.outcome, v.invariant) == expected, (name, v.outcome, v.invariant, v.reason)
         summary.append({"phase": name, "title": title, "outcome": v.outcome, "invariant": v.invariant, "blame": v.blame,

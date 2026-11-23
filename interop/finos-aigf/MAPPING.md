@@ -63,7 +63,7 @@ Corrections welcome, especially where a risk is mapped too broadly, a vector doe
 
 ## Worked example: the family office of #421
 
-[`case-421-family-office/`](case-421-family-office/) puts the cross-institution example of [finos/ai-governance-framework#421](https://github.com/finos/ai-governance-framework/issues/421) into seven signed packets. A client's 10M mandate is split across two banks, and the phases run from a plan within the mandate to a confirm, reconcile and resolve lifecycle after a lost response. Each phase has the verdict both reference verifiers compute, mapped to RI-24, RI-28, MI-18, MI-22 and MI-24.
+[`case-421-family-office/`](case-421-family-office/) puts the cross-institution example of [finos/ai-governance-framework#421](https://github.com/finos/ai-governance-framework/issues/421) into nine signed packets. A client's 10M mandate is split across two banks, and the phases run from a plan within the mandate to a confirm, reconcile and resolve lifecycle after a lost response, including when evidence arrives in batches. Each phase has the verdict both reference verifiers compute, mapped to RI-24, RI-28, MI-18, MI-22 and MI-24.
 
 ## Results of the cited vectors
 

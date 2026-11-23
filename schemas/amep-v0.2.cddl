@@ -143,6 +143,7 @@ invocation = {                                 ; [host]
   ? derived_from: [* ref]                      ; earlier invocations whose outputs fed this one (spec 5.9.1)
   ? budget_spent: uint
   ? args_digest: hex-digest                    ; SHA-256 of JCS(arguments sent) (spec 5.14)
+  ? reserve: { amount: amount, unit: unit }    ; the most this call can move (spec 5.8, 7.6 rule 6; v0.3)
   ? correlation: { ? session_ref: tstr, ? prompt_ref: tstr, ? tool_use_ref: tstr, ? traceparent: tstr }
   ? proof: proof
   * extension-key => any

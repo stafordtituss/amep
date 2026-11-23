@@ -178,6 +178,9 @@ EQUIVALENT = {
     # v0.3 grants: with no grant matching the action, the next check (no matching grant also permits the resource)
     # fails too, with the same outcome and invariant; this one is kept for the clearer reason.
     'if not act: return False, "action outside claims"',
+    # v0.3 holds (spec 7.6 rule 6): without the unknown-amount check, the sum that follows reads the unknown (null)
+    # amount and raises, which evaluate() turns into the same unresolved (I7). Kept for the gap it names (held_outcome).
+    '_check(bool(unknown), "unresolved", "I7",',
 }
 
 
