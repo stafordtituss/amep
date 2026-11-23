@@ -127,7 +127,12 @@ export function readReceipt(jwt, processorJwk) {
  */
 export function analyseBundle(bundle, trust) {
   const gaps = new Set();
-  const hops = (bundle.chains ?? []).map(splitChain);
+  // The same closed mandate presented more than once is one authorization, not several (AP2 #346: a verifier that
+  // doesn't remember acceptance can be shown it twice). It becomes one payment, with every receipt that references it.
+  const seen = new Map();
+  for (const ch of bundle.chains ?? []) seen.set(ch, (seen.get(ch) ?? 0) + 1);
+  const hops = [...seen.keys()].map(splitChain);
+  const presentations = [...seen.values()];
   const opens = new Set(hops.map(h => h[0]));
   const open = readSdJwt(hops[0]?.[0] ?? "", trust.userJwk);
   if (opens.size !== 1) open.checks.push(["one open mandate across the bundle", false, `${opens.size} different open mandates`]);
@@ -147,7 +152,9 @@ export function analyseBundle(bundle, trust) {
     const receipts = (bundle.receipts ?? []).map(j => readReceipt(j, trust.processorJwk))
       .filter(x => [refs.sdk, refs.spec].includes(x.claims?.reference))
       .map(x => ({ ...x, referenceRule: x.claims.reference === refs.sdk ? "closed issuer JWT (AP2 SDK)" : "closed presentation (spec text)" }));
-    return { n, closed: r, hash: refs.sdk, refs, receipts };
+    if (receipts.filter(x => x.claims?.status === "Success").length > 1)
+      r.checks.push(["one Success receipt per closed mandate", true, `${receipts.length} receipts reference this closed mandate (presented ${presentations[n]} time(s)): more than one payment under one consent (AP2 #346)`]);
+    return { n, closed: r, hash: refs.sdk, refs, receipts, presentations: presentations[n] };
   });
   const orphanReceipts = (bundle.receipts ?? []).map(j => readReceipt(j, trust.processorJwk))
     .filter(x => !payments.some(p => [p.refs.sdk, p.refs.spec].includes(x.claims?.reference)));

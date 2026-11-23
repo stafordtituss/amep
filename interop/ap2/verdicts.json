@@ -5,7 +5,7 @@
  "families": {
   "sdk": {
    "fixture": "packages/conformance/test/fixtures/ap2/sdk-bundles.json",
-   "fixture_sha256": "34ff708e1d26314314c0de477c339726159fbc656dbf1b889a72da0800dd0024",
+   "fixture_sha256": "7e1dd6d97003d11f61ee2b60625bc1fff282d9a5f1eaa7426b276bbd3140b61f",
    "vectors": {
     "sdk-within": {
      "ap2_checks_failed": [],
@@ -145,12 +145,30 @@
       "outcome": "preserved",
       "invariant": "-"
      }
+    },
+    "sdk-redeemed-twice": {
+     "ap2_checks_failed": [],
+     "mapping_problems": [],
+     "payments": [
+      {
+       "payment": 1,
+       "transaction_id": "txn-1",
+       "outcome": "violated",
+       "invariant": "I2",
+       "blame": "agent",
+       "gaps": []
+      }
+     ],
+     "verdict": {
+      "outcome": "violated",
+      "invariant": "I2"
+     }
     }
    }
   },
   "synthetic": {
    "fixture": "packages/conformance/test/fixtures/ap2/bundles.json",
-   "fixture_sha256": "0769e73f719434c469a65c39b06b57da366631e3104848c82cb3c03453c3d2ad",
+   "fixture_sha256": "bd530228cb9880d33f49016ab85f426a6c0e9668f3b6e47734b4aa779a71c4fc",
    "vectors": {
     "s1-within": {
      "ap2_checks_failed": [],
@@ -321,6 +339,42 @@
      "verdict": {
       "outcome": "unresolved",
       "invariant": "I7"
+     }
+    },
+    "s10-redeemed-twice": {
+     "ap2_checks_failed": [],
+     "mapping_problems": [],
+     "payments": [
+      {
+       "payment": 1,
+       "transaction_id": "txn-1",
+       "outcome": "violated",
+       "invariant": "I2",
+       "blame": "agent",
+       "gaps": []
+      }
+     ],
+     "verdict": {
+      "outcome": "violated",
+      "invariant": "I2"
+     }
+    },
+    "s11-redeemed-twice-small": {
+     "ap2_checks_failed": [],
+     "mapping_problems": [],
+     "payments": [
+      {
+       "payment": 1,
+       "transaction_id": "txn-1",
+       "outcome": "violated",
+       "invariant": "I2",
+       "blame": "agent",
+       "gaps": []
+      }
+     ],
+     "verdict": {
+      "outcome": "violated",
+      "invariant": "I2"
      }
     },
     "s9-unknown-then-second": {

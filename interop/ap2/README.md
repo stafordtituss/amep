@@ -38,6 +38,24 @@ The table is in [COMPARISON.md](COMPARISON.md), regenerated and checked by `node
 
 Where AP2's own checks would refuse a payment (`s2` over range, `s3` wrong payee), AMEP independently finds the processed payment `violated`, with blame on the agent. That's the after-the-fact check a dispute needs when a payment slipped through. AP2's credential provider rejects these closed mandates beforehand, so the scenarios assume it didn't.
 
+## Where AMEP goes further than AP2
+
+Each row is a result on the bundles here, most of them produced by AP2's own SDK:
+
+| Question a dispute asks | AP2 (spec and SDK at `e1ea56d`) | AMEP | Evidence |
+|---|---|---|---|
+| Did the processed payment stay within the mandate? | Checked **before** payment; the dispute procedure re-verifies artifacts and leaves resolution out of scope | Decided **afterwards**, per payment, by a party that signed none of it: `preserved`, `violated` with blame, or `unresolved` naming the missing record | every scenario |
+| Was the budget respected across payments? | The verifier must supply past spend itself (`MandateContext.total_amount`); without it, "Missing mandate context" | Recomputed from the processors' signed receipts, so anyone holding the evidence can recompute it | `s6`, `sdk-budget` |
+| What about a payment whose outcome is unknown? | Not addressed | Its amount is held: a later payment that would breach the budget if the first went through is `unresolved`, never `preserved` | `s9` |
+| One consent redeemed twice (AP2 #346)? | The SDK's verifier accepts the identical chain again; both receipts carry the same reference | Each closed mandate becomes an AMEP intent limited to its own payee and amount per call, so a second execution under it is `violated` (I2) even when the total fits every limit | `s10`, `s11`, `sdk-redeemed-twice` |
+| Is the receipt bound to this payment? | Two rules (#405); the SDK's binds by digest, the spec's describes a hash nobody computes | Accepts either and reports which matched; a missing or misbound receipt leaves the payment `unresolved` | `s5`, `s7` |
+| Was the mandate altered after signing? | Rejected by verification | `unresolved`, with the signature gap's cause (`missing`) | `s8` |
+| Can a second party check the conclusion? | No verdict format | Signed, re-derivable verdict records (spec 10.8), byte-identical across two implementations | `verdicts.json` |
+
+**What AP2 does that AMEP relies on rather than replaces:** checking signatures, disclosures and constraints before payment, and issuing receipts. AMEP adds the decision afterwards; it doesn't stand between the agent and the processor.
+
+**Blame for a double redemption** names the agent's call, the authority it exceeded. AP2's records don't show whether the second presentation came from the agent or from someone replaying it.
+
 ## Limits, stated plainly
 
 - **Checked against AP2's own SDK.** `make_sdk_bundles.py` produces seven bundles with AP2's Python SDK (github.com/google-agentic-commerce/AP2, `code/sdk/python`, commit `e1ea56d`), stored in `packages/conformance/test/fixtures/ap2/sdk-bundles.json`.

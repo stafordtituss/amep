@@ -2,6 +2,13 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## AP2: one consent redeemed twice is caught afterwards (unreleased, 2026-11-24)
+
+- **Each closed payment mandate becomes an AMEP intent** limited to its own payee and amount per call. The same closed mandate presented and processed twice (AP2 #346, which the SDK's verifier accepts) is `violated` (I2), even when the total stays within every limit of the open mandate.
+- **New scenarios:** `s10`, `s11` and an SDK-produced `sdk-redeemed-twice`.
+- **The README** gains "Where AMEP goes further than AP2", row by row with its evidence.
+- **`interop/ap2/verdicts.json`** is AMEP's pinned column for the AER-1 crosswalk on AP2 #402.
+
 ## AP2 payments, evaluated afterwards (unreleased, 2026-11-23)
 
 - `packages/conformance/src/profiles/ap2.mjs` reads Google's Agent Payments Protocol (AP2) artifacts and checks them by AP2's own rules: ES256 signatures, SD-JWT disclosures, the closed mandate's `sd_hash`, and receipt references. It builds AMEP evidence from them: the open mandate becomes the authority, each closed mandate an invocation with its amount as `reserve`, and each signed receipt an effect or a `not_executed` statement.

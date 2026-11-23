@@ -87,6 +87,10 @@ const SCENARIOS = [
     claims[1].payment_amount.amount = 9900;
     const forged = `${head}~~${jwt}~${b64u(JSON.stringify(claims))}~`;
     return { closed: [forged], receipts: [receipt(forged, 1)] }; }],
+  ["s10-redeemed-twice", "The same closed mandate (150.00) is presented twice and processed twice (AP2 #346)", o => {
+    const c = closedMandate(o, 1, { amount: 15000 }); return { closed: [c, c], receipts: [receipt(c, 1), receipt(c, 2)] }; }],
+  ["s11-redeemed-twice-small", "The same closed mandate (50.00) is presented twice and processed twice; the total stays within every limit", o => {
+    const c = closedMandate(o, 1, { amount: 5000 }); return { closed: [c, c], receipts: [receipt(c, 1), receipt(c, 2)] }; }],
   ["s9-unknown-then-second", "The first payment's outcome is unknown; a second (150.00) would take the budget over if the first went through", o => {
     const a = closedMandate(o, 1), b = closedMandate(o, 2, { amount: 15000 }); return { closed: [a, b], receipts: [receipt(b, 2)] }; }],
 ];
@@ -125,11 +129,22 @@ export function amepOf(an) {
   for (const p of an.payments) {
     const c = p.closed.claims ?? {};
     const value = { amount: majorUnits(c.payment_amount?.amount, c.payment_amount?.currency), unit: `iso4217:${c.payment_amount?.currency}` };
-    const inv = { id: `i-${p.n + 1}`, kind: "invocation", authority_ref: "m-1", interpretation_ref: "a-1", actor: "ap2-agent", t: c.iat ?? T0,
+    // The closed mandate authorizes one payment: this payee, this amount. As an AMEP intent (spec 5.6, "narrows a mandate
+    // to what was asked in one request") its own amount becomes the per-call limit, so a second execution under the same
+    // closed mandate (AP2 #346) exceeds it, even when the total stays inside the open mandate's limits.
+    const signedOk = p.closed.checks.every(x => x[1]);
+    let intentRef = {};
+    if (signedOk && value.amount && claims.exp) {
+      objs.intents ??= [];
+      objs.intents.push(H.sign({ id: `n-${p.n + 1}`, kind: "intent", prompt_ref: `ap2-closed:${p.hash}`, claims: {
+        actions: ["payments.send"], resources: [`payee:${c.payee?.id}`], ceiling: "financial", exp: claims.exp,
+        limits: [{ unit: value.unit, per_call: value.amount }] } }, { v: 2 }));
+      intentRef = { intent_ref: `n-${p.n + 1}` };
+    }
+    const inv = { id: `i-${p.n + 1}`, kind: "invocation", authority_ref: "m-1", interpretation_ref: "a-1", ...intentRef, actor: "ap2-agent", t: c.iat ?? T0,
       declared: { action: "payments.send", resource: `payee:${c.payee?.id}`, effect: "financial" },
       ...(value.amount ? { reserve: value } : {}), "x-ap2": { transaction_id: c.transaction_id, closed_hash: p.hash } };
     // the importer signs only what passed AP2's own checks; anything else stays unsigned, so AMEP can't rely on it
-    const signedOk = p.closed.checks.every(x => x[1]);
     const invObj = signedOk ? H.sign(inv, { v: 2 }) : inv;
     objs.invocations.push(invObj);
     for (const [k, r] of p.receipts.entries()) {
@@ -150,7 +165,7 @@ export function amepOf(an) {
   // Payments are evaluated as they settle: one packet per payment, in order, with verifier state carried between them
   // (spec 10.7), so an earlier payment's total, or its hold when its outcome is unknown, counts for the later ones.
   const packets = objs.invocations.map(inv => ({ amep_version: "0.3", delegations: [], mandates: objs.mandates,
-    interpretations: objs.interpretations, invocations: [inv], effects: objs.effects.filter(e => e.invocation === inv.id),
+    interpretations: objs.interpretations, intents: (objs.intents ?? []).filter(n => n.id === inv.intent_ref), invocations: [inv], effects: objs.effects.filter(e => e.invocation === inv.id),
     call_statements: objs.call_statements.filter(c => c.invocation === inv.id) }));
   const results = packets.flatMap(pk => evaluate(pk, AMEP_KEYS, sigOk, [], state));
   return { packets, problems, results, verdict: verdict(results) };

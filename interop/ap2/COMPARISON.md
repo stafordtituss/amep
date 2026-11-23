@@ -16,6 +16,8 @@ Open mandate in every scenario: payee `merchant_1` only, `amount_range` max 200.
 | `s6-budget`: Two payments, each within amount_range, together over the budget (199.00 + 150.00 > 300.00) | pass | accept<br>accept | Success<br>Success | violated I2 (blame agent) | i-1: preserved -<br>i-2: violated I2 (blame agent) |
 | `s7-receipt-for-another-mandate`: The only receipt references a different mandate | pass | accept | none (+1 for another mandate) | unresolved I7 (receipt i-1) | i-1: unresolved I7 (receipt i-1) |
 | `s8-altered-amount`: The closed mandate's amount was changed after the agent signed it | fail: every referenced disclosure present; vct mandate.payment.1 | reject: the closed mandate fails AP2's artifact checks | Success | unresolved I7 (signature i-1, missing) | i-1: unresolved I7 (signature i-1, missing) |
+| `s10-redeemed-twice`: The same closed mandate (150.00) is presented twice and processed twice (AP2 #346) | pass | accept | Success+Success | violated I2 (blame agent) | i-1: violated I2 (blame agent) |
+| `s11-redeemed-twice-small`: The same closed mandate (50.00) is presented twice and processed twice; the total stays within every limit | pass | accept | Success+Success | violated I2 (blame agent) | i-1: violated I2 (blame agent) |
 | `s9-unknown-then-second`: The first payment's outcome is unknown; a second (150.00) would take the budget over if the first went through | pass | accept<br>accept | none<br>Success | unresolved I7 (receipt i-1) | i-1: unresolved I7 (receipt i-1)<br>i-2: unresolved I7 (held_outcome i-1) |
 
 ## What the profile can't evaluate

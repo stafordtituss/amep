@@ -2,7 +2,8 @@
 profile can be checked against real SDK output. Writes JSON to the path given as argv[1].
 
 Scenarios mirror interop/ap2/compare.mjs where the SDK lets us build them honestly:
-  sdk-within, sdk-over-range, sdk-wrong-payee, sdk-declined, sdk-lost-receipt, sdk-budget, sdk-issuer-jwt-hash.
+  sdk-within, sdk-over-range, sdk-wrong-payee, sdk-declined, sdk-lost-receipt, sdk-budget, sdk-issuer-jwt-hash,
+  sdk-redeemed-twice.
 """
 import json
 import sys
@@ -70,6 +71,8 @@ pm, c = closed(1); bundles["sdk-lost-receipt"] = {"chains": [c], "receipts": []}
 pa, ca = closed(1); pb, cb = closed(2, amount=15000)
 bundles["sdk-budget"] = {"chains": [ca, cb], "receipts": [receipt(pa, ca), receipt(pb, cb)]}
 pm, c = closed(1, hash_mode="issuer_jwt_hash"); bundles["sdk-issuer-jwt-hash"] = {"chains": [c], "receipts": [receipt(pm, c)]}
+# AP2 #346: the identical closed mandate presented twice, and processed twice (the SDK's verifier accepts both)
+pm, c = closed(1, amount=5000); bundles["sdk-redeemed-twice"] = {"chains": [c, c], "receipts": [receipt(pm, c), receipt(pm, c)]}
 
 # the SDK's own verdict on each chain, for the record: verify, then evaluate the open mandate's constraints
 from ap2.sdk.payment_mandate_chain import PaymentMandateChain  # noqa: E402

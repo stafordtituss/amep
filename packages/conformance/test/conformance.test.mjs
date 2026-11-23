@@ -496,6 +496,7 @@ describe("profile: AP2 (Agent Payments Protocol)", () => {
       "s5-lost-receipt": "unresolved I7 receipt", "s6-budget": "preserved -, violated I2",
       "s7-receipt-for-another-mandate": "unresolved I7 receipt", "s8-altered-amount": "unresolved I7 signature",
       "s9-unknown-then-second": "unresolved I7 receipt, unresolved I7 held_outcome",
+      "s10-redeemed-twice": "violated I2", "s11-redeemed-twice-small": "violated I2",
     });
   });
 });
@@ -517,6 +518,7 @@ describe("profile: AP2, on bundles produced by AP2's own Python SDK (e1ea56d)", 
     assert.deepEqual(got, {
       "sdk-within": "preserved -", "sdk-over-range": "violated I2", "sdk-wrong-payee": "violated I2", "sdk-declined": "preserved -",
       "sdk-lost-receipt": "unresolved I7", "sdk-budget": "preserved -, violated I2", "sdk-issuer-jwt-hash": "preserved -",
+      "sdk-redeemed-twice": "violated I2",
     });
   });
 });
