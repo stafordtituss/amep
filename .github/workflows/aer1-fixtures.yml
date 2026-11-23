@@ -1,0 +1,43 @@
+name: aer1-fixtures
+
+# Reruns Brennan Zambo's two AER-1 fixtures against the expectations committed in
+# 5f59f88 (interop/aer1-fixtures/EXPECTED.md), twice: on the in-repo verifier, and
+# on the released @stafordtituss/amep from npm. Kept apart from the core conformance
+# job because it fetches the fixtures from the AER-1 hub: an outage there should not
+# block the core suite. Exit 2 means a fixture changed upstream, not a regression.
+
+on:
+  push:
+    paths:
+      - "packages/conformance/**"
+      - "packages/js/**"
+      - "interop/aer1-fixtures/**"
+      - ".github/workflows/aer1-fixtures.yml"
+  pull_request:
+    paths:
+      - "packages/conformance/**"
+      - "packages/js/**"
+      - "interop/aer1-fixtures/**"
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rerun:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: In-repo verifier
+        run: |
+          (cd packages/conformance && npm install --no-audit --no-fund)
+          node interop/aer1-fixtures/regress.mjs
+      - name: Released verifier, @stafordtituss/amep 0.3.0-alpha.2
+        run: |
+          (cd packages/conformance && npm pkg set "dependencies.@stafordtituss/amep=0.3.0-alpha.2" && npm install --no-audit --no-fund)
+          node interop/aer1-fixtures/regress.mjs --amep 0.3.0-alpha.2
