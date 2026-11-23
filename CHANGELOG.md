@@ -2,6 +2,21 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## Held approvals (unreleased, 2026-11-23)
+
+- **An approval cited by a call whose outcome is unknown is held** (spec 5.10, held approvals). That's a call that has neither receipts nor a `not_executed` statement.
+  - **While the approval is held,** another call under it is `unresolved` (I7), with gap `held_outcome` naming the first call, instead of `preserved`.
+  - **A later packet decides the first call afresh:**
+    - receipts make a second use `violated` (I8), as before;
+    - a `not_executed` statement releases the approval.
+  - **Holds carry across packets** in verifier state, as `approvals_held`.
+  - **Checks that decide `violated` still come first,** so a hold never hides a violation.
+- **The gap it closes.** Found while writing Takao Sato's VATE case 2 (accepted work interrupted, openid/authzen#795) as AMEP evidence. A second runtime re-ran an interrupted operation under the same single-use admission, and the re-run came out `preserved` while the first outcome was unknown. Released 0.3.0a2 still gives `preserved` on the new vector `approval-held-for-an-earlier-call-with-an-unknown-outcome`. It's the approval counterpart of held limits (spec 7.6, rule 6).
+- **Five new core vectors** (one positive, four must-reject):
+  - the core suite now has 238 vectors, 274 across the three suites;
+  - no existing vector changes its verdict;
+  - both verifiers produce byte-identical statements on all 274.
+
 ## Signature gaps say why (unreleased, 2026-11-23)
 
 - A gap for a refused signature (`signature`, `receipt_signature`, `call_statement_signature`, `revocation_signature`) now carries `cause`:
@@ -12,6 +27,7 @@ Specification drafts, conformance-suite versions and package versions are listed
 
   Both verifiers determine it in the same fixed order (spec 10.5.1). Before, an attacker's key, a host key minting a mandate and a tampered body all gave the same gap. Outcomes and invariants are unchanged. Verdict statements gain the member on those gaps, and both verifiers still produce byte-identical statements over all 269 vectors.
 - Found while filling in AMEP's row for UC-03 of the W3C AIKR case library (w3c-cg/aikr#45).
+- Vectors record only the outcome and the deciding invariant, so the causes are pinned by tests in both packages (`SignatureCause`, and "a signature gap says why"), and `tools/compare_verifiers.py` checks that the two verifiers agree on every gap.
 
 ## AER-1 regression check (2026-11-23)
 

@@ -917,6 +917,48 @@ def vectors():
     held("held call later shown executed counts toward the limit", ("violated", "I2"), earlier="executed")
     held("reserve with a numeric amount", ("unresolved", "I7"), held_amount="150.00", reserve={"amount": 100, "unit": "iso4217:EUR"})
     held("approved payment is not blocked by a held call", ("preserved", "-"), held_amount=None, approved=True)
+
+    # 10. Held approvals (spec 5.10, v0.3). From Takao Sato's VATE case 2, accepted work interrupted (openid/authzen#795):
+    # an earlier call (i-0) cited approval ap-1 and its outcome is unknown, so verifier state holds ap-1 for it. A second
+    # call under the same single-use approval must not come out preserved until i-0's outcome is known.
+    def appr_case(p, state, earlier=None, other_body=False, bad_state=False):
+        """earlier: None (i-0 only in state), "not_executed" or "executed" (i-0 is in this packet with that outcome)."""
+        for kind in ("mandates", "delegations", "interpretations"):
+            p[kind] = [I.sign({k: v for k, v in o.items() if k != "proof"}, v=2) if kind != "interpretations"
+                       else H.sign({k: v for k, v in o.items() if k != "proof"}, v=2) for o in p[kind]]
+        p["amep_version"] = "0.3"
+        body = {"action": "fs.write", "resource": "repo:app/src/auth.ts", "effect": "write_local", "released": [], "t": 11}
+        p["approvals"] = [I.sign({"id": "ap-1", "kind": "approval", "effect_digest": approval_digest(body),
+                                  "presence": "webauthn", "expiry": 50}, v=2)]
+        decl = {"action": "fs.write", "resource": "repo:app/src/auth.ts", "effect": "write_local"}
+        i0 = H.sign({"id": "i-0", "kind": "invocation", "authority_ref": "d-1", "interpretation_ref": "a-1", "t": 5,
+                     "declared": decl, "approval_ref": "ap-1"}, v=2)
+        res1 = "repo:app/src/session.ts" if other_body else "repo:app/src/auth.ts"
+        i1 = H.sign({"id": "i-1", "kind": "invocation", "authority_ref": "d-1", "interpretation_ref": "a-1", "t": 10,
+                     "declared": {**decl, "resource": res1}, "approval_ref": "ap-1"}, v=2)
+        e1 = O.sign({"id": "e-1", "kind": "effect", "invocation": "i-1", "observed_by": "hook:host", "assurance": "L1",
+                     "invocation_digest": digest(i1), "executed": {**body, "resource": res1}}, v=2)
+        p["invocations"], p["effects"] = [i1], [e1]
+        if earlier == "executed":
+            p["invocations"] = [i0, i1]
+            p["effects"] = [O.sign({"id": "e-0", "kind": "effect", "invocation": "i-0", "observed_by": "hook:host", "assurance": "L1",
+                                    "invocation_digest": digest(i0), "executed": {**body, "t": 6}}, v=2), e1]
+        elif earlier == "not_executed":
+            p["invocations"] = [i0, i1]
+            p["call_statements"] = [O.sign({"id": "c-0", "kind": "call_statement", "invocation": "i-0", "observed_by": "hook:host",
+                                            "disposition": "not_executed", "effect_count": 0, "t": 8, "invocation_digest": digest(i0)}, v=2)]
+        hold = {"invocation": "i-0"} if bad_state else {"invocation": "i-0", "digest": digest(i0)}
+        state.update({"approvals_used": {}, "spent": {}, "approvals_held": {"ap-1": hold}})
+
+    def held_appr(name, expect, **kw):
+        st = {}
+        add(name, expect, lambda p, *a: appr_case(p, st, **kw), state=st)
+
+    held_appr("approval held for an earlier call with an unknown outcome", ("unresolved", "I7"))
+    held_appr("held approval released when the earlier call is shown not executed", ("preserved", "-"), earlier="not_executed")
+    held_appr("held approval: the earlier call is shown executed, so the second use is a double use", ("violated", "I8"), earlier="executed")
+    held_appr("a held approval does not hide an effect the approval doesn't cover", ("violated", "I8"), other_body=True)
+    held_appr("malformed approval hold in verifier state", ("unresolved", "I7"), bad_state=True)
     return keys, V
 
 

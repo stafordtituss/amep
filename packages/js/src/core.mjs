@@ -374,6 +374,16 @@ function heldOf(state) {
   if (!ok) throw new Malformed("state.held must map invocation digests to {invocation, amounts}");
   return h;
 }
+// Verifier state's approval holds (spec 5.10, held approvals, v0.3): approval id -> {invocation, digest} of the earlier
+// invocation that cited it and whose outcome is still unknown.
+function approvalsHeldOf(state) {
+  const h = "approvals_held" in state ? state.approvals_held : {};
+  const ok = h && typeof h === "object" && !Array.isArray(h) && Object.values(h).every(v =>
+    v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).sort().join() === "digest,invocation"
+    && typeof v.invocation === "string" && typeof v.digest === "string" && /^[0-9a-f]{64}$/.test(v.digest));
+  if (!ok) throw new Malformed("state.approvals_held must map approval ids to {invocation, digest}");
+  return h;
+}
 // A limit with `actions` applies to effects whose action matches; without, to every financial effect.
 const limitApplies = (lim, x) => ("actions" in lim) ? lim.actions.some(p => patMatch(x.action, p)) : x.effect === "financial";
 // I1 for limits: a child may add limits, but never raise one the parent sets for the same unit and period.
@@ -454,11 +464,14 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   const priorWindows = new Set(totals.keys());
   // spec 7.6 rule 6 (v0.3): holds for earlier invocations whose outcome was unknown. A packet that contains a held
   // invocation decides it afresh, so its hold is set aside while this packet is evaluated, and never counted twice.
-  let heldIn;
-  try { heldIn = heldOf(state); } catch (e) { return allUnresolved(pk, `malformed verifier state: ${e.message}`); }
+  let heldIn, apprHeldIn;
+  try { heldIn = heldOf(state); apprHeldIn = approvalsHeldOf(state); } catch (e) { return allUnresolved(pk, `malformed verifier state: ${e.message}`); }
   const present = new Set();
   for (const i of pk.invocations || []) { try { present.add(digest(i)); } catch { /* reported by its own evaluation */ } }
   const held = Object.fromEntries(Object.entries(heldIn).filter(([d]) => !present.has(d))), newHeld = {};
+  // spec 5.10, held approvals (v0.3): approvals held for earlier invocations whose outcome is unknown; one held by an invocation
+  // in this packet is set aside, since this packet decides that invocation afresh
+  const apprHeld = Object.fromEntries(Object.entries(apprHeldIn).filter(([, h]) => !present.has(h.digest)));
   const approvalUse = Object.fromEntries(Object.entries(state.approvals_used || {}).map(([k, v]) => [k, [...v]]));
   let out = [];
   const invocations = pk.invocations || [];
@@ -603,6 +616,10 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
         if ("per_period" in lim && limitApplies(lim, inv.declared))
           amounts[periodKey(node, lim, lim.unit, inv.t)] = reserve !== undefined && reserve.unit === lim.unit ? reserve.amount : null;
       if (Object.keys(amounts).length) newHeld[invDigest] = { invocation: id, amounts };
+      // spec 5.10, held approvals (v0.3): the call may have run under its approval, so the approval is held for it until its
+      // outcome is known (from Takao Sato's VATE case 2)
+      const ref = inv.approval_ref;
+      if (typeof ref === "string" && !Object.hasOwn(apprHeld, ref)) apprHeld[ref] = { invocation: id, digest: invDigest };
     }
     check(!mine.length, "unresolved", "I7", "no executed-effect receipt", { need: "receipt", ref: id });
     const highImpact = CEILING.indexOf(inv.declared.effect) >= CEILING.indexOf("write_shared");
@@ -690,6 +707,12 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
         check(!!ap.consumed, "violated", "I8", "approval already consumed", { blame: "agent" });
         check("expiry" in ap && toTime(ap.expiry) < Math.max(tInv, toTime(x.t)), "violated", "I8", "approval expired", { blame: "agent" });
         check("nbf" in ap && toTime(ap.nbf) > tInv, "violated", "I8", "approval not yet valid", { blame: "agent" });
+      }
+      // spec 5.10, held approvals: after every check that decides violated, so a hold never hides a violation
+      const holder = Object.hasOwn(apprHeld, ap.id) && bodies.size ? apprHeld[ap.id] : null;
+      check(holder !== null && holder.invocation !== id, "unresolved", "I7",
+        `approval ${ap.id} is held for ${holder?.invocation}, whose outcome is unknown`, { need: "held_outcome", ref: holder?.invocation });
+      for (const d of bodies.keys()) {
         const use = listed === null ? d : opUse;
         const first = approvalUse[ap.id] ??= [id, use];
         check(first[0] !== id || first[1] !== use, "violated", "I8", `approval already used by ${first[0]}`, { blame: "agent" });
@@ -783,6 +806,7 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   state.spent = spent;
   state.approvals_used = approvalUse;
   if (totals.size) state.period_totals = Object.fromEntries([...totals].map(([k, v]) => [k, unitsStr(v)]));
+  if (Object.keys(apprHeld).length || "approvals_held" in state) state.approvals_held = apprHeld;
   const heldOut = { ...held, ...newHeld };
   if (Object.keys(heldOut).length || "held" in state) state.held = heldOut;
   return out;

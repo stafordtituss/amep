@@ -523,6 +523,18 @@ def held_of(state: dict) -> dict:
     return h
 
 
+def approvals_held_of(state: dict) -> dict:
+    """Verifier state's approval holds (spec 5.10, held approvals, v0.3): approval id -> {invocation, digest} of the earlier
+    invocation that cited it and whose outcome is still unknown."""
+    h = state.get("approvals_held", {})
+    if not isinstance(h, dict) or not all(
+            isinstance(k, str) and isinstance(v, dict) and set(v) == {"invocation", "digest"}
+            and isinstance(v["invocation"], str) and isinstance(v["digest"], str) and HEX64.match(v["digest"])
+            for k, v in h.items()):
+        raise Malformed("state.approvals_held must map approval ids to {invocation, digest}")
+    return h
+
+
 def limit_applies(lim: dict, x: dict) -> bool:
     """A limit with `actions` applies to effects whose action matches; without, to every financial effect."""
     if "actions" in lim:
@@ -619,6 +631,7 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
     # invocation decides it afresh, so its hold is set aside while this packet is evaluated, and never counted twice.
     try:
         held_in = held_of(state)
+        appr_held_in = approvals_held_of(state)
     except Malformed as e:
         return _all_unresolved(packet, f"malformed verifier state: {e}")
     present = set()
@@ -648,7 +661,10 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
             for f in d.get("quarantined", []):
                 quarantined[f] = min(quarantined.get(f, len(invocations)), order[d["invocation"]])
     ctx = {"v03": v03, "totals": totals, "prior_windows": prior_windows,
-           "held": {d: h for d, h in held_in.items() if d not in present}, "new_held": {}, "first_cause": first_cause}
+           "held": {d: h for d, h in held_in.items() if d not in present}, "new_held": {}, "first_cause": first_cause,
+           # spec 5.10, held approvals (v0.3): approvals held for earlier invocations whose outcome is unknown; one held by an
+           # invocation in this packet is set aside, since this packet decides that invocation afresh
+           "appr_held": {a: h for a, h in appr_held_in.items() if h["digest"] not in present}}
     for n, inv in enumerate(invocations):
         rid = inv.get("id", "?")
         try:
@@ -683,6 +699,8 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
     state["approvals_used"] = {k: list(v) for k, v in approval_use.items()}
     if totals:
         state["period_totals"] = {k: _units_str(v) for k, v in totals.items()}
+    if ctx["appr_held"] or "approvals_held" in state:
+        state["approvals_held"] = ctx["appr_held"]
     held_out = {**ctx["held"], **ctx["new_held"]}
     if held_out or "held" in state:
         state["held"] = held_out
@@ -891,6 +909,12 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
                     amounts[period_key(n, lim, lim["unit"], inv["t"])] = reserve["amount"] if same else None
         if amounts:
             ctx["new_held"][inv_digest] = {"invocation": rid, "amounts": amounts}
+        # spec 5.10, held approvals (v0.3): the call may have run under its approval, so the approval is held for it until its
+        # outcome is known. From Takao Sato's VATE case 2 (accepted work interrupted): without the hold, a re-run under
+        # the same single-use admission came out preserved, and only later evidence turned it into a double use.
+        ref = inv.get("approval_ref")
+        if isinstance(ref, str) and ref not in ctx["appr_held"]:
+            ctx["appr_held"][ref] = {"invocation": rid, "digest": inv_digest}
     _check(not mine, "unresolved", "I7", "no executed-effect receipt", need="receipt", ref=rid)
     high_impact = CEILING.index(inv["declared"]["effect"]) >= CEILING.index("write_shared")
     eff_claims = chain[0]["claims"]
@@ -975,6 +999,12 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
             _check(bool(appr.get("consumed")), "violated", "I8", "approval already consumed", blame="agent")
             _check("expiry" in appr and to_time(appr["expiry"]) < max(t_inv, t_x), "violated", "I8", "approval expired", blame="agent")
             _check("nbf" in appr and to_time(appr["nbf"]) > t_inv, "violated", "I8", "approval not yet valid", blame="agent")
+        # spec 5.10, held approvals: after every check that decides violated, so a hold never hides a violation
+        holder = ctx["appr_held"].get(appr["id"]) if bodies else None
+        _check(holder is not None and holder["invocation"] != rid, "unresolved", "I7",
+               f"approval {appr['id']} is held for {holder and holder['invocation']}, whose outcome is unknown",
+               need="held_outcome", ref=holder and holder["invocation"])
+        for d in bodies:
             use = (rid, d) if listed is None else op_use
             first = approval_use.setdefault(appr["id"], use)
             _check(first != use, "violated", "I8", f"approval already used by {first[0]}", blame="agent")
