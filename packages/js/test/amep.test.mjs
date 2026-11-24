@@ -194,3 +194,20 @@ test("a signature gap says why the signature was refused (spec 10.5.1)", () => {
   const s = JSON.parse(readFileSync(join(VECTORS, "must-reject/self-approval-signed-by-host-key.json"), "utf8"));
   assert.ok(gaps(s.packet).every(x => !("cause" in x)));
 });
+
+test("verdict statement: the artifact as subject, the packet as an input (in-toto/attestation#625)", (t) => {
+  const f = join(VECTORS, "must-reject", "payment-over-the-per-call-limit-without-approval.json");
+  if (!existsSync(f)) return t.skip("conformance vectors not present");
+  const v = JSON.parse(readFileSync(f, "utf8"));
+  const keys = JSON.parse(readFileSync(join(VECTORS, "keys.json"), "utf8"));
+  const bytes = Buffer.from(JSON.stringify(v.packet), "utf8");
+  const res = evaluate(JSON.parse(bytes.toString()), keys, sigOk);
+  const commit = { name: "git+https://example.com/app@refs/heads/main", digest: { gitCommit: "a".repeat(40) } };
+  const st = verdicts.statement(bytes, keys, res, undefined, { subjects: [commit] });
+  assert.deepEqual(st.subject, [commit]);
+  assert.equal(st.predicate.packet.sha256, createHash("sha256").update(bytes).digest("hex"));
+  // without subjects, unchanged: the packet is the subject, byte for byte as before
+  assert.deepEqual(verdicts.statement(bytes, keys, res).subject, [{ name: "amep-packet", digest: { sha256: st.predicate.packet.sha256 } }]);
+  assert.throws(() => verdicts.statement(bytes, keys, res, undefined, { subjects: [] }));
+  assert.throws(() => verdicts.statement(bytes, keys, res, undefined, { subjects: [{ name: "x", digest: { sha256: "ZZ" } }] }));
+});

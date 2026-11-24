@@ -1,0 +1,214 @@
+{
+ "format": "amep-ap2-verdicts-1",
+ "verifier": "AMEP ap2 profile (packages/conformance/src/profiles/ap2.mjs) with @stafordtituss/amep from this repository",
+ "note": "One entry per bundle. 'ap2_checks_failed' lists AP2 artifact checks that failed; 'payments' gives AMEP's result per payment, in order, evaluated payment by payment with verifier state carried (spec 10.7). Gaps name the missing record.",
+ "families": {
+  "sdk-checkout": {
+   "fixture": "packages/conformance/test/fixtures/ap2/sdk-bundles-v2.json",
+   "fixture_sha256": "70626262730fd4e057fb49aa5a404268f8e8192d6b1d3b0f460d3eb5c4a63a05",
+   "vectors": {
+    "sdk-within": {
+     "ap2_checks_failed": [],
+     "mapping_problems": [],
+     "payments": [
+      {
+       "payment": 1,
+       "transaction_id": "IEFD2AWz78SAp5E4ZMpoubz5hSVJLHuCrOCQwRsvOWE",
+       "outcome": "preserved",
+       "invariant": "-",
+       "blame": null,
+       "gaps": []
+      }
+     ],
+     "verdict": {
+      "outcome": "preserved",
+      "invariant": "-"
+     }
+    },
+    "sdk-over-range": {
+     "ap2_checks_failed": [],
+     "mapping_problems": [],
+     "payments": [
+      {
+       "payment": 1,
+       "transaction_id": "OI2IX3FtelCqIop28cnrIldbW70Ozl6W3S25plSJF0o",
+       "outcome": "violated",
+       "invariant": "I2",
+       "blame": "agent",
+       "gaps": []
+      }
+     ],
+     "verdict": {
+      "outcome": "violated",
+      "invariant": "I2"
+     }
+    },
+    "sdk-wrong-payee": {
+     "ap2_checks_failed": [],
+     "mapping_problems": [],
+     "payments": [
+      {
+       "payment": 1,
+       "transaction_id": "BDezYPKq9t_bC8lM2s0f4Mutr2cm2HSborhBFYmPWNU",
+       "outcome": "violated",
+       "invariant": "I2",
+       "blame": "agent",
+       "gaps": []
+      }
+     ],
+     "verdict": {
+      "outcome": "violated",
+      "invariant": "I2"
+     }
+    },
+    "sdk-declined": {
+     "ap2_checks_failed": [],
+     "mapping_problems": [],
+     "payments": [
+      {
+       "payment": 1,
+       "transaction_id": "sNfY7S5-BccGql9UnZX8lFRpn01TWUV3TB_sxLdGjJ4",
+       "outcome": "preserved",
+       "invariant": "-",
+       "blame": null,
+       "gaps": []
+      }
+     ],
+     "verdict": {
+      "outcome": "preserved",
+      "invariant": "-"
+     }
+    },
+    "sdk-lost-receipt": {
+     "ap2_checks_failed": [],
+     "mapping_problems": [],
+     "payments": [
+      {
+       "payment": 1,
+       "transaction_id": "UfwsBVV6Aw17MQpITcjyzXT2OLVJGKRERHqXkIxIhiI",
+       "outcome": "unresolved",
+       "invariant": "I7",
+       "blame": null,
+       "gaps": [
+        {
+         "need": "receipt",
+         "ref": "i-1"
+        }
+       ]
+      }
+     ],
+     "verdict": {
+      "outcome": "unresolved",
+      "invariant": "I7"
+     }
+    },
+    "sdk-budget": {
+     "ap2_checks_failed": [],
+     "mapping_problems": [],
+     "payments": [
+      {
+       "payment": 1,
+       "transaction_id": "-8EQAy-qKNewoKScv7C5-9Q4fntxkG4BEctXhU7NWls",
+       "outcome": "preserved",
+       "invariant": "-",
+       "blame": null,
+       "gaps": []
+      },
+      {
+       "payment": 2,
+       "transaction_id": "AB1uWD7_s1G3xLhDaN_WIiKF2W036i8uGOdLi2nvE0c",
+       "outcome": "violated",
+       "invariant": "I2",
+       "blame": "agent",
+       "gaps": []
+      }
+     ],
+     "verdict": {
+      "outcome": "violated",
+      "invariant": "I2"
+     }
+    },
+    "sdk-issuer-jwt-hash": {
+     "ap2_checks_failed": [],
+     "mapping_problems": [],
+     "payments": [
+      {
+       "payment": 1,
+       "transaction_id": "WNsPHqWOsWynd9ml_fskIjWaS81AP2PMCrxix3vLfUo",
+       "outcome": "preserved",
+       "invariant": "-",
+       "blame": null,
+       "gaps": []
+      }
+     ],
+     "verdict": {
+      "outcome": "preserved",
+      "invariant": "-"
+     }
+    },
+    "sdk-redeemed-twice": {
+     "ap2_checks_failed": [],
+     "mapping_problems": [],
+     "payments": [
+      {
+       "payment": 1,
+       "transaction_id": "v-UNDa30lSLCHJDrCZRvIG2vBJ_jzp2d2lHR1j2OSH4",
+       "outcome": "violated",
+       "invariant": "I2",
+       "blame": "agent",
+       "gaps": []
+      }
+     ],
+     "verdict": {
+      "outcome": "violated",
+      "invariant": "I2"
+     }
+    },
+    "sdk-ref-other-checkout": {
+     "ap2_checks_failed": [],
+     "mapping_problems": [],
+     "payments": [
+      {
+       "payment": 1,
+       "transaction_id": "AYsqNUCsyf9bax3fdMtCAECCGyVscAcnLafasLE2vAI",
+       "outcome": "violated",
+       "invariant": "I2",
+       "blame": "agent",
+       "gaps": []
+      }
+     ],
+     "verdict": {
+      "outcome": "violated",
+      "invariant": "I2"
+     }
+    },
+    "sdk-ref-checkout-absent": {
+     "ap2_checks_failed": [
+      "checkout chain presented for transaction_id (payment.reference)"
+     ],
+     "mapping_problems": [],
+     "payments": [
+      {
+       "payment": 1,
+       "transaction_id": "xmSntn789cszB_XGEQnUVTTuexW6ZPYVoYOy4XvSIkM",
+       "outcome": "unresolved",
+       "invariant": "I7",
+       "blame": null,
+       "gaps": [
+        {
+         "need": "signature",
+         "ref": "i-1",
+         "cause": "missing"
+        }
+       ]
+      }
+     ],
+     "verdict": {
+      "outcome": "unresolved",
+      "invariant": "I7"
+     }
+    }
+   }
+  }
+ }
+}

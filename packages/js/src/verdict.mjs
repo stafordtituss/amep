@@ -30,11 +30,27 @@ export function verdictRecord(packetBytes, keys, results, verifier) {
   return rec;
 }
 
-/** The in-toto Statement v1 whose subject is the evaluated packet. */
-export function statement(packetBytes, keys, results, verifier) {
+/** in-toto ResourceDescriptors for the artifacts a verdict admits: [{ name, digest: { alg: hex } }], none empty. */
+function checkSubjects(subjects) {
+  if (!Array.isArray(subjects) || subjects.length === 0) throw new Error("subjects must be a non-empty array");
+  for (const s of subjects) {
+    const d = s && s.digest;
+    if (!s || typeof s !== "object" || typeof s.name !== "string" || !d || typeof d !== "object" || Array.isArray(d) ||
+        !Object.keys(d).length || !Object.values(d).every(v => typeof v === "string" && /^[0-9a-f]+$/.test(v)))
+      throw new Error("each subject needs a name and a digest of lowercase hex values");
+  }
+  return subjects.map(s => ({ name: s.name, digest: { ...s.digest } }));
+}
+
+/**
+ * The in-toto Statement v1 for a verdict. Its subject is the artifact the evaluated actions produced, when the caller
+ * names one (a commit, a release, a payment), with the packet's digest in the predicate as an input; otherwise the
+ * evaluated packet itself. Pass `{ subjects: [{ name, digest: { sha256: hex } }] }` to name artifacts.
+ */
+export function statement(packetBytes, keys, results, verifier, { subjects } = {}) {
   const predicate = verdictRecord(packetBytes, keys, results, verifier);
-  return { _type: STATEMENT_TYPE, subject: [{ name: "amep-packet", digest: { sha256: predicate.packet.sha256 } }],
-    predicateType: PREDICATE_TYPE, predicate };
+  const subject = subjects === undefined ? [{ name: "amep-packet", digest: { sha256: predicate.packet.sha256 } }] : checkSubjects(subjects);
+  return { _type: STATEMENT_TYPE, subject, predicateType: PREDICATE_TYPE, predicate };
 }
 
 /** The same verdict as an in-toto Simple Verification Result (SVR v0.2), for policy engines that consume SVRs.
