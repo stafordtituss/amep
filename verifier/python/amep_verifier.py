@@ -788,6 +788,10 @@ def vectors():
         p.update(decisions=[decision(H, "cd-15b", enforcement=closed_deny)])))
     add("deny on a fail-closed host contradicted by an observed effect", ("violated", "I11"), lambda p, I, H, O, X:
         p.update(decisions=[decision(H, "cd-15c", enforcement=closed_deny)]))
+    # the host's claim answers only "did anything execute?"; an invocation under revoked authority stays violated
+    add("deny on a fail-closed host does not clear an invocation under revoked authority", ("violated", "I6"), lambda p, I, H, O, X: (
+        p.update(revocations=[I.sign({"kind": "revocation", "target": "m-1", "t": 5})]), p.update(effects=[]),
+        p.update(decisions=[decision(H, "cd-15d", enforcement=closed_deny)])))
 
     def shared_noop(p, I, H, O, observed_by):
         bound(p, I, H, O)

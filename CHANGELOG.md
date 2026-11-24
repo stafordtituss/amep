@@ -13,11 +13,12 @@ Specification drafts, conformance-suite versions and package versions are listed
   - a result already `violated` on other evidence is left as it is.
 - **Why not "require `applied: confirmed`":** that field is signed by the same host as `fail_mode`, so requiring it alone would close nothing.
 - **Section 17** names the residual risk for `read` and `write_local`.
-- **Three new core vectors** (one positive, two must-reject):
+- **Three new core vectors for this** (one positive, two must-reject):
   - `high-impact-deny-on-a-fail-closed-host--no-independent-record` (`unresolved`, I10);
   - `high-impact-deny-on-a-fail-closed-host--reported-not-executed-by-an-independent-observer` (`preserved`);
   - `deny-on-a-fail-closed-host-contradicted-by-an-observed-effect` (`violated`, I11), the test Brennan suggested.
-- **The core suite now has 241 vectors, 277 across the three suites.** No existing vector changes its verdict. Both reference verifiers agree on all 277, and a verifier that answers "preserved" to everything scores 73/277.
+- **A host's claim never clears a violation.** Rerunning delegation-control-bench against this change showed a second gap. A host's `fail_mode: closed` replaced *any* result with `preserved`, including `violated` (I1 or I6) for an invocation under widened or revoked authority. In the bench's decision-log-only scenarios, the same denied read came out `violated` with the fail mode unknown and `preserved` with it declared closed. The declaration now answers only whether anything executed: on `read` and `write_local` calls it upgrades an `unresolved` result to `preserved` and leaves a `violated` one as it is. New vector: `deny-on-a-fail-closed-host-does-not-clear-an-invocation-under-revoked-authority` (`violated`, I6); under the previous rule it was `preserved`.
+- **The core suite now has 242 vectors, 278 across the three suites.** No existing vector changes its verdict. Both reference verifiers agree on all 278, and a verifier that answers "preserved" to everything scores 73/278.
 
 ## AP2: one consent redeemed twice is caught afterwards (unreleased, 2026-11-24)
 

@@ -691,12 +691,14 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
             # the host's own enforcement claim settles "no effect" only for low-impact calls (I10); a high-impact call
             # needs a not_executed statement from an observer other than the actor, which its own evaluation honours
             inv = next((i for i in packet.get("invocations", []) if i.get("id") == d.get("invocation")), None)
+            # either way the claim only answers "did anything execute?": it never overwrites a violation found on other evidence
             low = inv is not None and (inv.get("declared") or {}).get("effect") in ("read", "write_local")
+            cur = next((r for r in out if r.invocation == d["invocation"]), None)
             if low:
-                out = [r for r in out if r.invocation != d["invocation"]]
-                out.append(Result(d["invocation"], "preserved", "-", "denied before execution; no effect (enforcement confirmed)"))
+                if cur is None or cur.outcome == "unresolved":
+                    out = [r for r in out if r.invocation != d["invocation"]]
+                    out.append(Result(d["invocation"], "preserved", "-", "denied before execution; no effect (enforcement confirmed)"))
             elif inv is not None:
-                cur = next((r for r in out if r.invocation == d["invocation"]), None)
                 if cur is not None and cur.outcome == "unresolved":
                     out = [r for r in out if r.invocation != d["invocation"]]
                     out.append(Result(d["invocation"], "unresolved", "I10",

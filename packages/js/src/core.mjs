@@ -802,10 +802,11 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       // the host's own enforcement claim settles "no effect" only for low-impact calls (I10); a high-impact call needs
       // a not_executed statement from an observer other than the actor, which the call's own evaluation already honours
       const inv = (pk.invocations || []).find(i => i.id === d.invocation);
+      // either way the claim only answers "did anything execute?": it never overwrites a violation found on other evidence
       const low = !!inv && ["read", "write_local"].includes((inv.declared || {}).effect);
-      if (low) { out = out.filter(r => r.id !== d.invocation); out.push(result(d.invocation, "preserved", "-", "denied; no effect")); }
+      const cur = out.find(r => r.id === d.invocation);
+      if (low) { if (!cur || cur.outcome === "unresolved") { out = out.filter(r => r.id !== d.invocation); out.push(result(d.invocation, "preserved", "-", "denied; no effect")); } }
       else if (inv) {
-        const cur = out.find(r => r.id === d.invocation);
         if (cur && cur.outcome === "unresolved") {
           out = out.filter(r => r.id !== d.invocation);
           out.push(result(d.invocation, "unresolved", "I10", "denied, but only the host says it held; a high-impact call needs an independent not_executed statement",
