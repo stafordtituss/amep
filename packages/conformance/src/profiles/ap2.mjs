@@ -121,12 +121,42 @@ export function readReceipt(jwt, processorJwk) {
 }
 
 /**
- * Analyse an AP2 payment bundle: { chains: ["<open>~~<closed>~", ...], receipts: [jwt...] } with trust
- * { userJwk, processorJwk }. Every chain must share one open mandate. Returns the AP2-side checks and, for each closed
- * mandate, what AMEP can build from it.
+ * Analyse an AP2 payment bundle: { chains: ["<open>~~<closed>~", ...], receipts: [jwt...], checkouts?: [...] } with
+ * trust { userJwk, processorJwk, merchantJwk? }. Every chain must share one open mandate. Returns the AP2-side checks
+ * and, for each closed mandate, what AMEP can build from it.
+ *
+ * Checkout binding (AP2 payment.reference). An open payment mandate's `payment.reference` constraint names, by
+ * `conditional_transaction_id`, the open checkout mandate the payment is for: base64url(SHA-256) of that open checkout
+ * SD-JWT with its disclosures (the SDK's compute_sd_hash). A closed payment mandate's `transaction_id` is the
+ * checkout_hash of the merchant's checkout JWT, which the agent presents in a closed checkout mandate under an open
+ * checkout mandate (AP2 samples at e1ea56d). With the checkout chains in `checkouts`, the profile follows that link
+ * and gives each payment the open checkout it was actually made under; the AMEP resource then carries it, so a payment
+ * made for another checkout than the one the user's payment mandate names falls outside the mandate.
  */
+/** Read one checkout chain ("<open checkout>~~<closed checkout>~"). Returns { openHash, checkoutHash, checks }. */
+export function readCheckout(token, trust) {
+  const h = splitChain(token);
+  const open = readSdJwt(h[0] ?? "", trust.userJwk);
+  const closed = readSdJwt(h[h.length - 1] ?? "", open.claims?.cnf?.jwk);
+  const oc = open.claims ?? {}, cc = closed.claims ?? {};
+  const checks = [...open.checks.map(c => [`open checkout: ${c[0]}`, c[1], c[2]]), ...closed.checks.map(c => [`closed checkout: ${c[0]}`, c[1], c[2]])];
+  checks.push(["two hops: open checkout, then closed checkout", h.length === 2, `${h.length} hop(s)`]);
+  checks.push(["vct mandate.checkout.open.1", oc.vct === "mandate.checkout.open.1", `vct ${oc.vct}`]);
+  checks.push(["vct mandate.checkout.1", cc.vct === "mandate.checkout.1", `vct ${cc.vct}`]);
+  const bound = ("sd_hash" in cc) !== ("issuer_jwt_hash" in cc) && (cc.sd_hash === sha256b64u(open.presentation) || cc.issuer_jwt_hash === sha256b64u(open.issuerJwt ?? ""));
+  checks.push(["closed checkout binds the open checkout (exactly one of sd_hash, issuer_jwt_hash)", bound, "base64url(SHA-256) over ASCII"]);
+  checks.push(["checkout_hash is the hash of checkout_jwt", typeof cc.checkout_jwt === "string" && sha256b64u(cc.checkout_jwt) === cc.checkout_hash, "base64url(SHA-256) over ASCII"]);
+  if (trust.merchantJwk && typeof cc.checkout_jwt === "string") {
+    let ok = false;
+    try { const j = jwsParts(cc.checkout_jwt); ok = j.header.alg === "ES256" && es256ok(trust.merchantJwk, j.signingInput, j.sig); } catch {}
+    checks.push(["checkout JWT signed by the merchant key the verifier trusts", ok, "ES256"]);
+  }
+  return { openHash: sha256b64u(open.presentation ?? ""), checkoutHash: cc.checkout_hash ?? null, checks };
+}
+
 export function analyseBundle(bundle, trust) {
   const gaps = new Set();
+  const checkouts = (bundle.checkouts ?? []).map(t => readCheckout(t, trust));
   // The same closed mandate presented more than once is one authorization, not several (AP2 #346: a verifier that
   // doesn't remember acceptance can be shown it twice). It becomes one payment, with every receipt that references it.
   const seen = new Map();
@@ -154,7 +184,18 @@ export function analyseBundle(bundle, trust) {
       .map(x => ({ ...x, referenceRule: x.claims.reference === refs.sdk ? "closed issuer JWT (AP2 SDK)" : "closed presentation (spec text)" }));
     if (receipts.filter(x => x.claims?.status === "Success").length > 1)
       r.checks.push(["one Success receipt per closed mandate", true, `${receipts.length} receipts reference this closed mandate (presented ${presentations[n]} time(s)): more than one payment under one consent (AP2 #346)`]);
-    return { n, closed: r, hash: refs.sdk, refs, receipts, presentations: presentations[n] };
+    // checkout binding: only when the open mandate carries payment.reference
+    let checkout = null;
+    const ref = constraints.find(k => k?.type === "payment.reference");
+    if (ref) {
+      const co = checkouts.find(x => x.checkoutHash && x.checkoutHash === c.transaction_id);
+      const coOk = !!co && co.checks.every(x => x[1]);
+      r.checks.push(["checkout chain presented for transaction_id (payment.reference)", coOk,
+        co ? (coOk ? "checkout chain verifies" : `checkout chain fails: ${co.checks.filter(x => !x[1]).map(x => x[0]).join("; ")}`)
+          : "no presented checkout has this checkout_hash, so the reference can't be checked"]);
+      if (coOk) checkout = { openHash: co.openHash, matches: co.openHash === ref.conditional_transaction_id };
+    }
+    return { n, closed: r, hash: refs.sdk, refs, receipts, presentations: presentations[n], checkout };
   });
   const orphanReceipts = (bundle.receipts ?? []).map(j => readReceipt(j, trust.processorJwk))
     .filter(x => !payments.some(p => [p.refs.sdk, p.refs.spec].includes(x.claims?.reference)));
@@ -165,7 +206,8 @@ export function analyseBundle(bundle, trust) {
     if (k.type === "payment.allowed_payment_instruments") gaps.add("payment.allowed_payment_instruments: the instrument is not part of the AMEP resource");
     if (k.type === "payment.allowed_pisps") gaps.add("payment.allowed_pisps: not mapped");
     if (k.type === "payment.execution_date") gaps.add("payment.execution_date: not mapped");
-    if (k.type === "payment.reference") gaps.add("payment.reference (conditional_transaction_id) binds the checkout mandate, which this profile does not read");
+    if (k.type === "payment.reference" && !(bundle.checkouts ?? []).length)
+      gaps.add("payment.reference binds the payment to a checkout, but no checkout chain is presented: the binding can't be checked");
   }
   gaps.add("AP2 payment receipts carry no amount: the executed value is the closed mandate's, on the processor's signed word that it processed that mandate (its reference)");
   return { open, payments, orphanReceipts, constraints, gaps: [...gaps] };
@@ -177,6 +219,7 @@ export function claimsFromOpen(oc, constraints) {
   const problems = [];
   if (Number.isInteger(oc.iat)) out.nbf = oc.iat;
   if (Number.isInteger(oc.exp)) out.exp = oc.exp; else problems.push("the open mandate has no exp; AMEP needs an expiry");
+  const ref = constraints.find(k => k?.type === "payment.reference");
   for (const k of constraints) {
     if (k.type === "payment.allowed_payees" && Array.isArray(k.allowed))
       out.resources = k.allowed.map(p => `payee:${p.id}`);
@@ -193,8 +236,17 @@ export function claimsFromOpen(oc, constraints) {
       else out.limits.push({ unit: `iso4217:${k.currency}`, per_period: max, period: out.exp - out.nbf });
     }
   }
+  // payment.reference: the mandate covers only payments for the named open checkout (see analyseBundle)
+  if (ref) {
+    if (typeof ref.conditional_transaction_id === "string" && /^[A-Za-z0-9_-]+$/.test(ref.conditional_transaction_id))
+      out.resources = out.resources.map(r => `${r}/checkout:${ref.conditional_transaction_id}`);
+    else problems.push("payment.reference conditional_transaction_id is not a base64url digest");
+  }
   if (!out.limits.length) delete out.limits;
   return { claims: out, problems };
 }
 
-export const ap2 = { id: "ap2", analyseBundle, claimsFromOpen, readSdJwt, readReceipt, majorUnits, majorDecimal, splitChain };
+/** The AMEP resource for one payment: payee, and the open checkout it was made under when payment.reference applies. */
+export const paymentResource = (payeeId, p) => `payee:${payeeId}${p.checkout ? `/checkout:${p.checkout.openHash}` : ""}`;
+
+export const ap2 = { id: "ap2", analyseBundle, claimsFromOpen, readSdJwt, readReceipt, readCheckout, paymentResource, majorUnits, majorDecimal, splitChain };

@@ -66,6 +66,16 @@ Each row is a result on the bundles here, most of them produced by AP2's own SDK
     - one closed mandate presented and processed twice (`sdk-redeemed-twice`, AP2 #346).
   - **Results:** every SDK artifact passes AP2's checks as the profile implements them, and receipts bind by the SDK's reference rule. AMEP's verdict on each is as expected, and a test pins both.
   - **To regenerate:** install the SDK's dependencies in a virtual environment, then run `PYTHONPATH=<AP2>/code/sdk/python python make_sdk_bundles.py out.json`. ECDSA signatures are randomized, so the bytes differ each time; the verdicts don't.
+  - **This first family omits `payment.reference`,** which AP2's schema requires on every open payment mandate (`open_payment_mandate.json`, `contains`). Found by nmatt1's APAF-1 column ([AP2 #402](https://github.com/google-agentic-commerce/AP2/issues/402)). The family stays as it is, because others have pinned its hash; the second family below is schema-valid.
+- **A second SDK family, with checkouts** (`make_sdk_bundles_v2.py`, `packages/conformance/test/fixtures/ap2/sdk-bundles-v2.json`, verdicts in `verdicts-checkout.json`). It follows the flow of AP2's own shopping-agent and merchant samples:
+  - every open payment mandate carries `payment.reference`, whose `conditional_transaction_id` is the hash of the user's open checkout mandate (`compute_sd_hash`);
+  - each payment's `transaction_id` is the `checkout_hash` of the merchant's signed checkout JWT;
+  - the agent's closed checkout mandate, presented under the open checkout mandate, carries that JWT and its hash.
+
+  **The profile now checks this link.** It verifies each checkout chain (the user's signature on the open checkout, the agent's on the closed one, the hop binding, the hash of the checkout JWT, and the merchant's signature when the verifier trusts a merchant key). It then gives each payment the open checkout it was actually made under, and the AMEP resource carries it (`payee:<id>/checkout:<hash>`). The eight scenarios above give the same verdicts. Two more:
+  - `sdk-ref-other-checkout`: the payment is for a checkout made under another open checkout mandate, the reuse AP2's security considerations warn about. AMEP: `violated` (I2). AP2's SDK reports "PaymentReference mismatch" when given the presented checkout's hash.
+  - `sdk-ref-checkout-absent`: no checkout chain is presented, so the reference can't be checked. The importer doesn't sign the payment, and AMEP answers `unresolved`; `ap2_checks_failed` names the missing chain.
+  - **To regenerate:** as above, with `make_sdk_bundles_v2.py`.
   - **The eleven synthetic scenarios** in COMPARISON.md use the same serialization, plus three cases the SDK can't produce: a receipt for another mandate, an altered mandate, and an unknown first payment.
 - **AP2's specification and SDK disagree** on the receipt `reference`:
   - the specification says it is "calculated in the same manner as the `sd_hash`", meaning over the closed SD-JWT with its disclosures;
@@ -74,7 +84,7 @@ Each row is a result on the bundles here, most of them produced by AP2's own SDK
   The profile accepts either and reports which rule matched. The fixtures follow the SDK.
 - **Units differ between constraints.** `amount_range` is in integer minor units (20000 means 200.00), but `budget.max` is a major-unit number (the SDK's `Budget.max: float`, so 300.0 means 300.00). The profile reads each as AP2 defines it.
 - **Payment receipts carry no amount.** The executed value is the closed mandate's amount, on the processor's signed word that it processed that mandate. A processor that charged a different amount would show up only if its receipt said so.
-- **Not mapped:** `amount_range` minimum, `agent_recurrence`, `allowed_payment_instruments`, `allowed_pisps`, `execution_date`, and the checkout mandate (`payment.reference`). Each is reported as a gap when present.
+- **Not mapped:** `amount_range` minimum, `agent_recurrence`, `allowed_payment_instruments`, `allowed_pisps` and `execution_date`. Each is reported as a gap when present. `payment.reference` is mapped when the bundle presents the checkout chains, and reported as a gap when it doesn't. The checkout's own constraints (line items, allowed merchants) are not evaluated: AMEP checks that the payment is for the checkout the user named, not what that checkout contained.
 - **The budget's starting total** of zero rests on the importer's assertion that the bundle holds every payment under the open mandate. Without that, AMEP returns `unresolved` (spec 7.6, rule 5).
 
 ## Findings for AP2
