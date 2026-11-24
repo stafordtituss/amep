@@ -280,6 +280,27 @@ def signing_input(obj: dict) -> bytes:
     return body
 
 
+def key_status_ok(k: dict, obj: dict) -> bool:
+    """Spec 12.4: a key marked revoked, or used outside its nbf-exp interval, signs nothing. An object is placed in the
+    key's interval by its own time (t, or executed.t); an object with no time of its own is checked for revocation only."""
+    if "revoked" in k and k["revoked"] is not False:
+        return False
+    if "nbf" not in k and "exp" not in k:
+        return True
+    own = obj.get("t") if "t" in obj else (obj["executed"].get("t") if isinstance(obj.get("executed"), dict) and "t" in obj["executed"] else None)
+    if own is None and not ("t" in obj or (isinstance(obj.get("executed"), dict) and "t" in obj["executed"])):
+        return True
+    try:
+        t = to_time(own)
+        if "nbf" in k and t < to_time(k["nbf"]):
+            return False
+        if "exp" in k and t >= to_time(k["exp"]):
+            return False
+        return True
+    except (Malformed, TypeError, ValueError):
+        return False
+
+
 def verify_sig(obj, keys: dict, require_v2: bool = False) -> bool:
     if not isinstance(obj, dict):
         return False
@@ -294,6 +315,8 @@ def verify_sig(obj, keys: dict, require_v2: bool = False) -> bool:
         return False  # spec 12.2: lowercase hex of exactly 32 and 64 bytes; no whitespace or other forms
     if not set(k.get("roles", [])) & SIGNER_ROLES.get(obj.get("kind"), set()):
         return False  # valid key, wrong role: e.g. a host key minting a mandate or approving its own action
+    if not key_status_ok(k, obj):
+        return False  # spec 12.4: revoked, or outside the key's validity interval
     try:
         pub, sig = bytes.fromhex(k["x"]), bytes.fromhex(proof["sig"])
         if not ed25519_strict_ok(pub, sig):
@@ -316,6 +339,8 @@ def sig_cause(obj, keys: dict) -> str:
     roles = k.get("roles") if isinstance(k.get("roles"), list) else []
     if not set(r for r in roles if isinstance(r, str)) & SIGNER_ROLES.get(obj.get("kind"), set()):
         return "role"
+    if not key_status_ok(k, obj):
+        return "key_status"
     return "invalid"
 
 

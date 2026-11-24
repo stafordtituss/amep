@@ -1,0 +1,116 @@
+{
+ "name": "mandate signed by a revoked issuer key",
+ "expect": {
+  "outcome": "unresolved",
+  "invariant": "I7"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "fs.*",
+      "process.exec"
+     ],
+     "resources": [
+      "repo:app/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 100,
+     "depth": 2
+    },
+    "proof": {
+     "kid": "issuer-revoked",
+     "alg": "Ed25519",
+     "sig": "b1c110c5eb97ee72bf0052de584a1c735b823b0d7b917fbea90f8516a5eb9a6d0b0390416dbc4f6cd2a271269bcb64eeccdc94892c5aef6ee7b0e74b1a6b3003"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "fs.write"
+     ],
+     "resources": [
+      "repo:app/src/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 90,
+     "depth": 1
+    },
+    "proof": {
+     "kid": "issuer-revoked",
+     "alg": "Ed25519",
+     "sig": "1bd950bda6f0fdf9ca682fe0547a7550209067b2d26f41ba11e2ef4d80057bc7acaff57807abf89474a1d393c0cd2c9424dc7a1f74363b3153b9da709ff5de02"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "host_shell",
+    "version": "r9",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "185d02d49c8440af31134eec4b820a71cfa92a89dd007f0b912acbcb9bf860641ff6e3ff58e7a08754e6bf9c27d2269d166521b86e39293ad09957a61fe75a09"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "write_local"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "71490b9b0ba3d4f07e2c56fd46e94d12b6a67b2a961aacec4ecd9d055201ec03811d9d0dbb09a6ce53b49d2f129c94636be2a52d5fcee42c9ecf8460bca0a90b"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "hook:host",
+    "assurance": "L1",
+    "executed": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "write_local",
+     "released": [],
+     "t": 11
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "sig": "50525648c531e0be5cede8daa74a0d7c9199e767ab20e02ba5ce77bc0ffdcd02561f7987f36df79f2ce22f80b94b62a98fdda0301fff13d008a4d1f20154e505"
+    }
+   }
+  ]
+ }
+}

@@ -3,6 +3,19 @@
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
 
+## Two fixes from Andrii's review on the OpenID AIIM list (unreleased, 2026-11-24)
+
+Andrii (Radiolaria) reported both, with reproductions against the published code and vectors, on openid-aiim on 24 November.
+
+- **Both verifiers accepted a revoked key** (spec 12.4). A signed positive vector stayed `preserved` with its issuer or observer key marked `revoked: true`. Only the MCP gateway's key discovery filtered revoked keys; a key set given directly to either verifier was not checked. Key `nbf` and `exp` were not checked either.
+  - **Now:** a key whose `revoked` member is present and not `false`, or one used outside its `nbf`–`exp` interval, signs nothing. The result is `unresolved` (I7), with the new signature cause `key_status` (spec 10.5.1), checked after `role` and before `invalid`.
+  - **How an object is placed in the interval:** by its own time, `t` or `executed.t`. The interval includes `nbf` and excludes `exp`. An object with no time of its own is checked for revocation only, and spec 12.4 now says so.
+  - **Suite v0.3.1:** 5 new core vectors, and three keys added to `vectors/keys.json` (`issuer-revoked`, `observer-revoked`, `observer-windowed`). Four of the vectors are must-reject; all four returned `preserved` before the fix. No existing vector changes. The core suite now has 251 vectors (66 positive, 185 must-reject), 287 across the three suites. The key set's digest changes.
+- **The experimental TypeScript MCP producer could sign a false `not_executed`.** A handler that changed the backend and then threw before `recordEffect` was signed `not_executed`, which verifies as `preserved` and releases holds (spec 5.10, 7.6).
+  - **Now:** "no effect recorded" becomes `not_executed` only when the handler returned normally, or refused before acting by throwing the new `NotExecuted`. Any other exception with nothing recorded leaves the outcome unknown: no statement is signed, and the call is `unresolved`. The receipt store records the unknown outcome.
+  - **Tests:** his four controls are `prototypes/mcp-amep-evidence-ts/test/failure-window.test.mjs`, and the README's integration example says which statement each failure gets.
+- **JS core, as on the protect-mcp branch:** the I10 result for a host-only deny names its gap, `independent_observer`, as the Python core does. `tools/compare_verifiers.py` now agrees on all 287 vectors.
+
 ## An independent implementation, and four clarifications from it (unreleased, 2026-11-24)
 
 - **zambo-amep-verify 0.1.0,** by Brennan Zambo, was written from the specification and the published vectors alone, without reading either reference verifier. It agrees with all 228 single-packet vectors of the core suite: the deciding invariant as well as the outcome, for every positive and must-reject vector (stafordtituss/amep#18). Cross-packet state (Section 10.7) and the interop suites are its next rows. Recorded in spec 15.2 and LIMITS.md.

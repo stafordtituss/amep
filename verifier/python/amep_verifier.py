@@ -811,6 +811,27 @@ def vectors():
         high_impact(p), bound(p, I, H, O), p.update(effects=[]),
         p.update(invocations=[H2.sign(p["invocations"][0], v=2)]),
         stmt(p, O, disposition="not_executed", count=0, observed_by="proxy:egress", signer=O2)))
+    # spec 12.4: a key marked revoked, or used outside its nbf-exp interval, signs nothing (reported by Andrii, Radiolaria,
+    # on openid-aiim, 24 Nov 2026: both verifiers accepted a revoked issuer or observer key)
+    IR, OR = Signer("issuer-revoked", ["issuer"]), Signer("observer-revoked", ["observer"])
+    OW = Signer("observer-windowed", ["observer"])
+    keys[IR.kid] = {**IR.public(), "revoked": True}
+    keys[OR.kid] = {**OR.public(), "revoked": True}
+    keys[OW.kid] = {**OW.public(), "nbf": 5, "exp": 11}
+
+    def resign_chain(p, issuer):
+        p["mandates"] = [issuer.sign(p["mandates"][0])]
+        p["delegations"] = [issuer.sign(p["delegations"][0])]
+    add("mandate signed by a revoked issuer key", ("unresolved", "I7"), lambda p, I, H, O, X: resign_chain(p, IR))
+    add("receipt signed by a revoked observer key", ("unresolved", "I7"), lambda p, I, H, O, X:
+        p.update(effects=[OR.sign(p["effects"][0])]))
+    add("receipt signed at the observer key's expiry", ("unresolved", "I7"), lambda p, I, H, O, X:
+        p.update(effects=[OW.sign(p["effects"][0])]))
+    add("receipt signed within the observer key's validity interval", ("preserved", "-"), lambda p, I, H, O, X:
+        p.update(effects=[OW.sign({**p["effects"][0], "executed": {**p["effects"][0]["executed"], "t": 10}})]))
+    add("receipt signed before the observer key's nbf", ("unresolved", "I7"), lambda p, I, H, O, X:
+        p.update(invocations=[H.sign({**p["invocations"][0], "t": 2})],
+                 effects=[OW.sign({**p["effects"][0], "executed": {**p["effects"][0]["executed"], "t": 3}})]))
     # the host's claim answers only "did anything execute?"; an invocation under revoked authority stays violated
     add("deny on a fail-closed host does not clear an invocation under revoked authority", ("violated", "I6"), lambda p, I, H, O, X: (
         p.update(revocations=[I.sign({"kind": "revocation", "target": "m-1", "t": 5})]), p.update(effects=[]),
