@@ -2,6 +2,23 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## A host's own enforcement claim no longer settles a high-impact deny (unreleased, 2026-11-24)
+
+- **The question,** from issue #15. A pre-execution deny whose `enforcement` says `fail_mode: closed` or `applied: confirmed` used to make the call `preserved` ("denied; no effect") with no other record. The host that signs the deny declares both fields, so for a high-impact call that was self-reported evidence for "nothing executed", which I10 refuses everywhere else.
+  - Raised with delegation-control-bench, where 12 denied scenarios with only a decision log came out 12/12 `preserved` under AMEP and 0/12 under the bench's reference verifier.
+  - Brennan Zambo (AER-1) answered: a host's own declaration can't settle it.
+- **Now (spec 10.3):**
+  - for calls declared `read` or `write_local`, the host's declaration still settles "denied; no effect";
+  - for `write_shared` and above, it settles nothing. A `not_executed` call statement from an observer other than the actor still makes the call `preserved` (Section 5.14, rule 5). Without one, the result is `unresolved` (I10), need `independent_observer`;
+  - a result already `violated` on other evidence is left as it is.
+- **Why not "require `applied: confirmed`":** that field is signed by the same host as `fail_mode`, so requiring it alone would close nothing.
+- **Section 17** names the residual risk for `read` and `write_local`.
+- **Three new core vectors** (one positive, two must-reject):
+  - `high-impact-deny-on-a-fail-closed-host--no-independent-record` (`unresolved`, I10);
+  - `high-impact-deny-on-a-fail-closed-host--reported-not-executed-by-an-independent-observer` (`preserved`);
+  - `deny-on-a-fail-closed-host-contradicted-by-an-observed-effect` (`violated`, I11), the test Brennan suggested.
+- **The core suite now has 241 vectors, 277 across the three suites.** No existing vector changes its verdict. Both reference verifiers agree on all 277, and a verifier that answers "preserved" to everything scores 73/277.
+
 ## AP2: one consent redeemed twice is caught afterwards (unreleased, 2026-11-24)
 
 - **Each closed payment mandate becomes an AMEP intent** limited to its own payee and amount per call. The same closed mandate presented and processed twice (AP2 #346, which the SDK's verifier accepts) is `violated` (I2), even when the total stays within every limit of the open mandate.

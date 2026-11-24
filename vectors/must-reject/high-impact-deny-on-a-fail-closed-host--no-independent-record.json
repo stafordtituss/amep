@@ -1,0 +1,117 @@
+{
+ "name": "high-impact deny on a fail-closed host, no independent record",
+ "expect": {
+  "outcome": "unresolved",
+  "invariant": "I10"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "fs.*",
+      "process.exec"
+     ],
+     "resources": [
+      "repo:app/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "external_send",
+     "exp": 100,
+     "depth": 2
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "af140821659e3cd1a92144f06ef1126790e050e7103a72dea58f0af8cd00c26317e910c33fe636242e942347e180d4fef992a38e0636df8d6a040c26989ad902"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "fs.write"
+     ],
+     "resources": [
+      "repo:app/src/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "external_send",
+     "exp": 90,
+     "depth": 1
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "a6d439a7f1865b41589d528d8122086285d5066d466706e4edb044387e7a231afdc71e5834cf49cd9c4c205ce3a9419218578dcf32ce3486299088c7c0b7fc0f"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "host_shell",
+    "version": "r9",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "185d02d49c8440af31134eec4b820a71cfa92a89dd007f0b912acbcb9bf860641ff6e3ff58e7a08754e6bf9c27d2269d166521b86e39293ad09957a61fe75a09"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "external_send"
+    },
+    "actor": "agent:assistant-1",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "2e4a30f74bb75b4d0add614f484c29d0a8380529402dfa3589d96a166eb40f194279af4c0a8b972ed2d354784b6ba0afd8c80e38747dd478c6d8ab8b658f190c"
+    }
+   }
+  ],
+  "effects": [],
+  "decisions": [
+   {
+    "id": "cd-15a",
+    "kind": "decision",
+    "invocation": "i-1",
+    "outcome": "violated",
+    "mode": "deny",
+    "phase": "pre_execution",
+    "enforcement": {
+     "pep": "host-hook/2.0",
+     "fail_mode": "closed",
+     "applied": "confirmed"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "88ebe949313cb1ecdb0fd9bd5e7ea90c8477e64fda5a2a519a308536ecdbcb0d5c206b010a779ae6a55f3ed7eb62625a958b59b53e1a26d41cc8e6955f792403"
+    }
+   }
+  ]
+ }
+}

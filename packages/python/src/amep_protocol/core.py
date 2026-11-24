@@ -688,8 +688,20 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
             out = [r for r in out if r.invocation != d["invocation"]]
             out.append(Result(d["invocation"], "violated", "I11", "effect executed despite a deny/hold decision (enforcement contradicted)", blame="host"))
         elif enf.get("fail_mode") == "closed" or enf.get("applied") == "confirmed":
-            out = [r for r in out if r.invocation != d["invocation"]]
-            out.append(Result(d["invocation"], "preserved", "-", "denied before execution; no effect (enforcement confirmed)"))
+            # the host's own enforcement claim settles "no effect" only for low-impact calls (I10); a high-impact call
+            # needs a not_executed statement from an observer other than the actor, which its own evaluation honours
+            inv = next((i for i in packet.get("invocations", []) if i.get("id") == d.get("invocation")), None)
+            low = inv is not None and (inv.get("declared") or {}).get("effect") in ("read", "write_local")
+            if low:
+                out = [r for r in out if r.invocation != d["invocation"]]
+                out.append(Result(d["invocation"], "preserved", "-", "denied before execution; no effect (enforcement confirmed)"))
+            elif inv is not None:
+                cur = next((r for r in out if r.invocation == d["invocation"]), None)
+                if cur is not None and cur.outcome == "unresolved":
+                    out = [r for r in out if r.invocation != d["invocation"]]
+                    out.append(Result(d["invocation"], "unresolved", "I10",
+                                      "denied, but only the host says it held; a high-impact call needs an independent not_executed statement",
+                                      gaps=[{"need": "independent_observer", "ref": d["invocation"]}]))
     # spec 10.4: orphan effects
     inv_ids = {i.get("id") for i in packet.get("invocations", [])}
     for e in effects:

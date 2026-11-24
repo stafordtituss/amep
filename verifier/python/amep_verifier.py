@@ -778,6 +778,16 @@ def vectors():
         stmt(p, O, disposition="not_executed", count=0, observed_by="proxy:egress")))
     add("call statement with a negative effect count", ("unresolved", "I7"), lambda p, I, H, O, X: (
         bound(p, I, H, O), stmt(p, O, count=-1)))
+    # issue #15: a host's own fail_mode/applied claim settles "no effect" only for read and write_local (I10)
+    closed_deny = {"pep": "host-hook/2.0", "fail_mode": "closed", "applied": "confirmed"}
+    add("high-impact deny on a fail-closed host, no independent record", ("unresolved", "I10"), lambda p, I, H, O, X: (
+        high_impact(p), p.update(effects=[]), p.update(decisions=[decision(H, "cd-15a", enforcement=closed_deny)])))
+    add("high-impact deny on a fail-closed host, reported not executed by an independent observer", ("preserved", "-"), lambda p, I, H, O, X: (
+        high_impact(p), bound(p, I, H, O), p.update(effects=[]),
+        stmt(p, O, disposition="not_executed", count=0, observed_by="proxy:egress"),
+        p.update(decisions=[decision(H, "cd-15b", enforcement=closed_deny)])))
+    add("deny on a fail-closed host contradicted by an observed effect", ("violated", "I11"), lambda p, I, H, O, X:
+        p.update(decisions=[decision(H, "cd-15c", enforcement=closed_deny)]))
 
     def shared_noop(p, I, H, O, observed_by):
         bound(p, I, H, O)
