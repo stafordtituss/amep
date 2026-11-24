@@ -3,6 +3,17 @@
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
 
+## AP2: the checkout binding is checked, not just reported (unreleased, 2026-11-24)
+
+- **Finding, from nmatt1's APAF-1 column (AP2 #402):** none of AMEP's SDK fixtures carried `payment.reference`, which AP2's schema requires on every open payment mandate. The omission was in AMEP's generator. AP2's SDK emits the constraint, and its own samples set it to the hash of the user's open checkout mandate.
+- **A second SDK fixture family, with checkouts** (`interop/ap2/make_sdk_bundles_v2.py`, `sdk-bundles-v2.json`). It is schema-valid and built with AP2's SDK at `e1ea56d`, following AP2's sample flow. The first family and `verdicts.json` are unchanged (still `93aa9005…`), because others have pinned them; the new family's verdicts are in `interop/ap2/verdicts-checkout.json`.
+- **The AP2 profile now verifies the checkout link** that `payment.reference` creates. It checks each checkout chain, and binds each payment to the open checkout it was made under, through `transaction_id` = `checkout_hash`. The AMEP resource carries that checkout. Results:
+  - a payment for another checkout than the one the user named is `violated` (I2);
+  - a payment whose checkout chain isn't presented is `unresolved`;
+  - the eight earlier scenarios give the same verdicts as before.
+  
+  AP2's own SDK agrees on both new cases. This closes the profile's former gap, "payment.reference binds the checkout mandate, which this profile does not read".
+
 ## Two fixes from Andrii's review on the OpenID AIIM list (unreleased, 2026-11-24)
 
 Andrii (Radiolaria) reported both, with reproductions against the published code and vectors, on openid-aiim on 24 November.
