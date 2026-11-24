@@ -28,6 +28,7 @@ Payments are evaluated as they settle, one packet per payment, with verifier sta
   - which AP2 artifact checks failed.
 - **It's pinned** to the SHA-256 of the exact fixture files it was computed from.
 - **To compare implementations,** join on the bundle name.
+- **Joined with an independent column:** Brennan Zambo ran an AER-1 column over the same pinned fixtures and published the join, one row per payment: [aer1-kit `interop/ap2-crosswalk-joined-table-2026-11-23.md`](https://github.com/zambodotdev/aer1-kit/blob/main/interop/ap2-crosswalk-joined-table-2026-11-23.md) (AP2 #402). Of 22 payment rows, 10 agree and 12 diverge: 10 because the columns answer different questions (the record against the decision), and 2 where the same facts draw a different refusal. Every AMEP row in the join matches `verdicts.json`.
 
 The table is in [COMPARISON.md](COMPARISON.md), regenerated and checked by `node interop/ap2/compare.mjs [--check]`. The three scenarios where AMEP adds most:
 - **`s6-budget`:** two payments, each within `amount_range`, that together exceed the budget. AMEP finds the second payment `violated` (I2), using past spend it derives from the processors' signed receipts.
@@ -58,13 +59,14 @@ Each row is a result on the bundles here, most of them produced by AP2's own SDK
 
 ## Limits, stated plainly
 
-- **Checked against AP2's own SDK.** `make_sdk_bundles.py` produces seven bundles with AP2's Python SDK (github.com/google-agentic-commerce/AP2, `code/sdk/python`, commit `e1ea56d`), stored in `packages/conformance/test/fixtures/ap2/sdk-bundles.json`.
+- **Checked against AP2's own SDK.** `make_sdk_bundles.py` produces eight bundles with AP2's Python SDK (github.com/google-agentic-commerce/AP2, `code/sdk/python`, commit `e1ea56d`), stored in `packages/conformance/test/fixtures/ap2/sdk-bundles.json`.
   - **What they cover:**
     - within the mandate, over the range, the wrong payee, declined, a lost receipt, and over the budget;
-    - one bundle using the `issuer_jwt_hash` binding.
+    - one bundle using the `issuer_jwt_hash` binding;
+    - one closed mandate presented and processed twice (`sdk-redeemed-twice`, AP2 #346).
   - **Results:** every SDK artifact passes AP2's checks as the profile implements them, and receipts bind by the SDK's reference rule. AMEP's verdict on each is as expected, and a test pins both.
   - **To regenerate:** install the SDK's dependencies in a virtual environment, then run `PYTHONPATH=<AP2>/code/sdk/python python make_sdk_bundles.py out.json`. ECDSA signatures are randomized, so the bytes differ each time; the verdicts don't.
-  - **The nine synthetic scenarios** in COMPARISON.md use the same serialization, plus three cases the SDK can't produce: a receipt for another mandate, an altered mandate, and an unknown first payment.
+  - **The eleven synthetic scenarios** in COMPARISON.md use the same serialization, plus three cases the SDK can't produce: a receipt for another mandate, an altered mandate, and an unknown first payment.
 - **AP2's specification and SDK disagree** on the receipt `reference`:
   - the specification says it is "calculated in the same manner as the `sd_hash`", meaning over the closed SD-JWT with its disclosures;
   - the SDK hashes the closed mandate's issuer JWT alone, so a receipt stays bound however the mandate was presented.
@@ -75,10 +77,10 @@ Each row is a result on the bundles here, most of them produced by AP2's own SDK
 - **Not mapped:** `amount_range` minimum, `agent_recurrence`, `allowed_payment_instruments`, `allowed_pisps`, `execution_date`, and the checkout mandate (`payment.reference`). Each is reported as a gap when present.
 - **The budget's starting total** of zero rests on the importer's assertion that the bundle holds every payment under the open mandate. Without that, AMEP returns `unresolved` (spec 7.6, rule 5).
 
-## Findings to report to AP2
+## Findings for AP2
 
 Each was observed in AP2's own code at `e1ea56d`:
-1. **The receipt `reference` rule.** The specification says the `sd_hash` manner (over the closed SD-JWT with its disclosures). The SDK hashes only the closed issuer JWT (`MandateClient.get_closed_mandate_jwt`).
-2. **Budget arithmetic.** `BudgetEvaluator` computes `int(self.constraint.max * 100)`. With floating point, a budget of 1.15 becomes 114 cents and 0.29 becomes 28: one cent less than intended. It also assumes two decimal places for every currency (wrong for JPY's zero, or BHD's three).
-3. **A budget depends on caller-supplied past spend** (`MandateContext.total_amount`). Nothing in a bundle lets a third party recompute it afterwards. AMEP's answer is to derive it from signed receipts, and to hold unknown outcomes.
+1. **The receipt `reference` rule** (reported as [AP2 #405](https://github.com/google-agentic-commerce/AP2/issues/405)). The specification says the `sd_hash` manner (over the closed SD-JWT with its disclosures). The SDK hashes only the closed issuer JWT (`MandateClient.get_closed_mandate_jwt`). Across the 22 receipts in the fixtures, 21 match the SDK rule, none the specification's, and one (`s7`) neither. The closed hop commits the payment's claims by digest, so the SDK's rule binds this payment; the specification text is what needs to change.
+2. **Budget arithmetic** (already reported in AP2 #339, #368 and #377). `BudgetEvaluator` computes `int(self.constraint.max * 100)`. With floating point, a budget of 1.15 becomes 114 cents and 0.29 becomes 28: one cent less than intended. It also assumes two decimal places for every currency (wrong for JPY's zero, or BHD's three).
+3. **A budget depends on caller-supplied past spend** (raised in [AP2 #402](https://github.com/google-agentic-commerce/AP2/issues/402)) (`MandateContext.total_amount`). Nothing in a bundle lets a third party recompute it afterwards. AMEP's answer is to derive it from signed receipts, and to hold unknown outcomes.
 4. **Open mandates may omit `exp`.** The SDK model makes it optional, so an open payment mandate can be valid indefinitely. The profile reports this as a problem rather than assuming a window.

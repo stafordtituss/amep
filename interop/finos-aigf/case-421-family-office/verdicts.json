@@ -93,6 +93,6 @@
   "invariant": "-",
   "blame": null,
   "gaps": [],
-  "reason": "continuity preserved"
+  "reason": "nothing executed: inst:bank-b.example signed a not_executed call statement"
  }
 ]
