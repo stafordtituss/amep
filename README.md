@@ -105,6 +105,8 @@ AMEP needs outside scrutiny more than anything else. Three ways to help, all pub
 
 Every review, implementation and citation by others is logged, as written and including critical ones, in [`REVIEWS.md`](REVIEWS.md).
 
+**Independent implementations:** [zambo-amep-verify](https://github.com/zambodotdev/zambo-amep-verify) by Brennan Zambo, written from the specification and vectors alone, agrees with all 228 single-packet core vectors ([#19](https://github.com/stafordtituss/amep/issues/19)). More are welcome: see [#18](https://github.com/stafordtituss/amep/issues/18).
+
 ## Contributing
 
 Questions, vectors, implementations in other languages and research results are all welcome; see [`CONTRIBUTING.md`](CONTRIBUTING.md). Open problems suitable for papers and theses are in [`RESEARCH.md`](RESEARCH.md), and changes are listed in [`CHANGELOG.md`](CHANGELOG.md).
