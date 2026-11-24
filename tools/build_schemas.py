@@ -169,6 +169,7 @@ schemas["keyset"] = {
     "description": "Key set served at /.well-known/amep-keys.json (spec 12.4, 12.5).", "type": "object",
     "additionalProperties": {"type": "object", "required": ["kid", "alg", "x", "roles"], "additionalProperties": False,
         "properties": {"kid": {"type": "string"}, "alg": {"enum": ["Ed25519", "ES256"]}, "x": {"type": "string"},
+                       "operator": {"type": "string", "minLength": 1, "description": "Identifier of the organisation that controls this key (spec 12.5). Keys with the same operator are one party for observer independence (I10)."},
                        "roles": {"type": "array", "minItems": 1, "items": {"enum": ["issuer", "host", "observer", "approver"]}},
                        "nbf": {"$ref": C + "time"}, "exp": {"$ref": C + "time"}, "revoked": {"type": "boolean"}}}}
 os.makedirs(out, exist_ok=True)
