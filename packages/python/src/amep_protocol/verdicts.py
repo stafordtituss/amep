@@ -45,12 +45,27 @@ def verdict_record(packet_bytes: bytes, keys: dict, results: list, verifier: dic
     return rec
 
 
-def statement(packet_bytes: bytes, keys: dict, results: list, verifier: dict | None = None) -> dict:
-    """The in-toto Statement v1 whose subject is the evaluated packet."""
+def _check_subjects(subjects) -> list:
+    """in-toto ResourceDescriptors for the artifacts a verdict admits: [{name, digest: {alg: hex}}], none empty."""
+    if not isinstance(subjects, list) or not subjects:
+        raise ValueError("subjects must be a non-empty list")
+    out = []
+    for s in subjects:
+        d = s.get("digest") if isinstance(s, dict) else None
+        if not isinstance(s, dict) or not isinstance(s.get("name"), str) or not isinstance(d, dict) or not d or \
+                not all(isinstance(v, str) and v and all(c in "0123456789abcdef" for c in v) for v in d.values()):
+            raise ValueError("each subject needs a name and a digest of lowercase hex values")
+        out.append({"name": s["name"], "digest": dict(d)})
+    return out
+
+
+def statement(packet_bytes: bytes, keys: dict, results: list, verifier: dict | None = None, subjects: list | None = None) -> dict:
+    """The in-toto Statement v1 for a verdict. Its subject is the artifact the evaluated actions produced, when the
+    caller names one (a commit, a release, a payment), with the packet's digest in the predicate as an input;
+    otherwise the evaluated packet itself. Pass subjects=[{"name": ..., "digest": {"sha256": hex}}] to name artifacts."""
     rec = verdict_record(packet_bytes, keys, results, verifier)
-    return {"_type": STATEMENT_TYPE,
-            "subject": [{"name": "amep-packet", "digest": {"sha256": rec["packet"]["sha256"]}}],
-            "predicateType": PREDICATE_TYPE, "predicate": rec}
+    subject = [{"name": "amep-packet", "digest": {"sha256": rec["packet"]["sha256"]}}] if subjects is None else _check_subjects(subjects)
+    return {"_type": STATEMENT_TYPE, "subject": subject, "predicateType": PREDICATE_TYPE, "predicate": rec}
 
 
 def svr_statement(packet_bytes: bytes, keys: dict, results: list, verifier_id: str, time_created: str | None = None) -> dict:

@@ -3,6 +3,13 @@
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
 
+## Verdict statements can name the admitted artifact as subject (unreleased, 2026-11-24)
+
+- **From Sankalp Gilda's review of in-toto/attestation#625:** when the evaluated actions produced an artifact a policy admits (a commit, a release, a payment), that artifact should be the statement's subject, with the evidence packet as an input.
+- **Both statement builders now take optional `subjects`:** `statement(..., subjects=[...])` in Python and `statement(..., { subjects })` in JavaScript. Each subject is an in-toto ResourceDescriptor with a name and a digest of lowercase hex values. The packet stays in the predicate as `packet.sha256`.
+- **Without `subjects`, nothing changes:** the packet is the subject, and both verifiers still produce byte-identical statements for all 287 vectors.
+- `interop/in-toto/PREDICATE.md` describes the new subject model, and the example statement is regenerated for the current key set.
+
 ## Two fixes from Andrii's review on the OpenID AIIM list (unreleased, 2026-11-24)
 
 Andrii (Radiolaria) reported both, with reproductions against the published code and vectors, on openid-aiim on 24 November.
