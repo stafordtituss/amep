@@ -1065,6 +1065,11 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         obs = max(sorted(o for o in by_observer if d in by_observer[o]), key=lambda o: len(by_observer[o][d]))
         effects_of += [(e["executed"], d, obs) for e in by_observer[obs][d]]
     bodies = {d: x for x, d, _ in effects_of}
+    # spec 5.8.1 (v0.3.2): one operation takes effect at most once. Checked as soon as this call's receipts have verified,
+    # before any check that can only hold (held approvals, call statements, period limits), so no hold hides the second
+    # effect (found by the model check in formal/: an approval held for another call used to hide it).
+    _check(op_prev is not None and op_prev["invocation"] != rid, "violated", "I2",
+           f"operation {op} already took effect under {op_prev['invocation'] if op_prev else None}: executed twice", blame="agent")
     # every receipt a statement promises must be present, and no more (spec 5.14)
     for c in stmts:
         k = sum(1 for e in mine if e.get("observed_by") == c.get("observed_by"))
@@ -1097,15 +1102,22 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
             _check(bool(appr.get("consumed")), "violated", "I8", "approval already consumed", blame="agent")
             _check("expiry" in appr and to_time(appr["expiry"]) < max(t_inv, t_x), "violated", "I8", "approval expired", blame="agent")
             _check("nbf" in appr and to_time(appr["nbf"]) > t_inv, "violated", "I8", "approval not yet valid", blame="agent")
-        # spec 5.10, held approvals: after every check that decides violated, so a hold never hides a violation
+        # single use first: an approval another call already used is a violation, whatever holds it (spec 5.10)
+        for d in bodies:
+            use = (rid, d) if listed is None else op_use
+            first = approval_use.get(appr["id"], use)
+            _check(first != use, "violated", "I8", f"approval already used by {first[0]}", blame="agent")
+        # spec 5.10, held approvals: after every check that decides violated, so a hold never hides a violation. (The
+        # single-use check used to come after it, so a hold placed by a call after the approval's first use hid a third
+        # call's double use as held_outcome. Found by the model check in formal/.)
+        # this call's receipts show it used the approval, held or not: record the use first, so a third call is a
+        # double use even while an earlier call's outcome is unknown
+        for d in bodies:
+            approval_use.setdefault(appr["id"], (rid, d) if listed is None else op_use)
         holder = ctx["appr_held"].get(appr["id"]) if bodies else None
         _check(holder is not None and holder["invocation"] != rid, "unresolved", "I7",
                f"approval {appr['id']} is held for {holder and holder['invocation']}, whose outcome is unknown",
                need="held_outcome", ref=holder and holder["invocation"])
-        for d in bodies:
-            use = (rid, d) if listed is None else op_use
-            first = approval_use.setdefault(appr["id"], use)
-            _check(first != use, "violated", "I8", f"approval already used by {first[0]}", blame="agent")
     # 16. quantity limits (spec 7.6, v0.3), on every node of the chain and on the intent. An approval that passed I8
     # authorizes going over a limit; the amount still counts toward the period total. Every applicable limit is
     # checked before the result is decided, and a violation beats an unresolved check, so the verdict doesn't depend on
@@ -1146,10 +1158,8 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
     _check(bool(over) and not appr, "violated", "I2", f"risk budget of {over} exceeded without approval", blame="agent")
     for n in chain:
         spent[n["id"]] = spent.get(n["id"], 0) + c
-    # spec 5.8.1 (v0.3.2), after every other check: one operation takes effect at most once, and an attempt whose
-    # operation is held for an earlier attempt with an unknown outcome is held too, whatever authorization it carries
-    _check(op_prev is not None and op_prev["invocation"] != rid, "violated", "I2",
-           f"operation {op} already took effect under {op_prev['invocation'] if op_prev else None}: executed twice", blame="agent")
+    # spec 5.8.1 (v0.3.2), after every other check: an attempt whose operation is held for an earlier attempt with an
+    # unknown outcome is held too, whatever authorization it carries
     holder = ctx["ops_held"].get(op) if op is not None else None
     _check(holder is not None and holder["invocation"] != rid, "unresolved", "I7",
            f"operation {op} is held for {holder['invocation'] if holder else None}, whose outcome is unknown",
