@@ -211,3 +211,22 @@ test("verdict statement: the artifact as subject, the packet as an input (in-tot
   assert.throws(() => verdicts.statement(bytes, keys, res, undefined, { subjects: [] }));
   assert.throws(() => verdicts.statement(bytes, keys, res, undefined, { subjects: [{ name: "x", digest: { sha256: "ZZ" } }] }));
 });
+
+test("a not_executed statement only the actor signed releases no hold (spec 5.8.1, from review of #24)", () => {
+  const I = Key.generate("issuer-x", ["issuer"]), H = Key.generate("host-x", ["host"]), O = Key.generate("obs-x", ["observer"]);
+  const keys = keyset(I, H, O);
+  const m = I.sign(sdk.mandate("m-1", "user:x", sdk.claims(["tickets.update"], ["tickets:*"], "write_shared", 2000000000)), { v: 2 });
+  const a = H.sign(sdk.interpretation("a-1", "tickets", "1"), { v: 2 });
+  const inv = (id, t) => H.sign({ ...sdk.invocation(id, "m-1", "a-1", t, "tickets.update", "tickets:issue/1", "write_shared", { actor: "agent:x" }), operation: "op-1" }, { v: 2 });
+  const i0 = inv("i-0", 5), i1 = inv("i-1", 10);
+  const run = observedBy => {
+    const c0 = O.sign(sdk.callStatement("c-0", "i-0", observedBy, "not_executed", 0, 6), { v: 2 });
+    const e1 = O.sign(sdk.effect("e-1", "i-1", "server:tickets", "L1", sdk.effectBody("tickets.update", "tickets:issue/1", "write_shared", 11)), { v: 2 });
+    const res = evaluate(sdk.packet([m, a, i0, i1, c0, e1], { amepVersion: "0.3" }), keys, sigOk);
+    return Object.fromEntries(res.map(r => [r.id, [r.outcome, r.invariant]]));
+  };
+  // the actor's own word: i-0 stays unknown, so the retry is held
+  assert.deepEqual(run("agent:x"), { "i-0": ["unresolved", "I10"], "i-1": ["unresolved", "I7"] });
+  // an independent observer's statement: i-0 provably did nothing, so the retry proceeds
+  assert.deepEqual(run("server:tickets"), { "i-0": ["preserved", "-"], "i-1": ["preserved", "-"] });
+});

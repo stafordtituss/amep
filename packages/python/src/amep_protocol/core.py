@@ -959,19 +959,9 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
            "the arguments the server received differ from those the host signed (changed in transit)", blame="transport")
     _check(bool(rewritten), "unresolved", "I7", "the arguments were changed in transit; the server executed nothing", need="unaltered_call", ref=rid)
     _check(not_executed and bool(mine), "violated", "I11", "effect receipts contradict a signed not_executed statement", blame="server")
-    if not mine and not_executed:
-        # provably nothing was executed, so the call cannot have exceeded its authority; for a high-impact call the
-        # statement must come from a party other than the actor (I10)
-        hi = CEILING.index(inv["declared"]["effect"]) >= CEILING.index("write_shared")
-        _check(hi and all(c.get("observed_by") == inv.get("actor") or ctx["same_operator"](c, inv) for c in stmts if c["disposition"] == "not_executed"),
-               "unresolved", "I10", "high-impact call reported not executed only by the actor itself, or by a key of the host's own operator",
-               need="independent_observer", ref=rid)
-        # say why it is preserved: nothing ran, on the observer's signed word, not "within authority"
-        who = ", ".join(sorted({str(c.get("observed_by")) for c in stmts if c["disposition"] == "not_executed"}))
-        return f"nothing executed: {who} signed a not_executed call statement"
-    # 11. effect receipts. With none and no not_executed statement, the call may still have moved value: hold its
-    # reserve (or an unknown amount) against every period limit on its chain that applies to it (spec 7.6 rule 6).
-    if not mine:
+    def hold_unknown():
+        """An unknown outcome holds what the call could have used: its reserve against period limits (spec 7.6 rule 6),
+        its approval (5.10) and its operation (5.8.1), until evidence another party can check shows what happened."""
         reserve = inv.get("reserve") if ctx["v03"] else None
         amounts = {}
         for n in limited:
@@ -990,6 +980,24 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         # spec 5.8.1 (v0.3.2): likewise the operation, so a retry under fresh authorization can't take effect unnoticed
         if op is not None and op not in ctx["ops_held"] and op not in ctx["ops_done"]:
             ctx["ops_held"][op] = {"invocation": rid, "digest": inv_digest}
+
+    if not mine and not_executed:
+        # provably nothing was executed, so the call cannot have exceeded its authority; for a high-impact call the
+        # statement must come from a party other than the actor (I10). A statement that fails that test shows nothing, so
+        # the outcome stays unknown and the holds stay (v0.3.2, from Brennan Zambo's review of #24).
+        hi = CEILING.index(inv["declared"]["effect"]) >= CEILING.index("write_shared")
+        self_only = hi and all(c.get("observed_by") == inv.get("actor") or ctx["same_operator"](c, inv) for c in stmts if c["disposition"] == "not_executed")
+        if self_only:
+            hold_unknown()
+        _check(self_only, "unresolved", "I10", "high-impact call reported not executed only by the actor itself, or by a key of the host's own operator",
+               need="independent_observer", ref=rid)
+        # say why it is preserved: nothing ran, on the observer's signed word, not "within authority"
+        who = ", ".join(sorted({str(c.get("observed_by")) for c in stmts if c["disposition"] == "not_executed"}))
+        return f"nothing executed: {who} signed a not_executed call statement"
+    # 11. effect receipts. With none and no not_executed statement, the call may still have moved value: hold its
+    # reserve (or an unknown amount) against every period limit on its chain that applies to it (spec 7.6 rule 6).
+    if not mine:
+        hold_unknown()
     _check(not mine, "unresolved", "I7", "no executed-effect receipt", need="receipt", ref=rid)
     # spec 5.8.1 (v0.3.2): this attempt took effect. The operation is done; a hold it had on the operation is released.
     op_prev = ctx["ops_done"].get(op) if op is not None else None

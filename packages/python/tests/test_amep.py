@@ -37,6 +37,27 @@ def build(write_resource="repo:app/src/auth.ts", executed_resource=None):
 
 
 class SdkTest(unittest.TestCase):
+    def test_self_reported_not_executed_releases_no_hold(self):
+        # spec 5.8.1 (from review of #24): a not_executed statement only the actor signed shows nothing, so a
+        # high-impact first attempt stays unknown and a retry of the same operation is held
+        from amep_protocol import sdk, evaluate
+        I, H, O = sdk.Key.generate("issuer-x", ["issuer"]), sdk.Key.generate("host-x", ["host"]), sdk.Key.generate("obs-x", ["observer"])
+        keys = sdk.keyset(I, H, O)
+        m = I.sign(sdk.mandate("m-1", "user:x", sdk.claims(["tickets.update"], ["tickets:*"], "write_shared", 2000000000)), v=2)
+        a = H.sign(sdk.interpretation("a-1", "tickets", "1"), v=2)
+        def inv(i, t):
+            return H.sign({**sdk.invocation(i, "m-1", "a-1", t, "tickets.update", "tickets:issue/1", "write_shared", actor="agent:x"),
+                           "operation": "op-1"}, v=2)
+        i0, i1 = inv("i-0", 5), inv("i-1", 10)
+        def run(observed_by):
+            c0 = O.sign(sdk.call_statement("c-0", "i-0", observed_by, "not_executed", 0, 6), v=2)
+            e1 = O.sign(sdk.effect("e-1", "i-1", "server:tickets", "L1",
+                                   sdk.effect_body("tickets.update", "tickets:issue/1", "write_shared", 11)), v=2)
+            res = evaluate(sdk.packet(m, a, i0, i1, c0, e1, amep_version="0.3"), keys)
+            return {r.invocation: (r.outcome, r.invariant) for r in res}
+        self.assertEqual(run("agent:x"), {"i-0": ("unresolved", "I10"), "i-1": ("unresolved", "I7")})
+        self.assertEqual(run("server:tickets"), {"i-0": ("preserved", "-"), "i-1": ("preserved", "-")})
+
     def test_round_trip_preserved(self):
         p, keys = build()
         self.assertEqual(verdict(evaluate(p, keys)).outcome, "preserved")

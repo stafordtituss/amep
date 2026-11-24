@@ -14,7 +14,8 @@ Specification drafts, conformance-suite versions and package versions are listed
 - **The limit, stated in 5.8.1:** the identifier is chosen by the party that retries, so it binds only what that party records.
 - **Suite v0.3.2:** 5 core vectors (3 must-reject, all `preserved` before this change; 2 positive). No existing vector changes. The core suite now has 256 vectors (68 positive, 188 must-reject), 292 across the three suites.
 - **Schemas:** `operation` is an optional string of 1 to 256 characters in `invocation.json` and the CDDL.
-- **Status:** a proposal. The expected answers are open for Andrii's review before this is merged.
+- **What releases a hold (from Brennan Zambo's review on #24):** only a showing someone other than the actor can check. A high-impact first attempt reported not executed only by the actor's own side stays unknown, and every hold it had stays (operation, approval, period reserve). Before this, such a statement failed I10 for the first attempt but still let a retry through; tests in both packages pin it.
+- **Status:** a proposal. Brennan Zambo agreed with all five expected answers (#24); Andrii's review is open.
 
 ## Verdict statements can name the admitted artifact as subject (unreleased, 2026-11-24)
 

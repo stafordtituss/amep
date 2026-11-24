@@ -704,18 +704,9 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     check(rewritten.length > 0 && !notExecuted, "violated", "I2", "the arguments the server received differ from those the host signed (changed in transit)", { blame: "transport" });
     check(rewritten.length > 0, "unresolved", "I7", "the arguments were changed in transit; the server executed nothing", { need: "unaltered_call", ref: id });
     check(notExecuted && mine.length > 0, "violated", "I11", "effect receipts contradict a signed not_executed statement", { blame: "server" });
-    if (!mine.length && notExecuted) {
-      // provably nothing was executed; for a high-impact call the statement must come from a party other than the actor (I10)
-      const hi = CEILING.indexOf(inv.declared.effect) >= CEILING.indexOf("write_shared");
-      check(hi && stmts.filter(c => c.disposition === "not_executed").every(c => c.observed_by === inv.actor || sameOperator(c, inv)),
-        "unresolved", "I10", "high-impact call reported not executed only by the actor itself, or by a key of the host's own operator", { need: "independent_observer", ref: id });
-      // say why it is preserved: nothing ran, on the observer's signed word, not "within authority"
-      const who = [...new Set(stmts.filter(c => c.disposition === "not_executed").map(c => String(c.observed_by)))].sort().join(", ");
-      return `nothing executed: ${who} signed a not_executed call statement`;
-    }
-    // effect receipts. With none and no not_executed statement, the call may still have moved value: hold its reserve (or
-    // an unknown amount) against every period limit on its chain that applies to it (spec 7.6 rule 6).
-    if (!mine.length) {
+    // An unknown outcome holds what the call could have used: its reserve against period limits (spec 7.6 rule 6), its
+    // approval (5.10) and its operation (5.8.1), until evidence another party can check shows what happened.
+    const holdUnknown = () => {
       const reserve = v03 ? inv.reserve : undefined, amounts = {};
       for (const node of limited) for (const lim of node.claims.limits)
         if ("per_period" in lim && limitApplies(lim, inv.declared))
@@ -727,7 +718,22 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       if (typeof ref === "string" && !Object.hasOwn(apprHeld, ref)) apprHeld[ref] = { invocation: id, digest: invDigest };
       // spec 5.8.1 (v0.3.2): likewise the operation, so a retry under fresh authorization can't take effect unnoticed
       if (op !== undefined && !Object.hasOwn(opsHeld, op) && !Object.hasOwn(opsDone, op)) opsHeld[op] = { invocation: id, digest: invDigest };
+    };
+    if (!mine.length && notExecuted) {
+      // provably nothing was executed; for a high-impact call the statement must come from a party other than the actor (I10).
+      // A statement that fails that test shows nothing, so the outcome stays unknown and the holds stay (v0.3.2; a release
+      // must not rest on the word of the party that benefits from it, from Brennan Zambo's review of #24).
+      const hi = CEILING.indexOf(inv.declared.effect) >= CEILING.indexOf("write_shared");
+      const selfOnly = hi && stmts.filter(c => c.disposition === "not_executed").every(c => c.observed_by === inv.actor || sameOperator(c, inv));
+      if (selfOnly) holdUnknown();
+      check(selfOnly, "unresolved", "I10", "high-impact call reported not executed only by the actor itself, or by a key of the host's own operator", { need: "independent_observer", ref: id });
+      // say why it is preserved: nothing ran, on the observer's signed word, not "within authority"
+      const who = [...new Set(stmts.filter(c => c.disposition === "not_executed").map(c => String(c.observed_by)))].sort().join(", ");
+      return `nothing executed: ${who} signed a not_executed call statement`;
     }
+    // effect receipts. With none and no not_executed statement, the call may still have moved value: hold its reserve (or
+    // an unknown amount) against every period limit on its chain that applies to it (spec 7.6 rule 6).
+    if (!mine.length) holdUnknown();
     check(!mine.length, "unresolved", "I7", "no executed-effect receipt", { need: "receipt", ref: id });
     // spec 5.8.1 (v0.3.2): this attempt took effect. The operation is done; a hold it had on the operation is released.
     const opPrev = op !== undefined && Object.hasOwn(opsDone, op) ? opsDone[op] : null;
