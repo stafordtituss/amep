@@ -154,6 +154,22 @@ class VerdictStatementTest(unittest.TestCase):
         self.assertEqual(st["subject"][0]["digest"]["sha256"], hashlib.sha256(data).hexdigest())
         self.assertEqual(st["predicate"]["verdict"], {"outcome": "violated", "invariant": "I2", "blame": "agent", "gaps": []})
 
+    def test_statement_artifact_subject(self):
+        # in-toto/attestation#625: the artifact as subject, the packet as an input
+        from amep_protocol import evaluate_text, verdicts
+        data, keys = self._packet()
+        res = evaluate_text(data.decode(), keys)
+        commit = {"name": "git+https://example.com/app@refs/heads/main", "digest": {"gitCommit": "a" * 40}}
+        st = verdicts.statement(data, keys, res, subjects=[commit])
+        self.assertEqual(st["subject"], [commit])
+        self.assertEqual(st["predicate"]["packet"]["sha256"], hashlib.sha256(data).hexdigest())
+        self.assertEqual(verdicts.statement(data, keys, res)["subject"],
+                         [{"name": "amep-packet", "digest": {"sha256": hashlib.sha256(data).hexdigest()}}])
+        with self.assertRaises(ValueError):
+            verdicts.statement(data, keys, res, subjects=[])
+        with self.assertRaises(ValueError):
+            verdicts.statement(data, keys, res, subjects=[{"name": "x", "digest": {"sha256": "ZZ"}}])
+
     def test_envelope_round_trip_and_tamper(self):
         from amep_protocol import evaluate_text, verdicts
         from cryptography.hazmat.primitives import serialization
