@@ -6,7 +6,10 @@
 //   1. signs each recorded effect as an AMEP ExecutedEffectReceipt (spec 5.9), bound to the exact signed invocation
 //      the gateway sent (invocation_digest);
 //   2. signs one call statement (spec 5.14) saying whether anything was executed, how many receipts belong to the
-//      call, and the digest of the arguments the server received;
+//      call, and the digest of the arguments the server received. "Nothing was executed" (not_executed) is signed only
+//      when it is known: the handler returned normally with no effect recorded, or it refused before acting by
+//      throwing `NotExecuted`. A handler that throws anything else after recording nothing may have acted without
+//      recording it, so its outcome is unknown and no statement is signed: the call stays unresolved;
 //   3. stores both (write-ahead), so a client whose response was lost can fetch them with resources/read on
 //      amep-receipt://{invocation-id};
 //   4. attaches them to the result's `_meta`.
@@ -65,6 +68,14 @@ function wantsReceipts(ctx, server) {
  * Where a server keeps the evidence of recent calls, so a client whose response was lost can fetch it. The default
  * keeps the most recent `max` calls in memory; a production server supplies a durable store with the same interface.
  */
+/**
+ * Thrown by a tool handler that refuses before doing anything (validation failed, precondition not met): the only
+ * failure the wrapper may report as "nothing was executed". Throw it before any effect, never after one.
+ */
+export class NotExecuted extends Error {
+  constructor(message = "refused before execution") { super(message); this.name = "NotExecuted"; }
+}
+
 export class MemoryReceiptStore {
   #m = new Map();
   constructor({ max = 10_000 } = {}) { this.max = max; }
@@ -153,11 +164,17 @@ export class AmepEvidenceExtension {
       const receipts = recorded.map(body => this.observerKey.sign(sdk.effect(`${this.observedBy}:e-${++this.#counter}`,
         invocationId, this.observedBy, this.assurance, body, { invocationDigest }), { v: 2 }));
       const failed = !!failure || result?.isError === true;
+      // "No effect was recorded" is "no effect occurred" only if the handler ran to the end (every effect on its path
+      // was recorded) or refused before acting. An exception after an effect but before recordEffect would otherwise
+      // become a signed, false not_executed, which also releases holds (spec 5.10, 7.6). Reported by Andrii
+      // (Radiolaria) on openid-aiim, 24 Nov 2026.
+      const unknown = receipts.length === 0 && !!failure && !(failure instanceof NotExecuted);
       const disposition = receipts.length === 0 ? "not_executed" : failed ? "failed_after_effects" : "completed";
-      const statement = this.observerKey.sign(sdk.callStatement(`${this.observedBy}:c-${++this.#counter}`, invocationId,
-        this.observedBy, disposition, receipts.length, now, { invocationDigest, argsDigest: sdk.argsDigest(received) }), { v: 2 });
-      await this.store.put(invocationId, { call_statement: statement, receipts });   // write-ahead, before returning
-      const evidence = { [CALL_STATEMENT_KEY]: statement };
+      const statement = unknown ? undefined : this.observerKey.sign(sdk.callStatement(`${this.observedBy}:c-${++this.#counter}`,
+        invocationId, this.observedBy, disposition, receipts.length, now, { invocationDigest, argsDigest: sdk.argsDigest(received) }), { v: 2 });
+      // write-ahead, before returning; an unknown outcome is stored as such, so a later fetch doesn't read it as "none"
+      await this.store.put(invocationId, statement ? { call_statement: statement, receipts } : { receipts, outcome: "unknown" });
+      const evidence = statement ? { [CALL_STATEMENT_KEY]: statement } : {};
       if (receipts.length) evidence[RECEIPT_KEY] = receipts.length === 1 ? receipts[0] : receipts;
       if (failure) return { content: [{ type: "text", text: String(failure?.message ?? failure) }], isError: true, _meta: evidence };
       return { ...result, _meta: { ...(result?._meta ?? {}), ...evidence } };
