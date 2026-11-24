@@ -2,7 +2,7 @@
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24317758.svg)](https://doi.org/10.5281/zenodo.24317758) [![PyPI](https://img.shields.io/pypi/v/amep-protocol)](https://pypi.org/project/amep-protocol/) [![npm](https://img.shields.io/npm/v/@stafordtituss/amep)](https://www.npmjs.com/package/@stafordtituss/amep)
 
-**Status:** draft v0.3.0-draft.1 (packages 0.3.0a4) · **Independent implementation:** [zambo-amep-verify](https://github.com/zambodotdev/zambo-amep-verify), 228/228 single-packet core vectors · **Author and editor:** Staford Titus Selvaraj ([ORCID 0009-0004-8227-7595](https://orcid.org/0009-0004-8227-7595)) · **IETF:** [draft-stafordtituss-agentic-mandate-evidence](https://datatracker.ietf.org/doc/draft-stafordtituss-agentic-mandate-evidence/) · **Paper:** [Preprints.org, doi:10.20944/preprints202611.1865.v1](https://doi.org/10.20944/preprints202611.1865.v1)
+**Status:** draft v0.3.0-draft.1 (packages 0.3.0a4) · **Independent implementation:** [zambo-amep-verify](https://github.com/zambodotdev/zambo-amep-verify), 246/246 core vectors (cross-packet state supplied) · **Author and editor:** Staford Titus Selvaraj ([ORCID 0009-0004-8227-7595](https://orcid.org/0009-0004-8227-7595)) · **IETF:** [draft-stafordtituss-agentic-mandate-evidence](https://datatracker.ietf.org/doc/draft-stafordtituss-agentic-mandate-evidence/) · **Paper:** [Preprints.org, doi:10.20944/preprints202611.1865.v1](https://doi.org/10.20944/preprints202611.1865.v1)
 
 AI agents act for people through chains of delegation, tools and adapters. Identity tells you *who* acted, and authorization tells you what a token *allowed*. Neither proves that **what actually happened stayed within what a person authorized**.
 
@@ -105,7 +105,7 @@ AMEP needs outside scrutiny more than anything else. Three ways to help, all pub
 
 Every review, implementation and citation by others is logged, as written and including critical ones, in [`REVIEWS.md`](REVIEWS.md).
 
-**Independent implementations:** [zambo-amep-verify](https://github.com/zambodotdev/zambo-amep-verify) by Brennan Zambo, written from the specification and vectors alone, agrees with all 228 single-packet core vectors ([#19](https://github.com/stafordtituss/amep/issues/19)). More are welcome: see [#18](https://github.com/stafordtituss/amep/issues/18).
+**Independent implementations:** [zambo-amep-verify](https://github.com/zambodotdev/zambo-amep-verify) by Brennan Zambo, written from the specification and vectors alone, agrees with all 246 core vectors, given the earlier state that the 18 cross-packet vectors supply; it doesn't build that state itself yet ([#19](https://github.com/stafordtituss/amep/issues/19)). More are welcome: see [#18](https://github.com/stafordtituss/amep/issues/18).
 
 ## Contributing
 
