@@ -2,7 +2,17 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
-## A host's own enforcement claim never settles a deny (unreleased, 2026-11-24)
+## Packages amep-protocol 0.3.0a4, @stafordtituss/amep 0.3.0-alpha.4, amep-mcp 0.1.0a5 (2026-11-24)
+
+They carry the change below that was marked unreleased: **a host's own enforcement claim never settles a deny**, from issue #15.
+
+**One verdict changes from 0.3.0a3:** a pre-execution deny with `fail_mode: closed` or `applied: confirmed` and no other record is now `unresolved`, where it was `preserved`. Deployments that relied on it should have the enforcement point or gateway issue `not_executed` call statements (spec 5.14).
+
+amep-mcp 0.1.0a5 bundles the 243-vector core suite and needs amep-protocol 0.3.0a4.
+
+The AP2 entries below sit in the repository (`interop/ap2/`) and in the conformance tool, which isn't published.
+
+## A host's own enforcement claim never settles a deny (2026-11-24)
 
 - **The question,** from issue #15. A pre-execution deny whose `enforcement` says `fail_mode: closed` or `applied: confirmed` used to make the call `preserved` ("denied; no effect") with no other record. The host that signs the deny declares both fields, so that was self-reported evidence for "nothing executed".
   - Raised with delegation-control-bench, where 12 denied scenarios with only a decision log came out 12/12 `preserved` under AMEP and 0/12 under the bench's reference verifier.
@@ -22,14 +32,14 @@ Specification drafts, conformance-suite versions and package versions are listed
   - New: `high-impact-deny-on-a-fail-closed-host--no-independent-record` (`unresolved`, I10); `high-impact-deny-on-a-fail-closed-host--reported-not-executed-by-an-independent-observer` (`preserved`); `deny-on-a-fail-closed-host-contradicted-by-an-observed-effect` (`violated`, I11), the test Brennan suggested; `deny-on-a-fail-closed-host-does-not-clear-an-invocation-under-revoked-authority` (`violated`, I6; `preserved` under the old rule).
 - **The core suite now has 243 vectors, 279 across the three suites.** Both reference verifiers agree on all 279, and a verifier that answers "preserved" to everything scores 73/279.
 
-## AP2: one consent redeemed twice is caught afterwards (unreleased, 2026-11-24)
+## AP2: one consent redeemed twice is caught afterwards (repository only, 2026-11-24)
 
 - **Each closed payment mandate becomes an AMEP intent** limited to its own payee and amount per call. The same closed mandate presented and processed twice (AP2 #346, which the SDK's verifier accepts) is `violated` (I2), even when the total stays within every limit of the open mandate.
 - **New scenarios:** `s10`, `s11` and an SDK-produced `sdk-redeemed-twice`.
 - **The README** gains "Where AMEP goes further than AP2", row by row with its evidence.
 - **`interop/ap2/verdicts.json`** is AMEP's pinned column for the AER-1 crosswalk on AP2 #402.
 
-## AP2 payments, evaluated afterwards (unreleased, 2026-11-23)
+## AP2 payments, evaluated afterwards (repository only, 2026-11-23)
 
 - `packages/conformance/src/profiles/ap2.mjs` reads Google's Agent Payments Protocol (AP2) artifacts and checks them by AP2's own rules: ES256 signatures, SD-JWT disclosures, the closed mandate's `sd_hash`, and receipt references. It builds AMEP evidence from them: the open mandate becomes the authority, each closed mandate an invocation with its amount as `reserve`, and each signed receipt an effect or a `not_executed` statement.
 - `interop/ap2/` evaluates nine scenarios payment by payment, next to AP2's own per-payment check. AMEP decides two things AP2 leaves open:
@@ -117,7 +127,7 @@ They carry every change below, down to "Operation approvals", in both reference 
 
 amep-mcp 0.1.0a3 bundles the 233-vector suite and needs amep-protocol 0.3.0a2.
 
-## Limits: order-independent, and observer totals name their window (unreleased, 2026-11-23)
+## Limits: order-independent, and observer totals name their window (2026-11-23)
 
 From Carlos Vendrell Felici's rerun of his payments review against this draft (stafordtituss/amep#10, 23 Nov 2026). He found three problems.
 
@@ -136,7 +146,7 @@ From Carlos Vendrell Felici's rerun of his payments review against this draft (s
   Suite v0.3.0 is 233 vectors (62 positive, 171 must-reject); both verifiers agree on all 269 of the three suites. JSON Schema and CDDL require `{from, total}`.
 - **Private vulnerability reporting** is now enabled on the repository, for the operation-approval findings he holds back for a private advisory.
 
-## Holds: an unknown outcome stays counted across packets (unreleased, 2026-11-23)
+## Holds: an unknown outcome stays counted across packets (2026-11-23)
 
 - **Spec 7.6 rule 6, 5.8 and 10.7:** an invocation may carry `reserve` (`{amount, unit}`), the most the call can move. When a verified invocation ends a packet with no receipt and no `not_executed` statement, the verifier's state holds it against every period limit on its chain: at its `reserve`, or at an unknown amount without one. In later packets:
   - a period total that could exceed its limit with the holds added is `unresolved` (I7), gap `held_outcome`;
@@ -155,7 +165,7 @@ From Carlos Vendrell Felici's rerun of his payments review against this draft (s
 - An approval that passed I8 authorizes its effect to go over the limit, so holds don't block it (a vector covers it).
 - Suite v0.3.0 is now 228 vectors (62 positive, 166 must-reject), 7 of them new; both verifiers agree on all 264 vectors of the three suites. JSON Schema and CDDL gain `reserve`.
 
-## Worked example for FINOS AIGF #421 (unreleased, 2026-11-23)
+## Worked example for FINOS AIGF #421 (repository only, 2026-11-23)
 
 - **`interop/finos-aigf/case-421-family-office/`:** the family-office example of finos/ai-governance-framework#421 as seven signed packets. A client's USD 10M mandate is split across two banks; each bank signs what it booked and counts its own leg, and the client's verifier holds the total. The phases:
   - a plan within the mandate (`preserved`);
