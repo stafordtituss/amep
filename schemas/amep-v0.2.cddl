@@ -255,6 +255,7 @@ key-entry = {
   alg: "Ed25519" / "ES256"
   x: tstr
   roles: [+ ("issuer" / "host" / "observer" / "approver")]
+  ? operator: tstr .size (1..1000)   ; spec 12.5: the organisation that controls this key (v0.3)
   ? nbf: amep-time
   ? exp: amep-time
   ? revoked: bool

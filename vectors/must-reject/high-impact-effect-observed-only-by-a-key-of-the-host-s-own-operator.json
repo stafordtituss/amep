@@ -1,0 +1,117 @@
+{
+ "name": "high-impact effect observed only by a key of the host's own operator",
+ "expect": {
+  "outcome": "unresolved",
+  "invariant": "I10"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "fs.*",
+      "process.exec"
+     ],
+     "resources": [
+      "repo:app/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "external_send",
+     "exp": 100,
+     "depth": 2
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "af140821659e3cd1a92144f06ef1126790e050e7103a72dea58f0af8cd00c26317e910c33fe636242e942347e180d4fef992a38e0636df8d6a040c26989ad902"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "fs.write"
+     ],
+     "resources": [
+      "repo:app/src/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "external_send",
+     "exp": 90,
+     "depth": 1
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "a6d439a7f1865b41589d528d8122086285d5066d466706e4edb044387e7a231afdc71e5834cf49cd9c4c205ce3a9419218578dcf32ce3486299088c7c0b7fc0f"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "host_shell",
+    "version": "r9",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "185d02d49c8440af31134eec4b820a71cfa92a89dd007f0b912acbcb9bf860641ff6e3ff58e7a08754e6bf9c27d2269d166521b86e39293ad09957a61fe75a09"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "external_send"
+    },
+    "actor": "agent:assistant-1",
+    "proof": {
+     "kid": "host-2",
+     "alg": "Ed25519",
+     "sig": "f171b81a161dc4dc7c0b493e152cd32ae3b4c1e5cd7476de6ae4d07c8476fecc6abbc5bcb3defc781189e5218101abeaa61eeef5435dc33fd326e65cbbb47405"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "proxy:egress",
+    "assurance": "L2",
+    "executed": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "external_send",
+     "released": [],
+     "t": 11
+    },
+    "proof": {
+     "kid": "observer-2",
+     "alg": "Ed25519",
+     "sig": "c1c186c6d6c14f0f6b71a9af3ff8362bf615440de0e7c6694208b1a61a5710a4e1b9ab625cfd7000e72fc4d8002c5cfa2b19e021b8c7ef621fb7b9d503f26904"
+    }
+   }
+  ]
+ }
+}

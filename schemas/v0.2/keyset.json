@@ -26,6 +26,11 @@
    "x": {
     "type": "string"
    },
+   "operator": {
+    "type": "string",
+    "minLength": 1,
+    "description": "Identifier of the organisation that controls this key (spec 12.5). Keys with the same operator are one party for observer independence (I10)."
+   },
    "roles": {
     "type": "array",
     "minItems": 1,

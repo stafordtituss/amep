@@ -25,7 +25,7 @@ node packages/conformance/bin/amep-conformance.mjs verify \
 
 **What the command must print.** On stdout: `{"outcome": "...", "invariant": "..."}`, or the same object under `"verdict"`. A crash, a timeout or output that isn't JSON counts as a miss, never a pass.
 
-**Suites.** By default the tool runs three: `vectors/`, `interop/approval-path-attacks/` and `interop/w3c-agent-identity/delegation-continuity/`, 279 vectors in all. Add `--suite DIR` to run others.
+**Suites.** By default the tool runs three: `vectors/`, `interop/approval-path-attacks/` and `interop/w3c-agent-identity/delegation-continuity/`, 282 vectors in all. Add `--suite DIR` to run others.
 
 **Results.** `results.json` records the implementation, the tool version, each suite's SHA-256 and pass counts, and every disagreement. `results.md` is a summary ready to paste into an [implementation report](https://github.com/stafordtituss/amep/issues/new?template=implementation-report.yml).
 
@@ -33,9 +33,9 @@ node packages/conformance/bin/amep-conformance.mjs verify \
 
 | Verifier | Result |
 |---|---|
-| Python `amep-protocol` | 279/279 |
-| JavaScript `@stafordtituss/amep` | 279/279 |
-| A verifier that answers "preserved" to everything | 73/279: every positive vector, no must-reject vector |
+| Python `amep-protocol` | 282/282 |
+| JavaScript `@stafordtituss/amep` | 282/282 |
+| A verifier that answers "preserved" to everything | 74/282: every positive vector, no must-reject vector |
 
 ## `import`: bring your own records
 

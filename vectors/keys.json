@@ -55,5 +55,32 @@
   "roles": [
    "observer"
   ]
+ },
+ "host-2": {
+  "kid": "host-2",
+  "alg": "Ed25519",
+  "x": "443d36189f90fd357d4afe9527ac51443832a95ba033854ec0a77512efe8e1ac",
+  "roles": [
+   "host"
+  ],
+  "operator": "op:agent-platform.example"
+ },
+ "observer-2": {
+  "kid": "observer-2",
+  "alg": "Ed25519",
+  "x": "079f23c7411259e315d9588fdb9eddf8064844b684cdd760b2fcdeeea4eb89c9",
+  "roles": [
+   "observer"
+  ],
+  "operator": "op:agent-platform.example"
+ },
+ "observer-3": {
+  "kid": "observer-3",
+  "alg": "Ed25519",
+  "x": "a40d82c9b9eaad47db5f6da25740c3bb034e487f30a522346ceb7dd828306328",
+  "roles": [
+   "observer"
+  ],
+  "operator": "op:independent-audit.example"
  }
 }

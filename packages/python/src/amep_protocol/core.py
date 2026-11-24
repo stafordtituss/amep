@@ -660,7 +660,18 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
         if d.get("mode") == "quarantine" and d.get("phase") == "pre_execution" and d.get("invocation") in order:
             for f in d.get("quarantined", []):
                 quarantined[f] = min(quarantined.get(f, len(invocations)), order[d["invocation"]])
-    ctx = {"v03": v03, "totals": totals, "prior_windows": prior_windows,
+    def operator_of(o):
+        # spec 12.5 (v0.3): a key may name the operator that controls it; two keys with the same operator are one party
+        # for observer independence (I10), whatever identifiers their records use
+        kid = (o.get("proof") or {}).get("kid") if isinstance(o, dict) else None
+        k = keys.get(kid) if isinstance(kid, str) else None
+        return k["operator"] if isinstance(k, dict) and isinstance(k.get("operator"), str) else None
+
+    def same_operator(a, b):
+        x = operator_of(a)
+        return x is not None and x == operator_of(b)
+
+    ctx = {"v03": v03, "totals": totals, "prior_windows": prior_windows, "same_operator": same_operator,
            "held": {d: h for d, h in held_in.items() if d not in present}, "new_held": {}, "first_cause": first_cause,
            # spec 5.10, held approvals (v0.3): approvals held for earlier invocations whose outcome is unknown; one held by an
            # invocation in this packet is set aside, since this packet decides that invocation afresh
@@ -902,8 +913,9 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         # provably nothing was executed, so the call cannot have exceeded its authority; for a high-impact call the
         # statement must come from a party other than the actor (I10)
         hi = CEILING.index(inv["declared"]["effect"]) >= CEILING.index("write_shared")
-        _check(hi and all(c.get("observed_by") == inv.get("actor") for c in stmts if c["disposition"] == "not_executed"),
-               "unresolved", "I10", "high-impact call reported not executed only by the actor itself", need="independent_observer", ref=rid)
+        _check(hi and all(c.get("observed_by") == inv.get("actor") or ctx["same_operator"](c, inv) for c in stmts if c["disposition"] == "not_executed"),
+               "unresolved", "I10", "high-impact call reported not executed only by the actor itself, or by a key of the host's own operator",
+               need="independent_observer", ref=rid)
         # say why it is preserved: nothing ran, on the observer's signed word, not "within authority"
         who = ", ".join(sorted({str(c.get("observed_by")) for c in stmts if c["disposition"] == "not_executed"}))
         return f"nothing executed: {who} signed a not_executed call statement"
@@ -944,6 +956,8 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         if high_impact:
             _check(not inv.get("actor"), "unresolved", "I10", "actor not recorded; observer independence cannot be shown", need="actor", ref=rid)
             _check(e.get("observed_by") == inv["actor"] or e.get("assurance") == "L0", "unresolved", "I10", "high-impact effect only self-reported", need="independent_observer", ref=e.get('id', '?'))
+            _check(ctx["same_operator"](e, inv), "unresolved", "I10", "high-impact effect observed only by a key of the host's own operator",
+                   need="independent_observer", ref=e.get('id', '?'))
         x = e["executed"]
         # liveness at each effect's own time (spec 8 I6, v0.3): authority must still be in force when the effect
         # occurs, not only when it was invoked. Proposed by Cliff Singletary on audit@ietf.org, 19 Nov 2026.

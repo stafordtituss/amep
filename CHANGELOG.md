@@ -2,6 +2,19 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## Observer independence by operator, not only by name (unreleased, 2026-11-24)
+
+- **The gap,** listed in LIMITS.md: for high-impact effects, I10 requires an observer other than the actor, but AMEP compared identifiers only. A host could sign the invocation with one key and the receipt with another, under a different name, and I10 was met.
+- **Now (spec 12.5, I10, 5.14 rule 5):** a key may carry `operator`, the organisation that controls it. When the key that signed an effect receipt or a `not_executed` statement and the key that signed the invocation both name the same operator, I10 is not met: `unresolved`, need `independent_observer`. A key set that names no operators behaves as before.
+- **Schema:** `operator` is an optional string in `schemas/v0.2/keyset.json`.
+- **Three new core vectors** (one positive, two must-reject), with keys `host-2`, `observer-2` (same operator) and `observer-3` (another operator) added to `vectors/keys.json`:
+  - `high-impact-effect-observed-only-by-a-key-of-the-host-s-own-operator` (`unresolved`, I10);
+  - `high-impact-call-reported-not-executed-only-by-a-key-of-the-host-s-own-operator` (`unresolved`, I10);
+  - `high-impact-effect-observed-by-a-key-of-another-operator` (`preserved`).
+
+  Under the previous rule both must-reject vectors were `preserved`.
+- **The core suite now has 246 vectors, 282 across the three suites.** No existing vector changes its verdict. The key set's digest changes, because it gains three keys.
+
 ## Packages amep-protocol 0.3.0a4, @stafordtituss/amep 0.3.0-alpha.4, amep-mcp 0.1.0a5 (2026-11-24)
 
 They carry the change below that was marked unreleased: **a host's own enforcement claim never settles a deny**, from issue #15.

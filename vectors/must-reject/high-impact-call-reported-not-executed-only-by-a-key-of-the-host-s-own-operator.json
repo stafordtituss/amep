@@ -1,0 +1,122 @@
+{
+ "name": "high-impact call reported not executed only by a key of the host's own operator",
+ "expect": {
+  "outcome": "unresolved",
+  "invariant": "I10"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "fs.*",
+      "process.exec"
+     ],
+     "resources": [
+      "repo:app/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "external_send",
+     "exp": 100,
+     "depth": 2
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "a74bd5bf40aa639d6538a09574c33f42edc8bc6eadfcf2e3cac6ceed94a042ea34040226d0ed73a108cf7768d9fd8a995ef4da4f76bdc1c834ddf30bb72bfc05"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "fs.write"
+     ],
+     "resources": [
+      "repo:app/src/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "external_send",
+     "exp": 90,
+     "depth": 1
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "00f621f3c8be1e0f8adbbcd8693149656f9e5880f4ca466306a129ec654fc6364f69640ce3e3dd91f8a7b95554eda05792bd5dae8bf52e215f69ea6e80557008"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "host_shell",
+    "version": "r9",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "39a6a8663dcd45b7c212805d517d108e3864048bd5b8146837d1d638a4138dca2ed75e828946f9e33e507e9c2efc26a71c216a2e698d868963db309d5523380c"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "external_send"
+    },
+    "actor": "agent:assistant-1",
+    "args_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "proof": {
+     "kid": "host-2",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "55113fcd237e7b975539ed16d20de84412234eb3530831b8cb53f5499cd3869e975f1a8a7796cb551f6a778b88ebaa83712b8d4c1cb81e302175b7d0732d2709"
+    }
+   }
+  ],
+  "effects": [],
+  "amep_version": "0.3",
+  "call_statements": [
+   {
+    "id": "c-1",
+    "kind": "call_statement",
+    "invocation": "i-1",
+    "observed_by": "proxy:egress",
+    "disposition": "not_executed",
+    "effect_count": 0,
+    "t": 12,
+    "invocation_digest": "0faacadbad2ac5428ae067779dc671ff302eb63245f7da3e132bfdaeb5129583",
+    "args_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "proof": {
+     "kid": "observer-2",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "e46b8572e4e303c0385a48c0c99940e12bb0f9d0346a24a68d6e800bed4daa8aa354a833b9d2449942d6a8dc05ab146068b3292bf9bf805e912b0710c095180e"
+    }
+   }
+  ]
+ }
+}

@@ -23,14 +23,14 @@ The entries fall into three groups:
 | Earlier spend, for a period limit | `unresolved` until it's supplied | a counting observer (`counted_by`) or verifier state carried between packets (spec 7.6) | `must-reject/a-period-limit-without-a-counting-observer-needs-earlier-state` |
 | A maximum for a call whose outcome is unknown | `unresolved` for later calls under the same period limit | `reserve` on the call (spec 5.9.2) | `must-reject/held-call-without-a-reserve-leaves-the-period-total-unbounded` |
 | Current revocation status | `unresolved` | signed status as of the action | `must-reject/revocable-mandate-without-status`, `must-reject/stale-revocation-status` |
+| Who runs each key. Without it, observer independence (I10) is checked by the identifiers in the records, so two names run by one party would pass. | `preserved` for a differently named observer | `operator` on each `host` and `observer` key (spec 12.5). With it, an observer key of the host's own operator is `unresolved` (I10). | `must-reject/high-impact-effect-observed-only-by-a-key-of-the-host-s-own-operator`, `must-reject/high-impact-call-reported-not-executed-only-by-a-key-of-the-host-s-own-operator`; `positive/high-impact-effect-observed-by-a-key-of-another-operator` |
 
 ## C. Open gaps
 
 | Gap | Today | What would close it |
 |---|---|---|
-| **Independence is checked by name.** For high-impact effects the observer must not be the actor (I10), and AMEP compares identifiers, so two names run by one party pass. | `must-reject/self-reported-high-impact-effect` is `unresolved` (I10); `positive/independently-observed-high-impact-effect` is `preserved` | Declare each observer key's operator in the key set, and require a different operator for I10. |
 | **Some constraints have no field in the evidence:** the purpose of an executed effect, its audience or credential binding, counts across a principal's agents, and conflicting records. | A violation of one of these is invisible to AMEP: delegation-control-bench's [disagreements table](https://github.com/stafordtituss/delegation-control-bench/blob/main/results/RESULTS.md) (DEL-04, DEL-10 and others) | New evidence members, each with its own vectors. |
-| **Both reference verifiers have the same author,** so their agreement can't rule out a shared misreading of the specification (spec 15.2). | 279/279 agreement, by one author | An implementation by someone else, run against the suite with `packages/conformance`. |
+| **Both reference verifiers have the same author,** so their agreement can't rule out a shared misreading of the specification (spec 15.2). | 282/282 agreement, by one author | An implementation by someone else, run against the suite with `packages/conformance`. |
 
 **Outside AMEP:** AP2 payment receipts carry no amount, so AMEP's AP2 profile takes the executed amount from the closed mandate, on the processor's word (`interop/ap2/README.md`). AP2 adding an amount to its receipts would close this.
 

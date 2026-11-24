@@ -444,6 +444,12 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     if (!ed25519StrictOk(k.x, o.proof.sig)) return false;
     try { return sigOk(o, k); } catch { return false; }
   };
+  // spec 12.5 (v0.3): a key may name the operator that controls it. Two keys with the same operator are one party for
+  // observer independence (I10), whatever identifiers their records use.
+  const operatorOf = o => { const kid = o && o.proof ? o.proof.kid : undefined;
+    const k = typeof kid === "string" && Object.hasOwn(keys, kid) ? keys[kid] : null;
+    return k && typeof k.operator === "string" ? k.operator : null; };
+  const sameOperator = (a, b) => { const x = operatorOf(a); return x !== null && x === operatorOf(b); };
   // spec 10.5.1 (v0.3): why a refused signature was refused, in a fixed order every verifier shares
   const sigCause = o => {
     if (!o || typeof o !== "object" || Array.isArray(o) || !o.proof || typeof o.proof !== "object" || Array.isArray(o.proof)) return "missing";
@@ -602,8 +608,8 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     if (!mine.length && notExecuted) {
       // provably nothing was executed; for a high-impact call the statement must come from a party other than the actor (I10)
       const hi = CEILING.indexOf(inv.declared.effect) >= CEILING.indexOf("write_shared");
-      check(hi && stmts.filter(c => c.disposition === "not_executed").every(c => c.observed_by === inv.actor),
-        "unresolved", "I10", "high-impact call reported not executed only by the actor itself", { need: "independent_observer", ref: id });
+      check(hi && stmts.filter(c => c.disposition === "not_executed").every(c => c.observed_by === inv.actor || sameOperator(c, inv)),
+        "unresolved", "I10", "high-impact call reported not executed only by the actor itself, or by a key of the host's own operator", { need: "independent_observer", ref: id });
       // say why it is preserved: nothing ran, on the observer's signed word, not "within authority"
       const who = [...new Set(stmts.filter(c => c.disposition === "not_executed").map(c => String(c.observed_by)))].sort().join(", ");
       return `nothing executed: ${who} signed a not_executed call statement`;
@@ -634,6 +640,7 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       if (highImpact) {
         check(!inv.actor, "unresolved", "I10", "actor not recorded; observer independence cannot be shown", { need: "actor", ref: id });
         check(e.observed_by === inv.actor || e.assurance === "L0", "unresolved", "I10", "high-impact effect only self-reported", { need: "independent_observer", ref: e.id ?? "?" });
+        check(sameOperator(e, inv), "unresolved", "I10", "high-impact effect observed only by a key of the host's own operator", { need: "independent_observer", ref: e.id ?? "?" });
       }
       const x = e.executed;
       // liveness at each effect's own time (spec 8 I6, v0.3): authority must still be in force when the effect occurs,

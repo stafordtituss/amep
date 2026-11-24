@@ -793,6 +793,24 @@ def vectors():
     add("deny on a fail-closed host with no other record", ("unresolved", "I7"), lambda p, I, H, O, X: (
         p.update(decisions=[decision(H, "cd-2b", enforcement={"pep": "host-hook/2.0", "fail_mode": "closed", "applied": "confirmed"})]),
         p.update(effects=[])))
+    # spec 12.5 (v0.3): observer independence by operator, not only by name (LIMITS.md, gap C1). host-2 and observer-2
+    # are run by the same operator; observer-3 by another one.
+    H2, O2, O3 = Signer("host-2", ["host"]), Signer("observer-2", ["observer"]), Signer("observer-3", ["observer"])
+    for sgn, op in ((H2, "op:agent-platform.example"), (O2, "op:agent-platform.example"), (O3, "op:independent-audit.example")):
+        keys[sgn.kid] = {**sgn.public(), "operator": op}
+
+    def by_operator(p, observer):
+        high_impact(p)
+        p["invocations"] = [H2.sign(p["invocations"][0])]
+        p["effects"] = [observer.sign(p["effects"][0])]
+    add("high-impact effect observed only by a key of the host's own operator", ("unresolved", "I10"), lambda p, I, H, O, X:
+        by_operator(p, O2))
+    add("high-impact effect observed by a key of another operator", ("preserved", "-"), lambda p, I, H, O, X:
+        by_operator(p, O3))
+    add("high-impact call reported not executed only by a key of the host's own operator", ("unresolved", "I10"), lambda p, I, H, O, X: (
+        high_impact(p), bound(p, I, H, O), p.update(effects=[]),
+        p.update(invocations=[H2.sign(p["invocations"][0], v=2)]),
+        stmt(p, O, disposition="not_executed", count=0, observed_by="proxy:egress", signer=O2)))
     # the host's claim answers only "did anything execute?"; an invocation under revoked authority stays violated
     add("deny on a fail-closed host does not clear an invocation under revoked authority", ("violated", "I6"), lambda p, I, H, O, X: (
         p.update(revocations=[I.sign({"kind": "revocation", "target": "m-1", "t": 5})]), p.update(effects=[]),
