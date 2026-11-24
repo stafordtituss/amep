@@ -74,6 +74,8 @@ The IETF Internet-Draft is in `ietf/`: Markdown source, with XML, text and HTML 
 
 Not an identity provider, a policy engine or a prompt-injection detector. AMEP binds to OAuth and OpenID AuthZEN for decisions, SCITT for transparency, MCP and A2A for carriage, and OpenTelemetry for tracing.
 
+What AMEP can't show, each limit pinned by a vector or test: [LIMITS.md](LIMITS.md).
+
 ## Related work
 
 AMEP evaluates evidence *after* authority has been granted and exercised. Related work, mostly on granting and checking authority *before* an action:
