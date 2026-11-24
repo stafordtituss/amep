@@ -384,6 +384,17 @@ function approvalsHeldOf(state) {
   if (!ok) throw new Malformed("state.approvals_held must map approval ids to {invocation, digest}");
   return h;
 }
+// Verifier state's operation records (spec 5.8.1, v0.3.2): operation -> {invocation, digest} of the attempt that holds it
+// (outcome unknown) or that took effect. One logical operation may be attempted several times; at most one attempt may
+// take effect, and while one attempt's outcome is unknown, later attempts are held, whatever authorizes them.
+function operationsOf(state, name) {
+  const h = name in state ? state[name] : {};
+  const ok = h && typeof h === "object" && !Array.isArray(h) && Object.values(h).every(v =>
+    v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).sort().join() === "digest,invocation"
+    && typeof v.invocation === "string" && typeof v.digest === "string" && /^[0-9a-f]{64}$/.test(v.digest));
+  if (!ok) throw new Malformed(`state.${name} must map operation ids to {invocation, digest}`);
+  return h;
+}
 // A limit with `actions` applies to effects whose action matches; without, to every financial effect.
 const limitApplies = (lim, x) => ("actions" in lim) ? lim.actions.some(p => patMatch(x.action, p)) : x.effect === "financial";
 // I1 for limits: a child may add limits, but never raise one the parent sets for the same unit and period.
@@ -486,14 +497,18 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   const priorWindows = new Set(totals.keys());
   // spec 7.6 rule 6 (v0.3): holds for earlier invocations whose outcome was unknown. A packet that contains a held
   // invocation decides it afresh, so its hold is set aside while this packet is evaluated, and never counted twice.
-  let heldIn, apprHeldIn;
-  try { heldIn = heldOf(state); apprHeldIn = approvalsHeldOf(state); } catch (e) { return allUnresolved(pk, `malformed verifier state: ${e.message}`); }
+  let heldIn, apprHeldIn, opsHeldIn, opsDoneIn;
+  try { heldIn = heldOf(state); apprHeldIn = approvalsHeldOf(state); opsHeldIn = operationsOf(state, "operations_held"); opsDoneIn = operationsOf(state, "operations_done"); }
+  catch (e) { return allUnresolved(pk, `malformed verifier state: ${e.message}`); }
   const present = new Set();
   for (const i of pk.invocations || []) { try { present.add(digest(i)); } catch { /* reported by its own evaluation */ } }
   const held = Object.fromEntries(Object.entries(heldIn).filter(([d]) => !present.has(d))), newHeld = {};
   // spec 5.10, held approvals (v0.3): approvals held for earlier invocations whose outcome is unknown; one held by an invocation
   // in this packet is set aside, since this packet decides that invocation afresh
   const apprHeld = Object.fromEntries(Object.entries(apprHeldIn).filter(([, h]) => !present.has(h.digest)));
+  // spec 5.8.1 (v0.3.2): an attempt recorded in state but present in this packet is decided afresh here
+  const opsHeld = Object.fromEntries(Object.entries(opsHeldIn).filter(([, h]) => !present.has(h.digest)));
+  const opsDone = Object.fromEntries(Object.entries(opsDoneIn).filter(([, h]) => !present.has(h.digest)));
   const approvalUse = Object.fromEntries(Object.entries(state.approvals_used || {}).map(([k, v]) => [k, [...v]]));
   let out = [];
   const invocations = pk.invocations || [];
@@ -527,6 +542,9 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
 
   function evalInvocation(inv) {
     const id = inv.id, tInv = toTime(inv.t);
+    const op = "operation" in inv ? inv.operation : undefined;
+    check(op !== undefined && (typeof op !== "string" || op.length === 0 || op.length > MAX_NAME), "unresolved", "I7",
+      "operation must be a non-empty string", { need: "well_formed_evidence", ref: id });
     const chain = []; const seen = new Set(); let n = objs[inv.authority_ref];
     while (n && !seen.has(n.id)) { seen.add(n.id); chain.unshift(n); n = objs[n.parent]; }
     check(!chain.length || chain[0].kind !== "mandate", "unresolved", "I7", "no root mandate", { need: "root_mandate", ref: inv.authority_ref ?? "-" });
@@ -642,8 +660,14 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       // outcome is known (from Takao Sato's VATE case 2)
       const ref = inv.approval_ref;
       if (typeof ref === "string" && !Object.hasOwn(apprHeld, ref)) apprHeld[ref] = { invocation: id, digest: invDigest };
+      // spec 5.8.1 (v0.3.2): likewise the operation, so a retry under fresh authorization can't take effect unnoticed
+      if (op !== undefined && !Object.hasOwn(opsHeld, op) && !Object.hasOwn(opsDone, op)) opsHeld[op] = { invocation: id, digest: invDigest };
     }
     check(!mine.length, "unresolved", "I7", "no executed-effect receipt", { need: "receipt", ref: id });
+    // spec 5.8.1 (v0.3.2): this attempt took effect. The operation is done; a hold it had on the operation is released.
+    const opPrev = op !== undefined && Object.hasOwn(opsDone, op) ? opsDone[op] : null;
+    if (op !== undefined && opPrev === null) opsDone[op] = { invocation: id, digest: invDigest };
+    if (op !== undefined && Object.hasOwn(opsHeld, op) && opsHeld[op].invocation === id) delete opsHeld[op];
     const highImpact = CEILING.indexOf(inv.declared.effect) >= CEILING.indexOf("write_shared");
     let claims = chain[0].claims; for (const c of chain.slice(1)) claims = meet(c.claims, claims, v03);
     if (intent) claims = meet(intent.claims, claims, v03);
@@ -813,6 +837,12 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     const over = chain.find(n => "budget" in n.claims && (spent[n.id] || 0) + c > n.claims.budget);
     check(!!over && !ap, "violated", "I2", `risk budget of ${over && over.id} exceeded without approval`, { blame: "agent" });
     for (const n of chain) spent[n.id] = (spent[n.id] || 0) + c;
+    // spec 5.8.1 (v0.3.2), after every other check: one operation takes effect at most once, and an attempt whose
+    // operation is held for an earlier attempt with an unknown outcome is held too, whatever authorization it carries
+    check(opPrev !== null && opPrev.invocation !== id, "violated", "I2", `operation ${op} already took effect under ${opPrev?.invocation}: executed twice`, { blame: "agent" });
+    const opHolder = op !== undefined && Object.hasOwn(opsHeld, op) ? opsHeld[op] : null;
+    check(opHolder !== null && opHolder.invocation !== id, "unresolved", "I7",
+      `operation ${op} is held for ${opHolder?.invocation}, whose outcome is unknown`, { need: "held_outcome", ref: opHolder?.invocation });
   }
 
   // spec 10.3 decision reconciliation: only PRE-execution decisions can be contradicted or confirm a block
@@ -844,6 +874,8 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   state.approvals_used = approvalUse;
   if (totals.size) state.period_totals = Object.fromEntries([...totals].map(([k, v]) => [k, unitsStr(v)]));
   if (Object.keys(apprHeld).length || "approvals_held" in state) state.approvals_held = apprHeld;
+  if (Object.keys(opsHeld).length || "operations_held" in state) state.operations_held = opsHeld;
+  if (Object.keys(opsDone).length || "operations_done" in state) state.operations_done = opsDone;
   const heldOut = { ...held, ...newHeld };
   if (Object.keys(heldOut).length || "held" in state) state.held = heldOut;
   return out;

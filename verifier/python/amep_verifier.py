@@ -1017,6 +1017,50 @@ def vectors():
     held_appr("held approval: the earlier call is shown executed, so the second use is a double use", ("violated", "I8"), earlier="executed")
     held_appr("a held approval does not hide an effect the approval doesn't cover", ("violated", "I8"), other_body=True)
     held_appr("malformed approval hold in verifier state", ("unresolved", "I7"), bad_state=True)
+
+    # 11. Operation identity (spec 5.8.1, v0.3.2). From Andrii's review (Radiolaria) on openid-aiim, 24 Nov 2026: an
+    # attempt (i-0) whose outcome is unknown, then a retry (i-1) of the same logical operation. Without an operation
+    # identifier, a retry under fresh authorization started clean, and a double execution went unnoticed.
+    def op_case(p, state, kind):
+        for k in ("mandates", "delegations"):
+            p[k] = [I.sign({x: v for x, v in o.items() if x != "proof"}, v=2) for o in p[k]]
+        p["interpretations"] = [H.sign({x: v for x, v in o.items() if x != "proof"}, v=2) for o in p["interpretations"]]
+        p["amep_version"] = "0.3"
+        decl = {"action": "fs.write", "resource": "repo:app/src/auth.ts", "effect": "write_local"}
+        body = {**decl, "released": [], "t": 11}
+        i0 = H.sign({"id": "i-0", "kind": "invocation", "authority_ref": "d-1", "interpretation_ref": "a-1", "t": 5,
+                     "declared": decl, "operation": "op-7f3a"}, v=2)
+        auth = "d-1"
+        if kind == "fresh_mandate":   # the retry runs under a fresh grant from the same issuer
+            m2 = {x: v for x, v in p["mandates"][0].items() if x != "proof"}
+            p["mandates"].append(I.sign({**m2, "id": "m-2"}, v=2))
+            auth = "m-2"
+        i1 = H.sign({"id": "i-1", "kind": "invocation", "authority_ref": auth, "interpretation_ref": "a-1", "t": 10,
+                     "declared": decl, "operation": "op-9c21" if kind == "independent" else "op-7f3a"}, v=2)
+        e1 = O.sign({"id": "e-1", "kind": "effect", "invocation": "i-1", "observed_by": "hook:host", "assurance": "L1",
+                     "invocation_digest": digest(i1), "executed": body}, v=2)
+        p["invocations"], p["effects"] = [i1], [e1]
+        hold = {"operations_held": {"op-7f3a": {"invocation": "i-0", "digest": digest(i0)}}}
+        if kind == "twice":
+            p["invocations"] = [i0, i1]
+            p["effects"] = [O.sign({"id": "e-0", "kind": "effect", "invocation": "i-0", "observed_by": "hook:host", "assurance": "L1",
+                                    "invocation_digest": digest(i0), "executed": {**body, "t": 6}}, v=2), e1]
+            return
+        if kind == "released":
+            p["invocations"] = [i0, i1]
+            p["call_statements"] = [O.sign({"id": "c-0", "kind": "call_statement", "invocation": "i-0", "observed_by": "hook:host",
+                                            "disposition": "not_executed", "effect_count": 0, "t": 8, "invocation_digest": digest(i0)}, v=2)]
+        state.update(hold)
+
+    def operation(name, expect, kind):
+        st = {}
+        add(name, expect, lambda p, *a: op_case(p, st, kind), state=st)
+
+    operation("retry of an operation whose first attempt has an unknown outcome", ("unresolved", "I7"), "held")
+    operation("retry under a fresh mandate is still held for the first attempt", ("unresolved", "I7"), "fresh_mandate")
+    operation("one operation executed twice", ("violated", "I2"), "twice")
+    operation("retry after the first attempt is shown not executed", ("preserved", "-"), "released")
+    operation("an independent operation proceeds while another is held", ("preserved", "-"), "independent")
     return keys, V
 
 

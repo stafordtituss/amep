@@ -3,6 +3,19 @@
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
 
+## Operation identity: a retry can't take effect unnoticed (proposal, unreleased, 2026-11-25)
+
+- **The gap, from Andrii's review (Radiolaria) on the OpenID AIIM list:** an attempt whose outcome is unknown, retried under a fresh authorization, started clean. If both attempts took effect, the operation ran twice and no rule was broken. AAuth Budgets has the same gap across auth tokens.
+- **Now (spec 5.8.1):** an invocation may carry `operation`, the same identifier on every attempt.
+  - An unknown outcome holds the operation, and a later attempt is `unresolved` with gap `held_outcome`, whatever authorization it carries.
+  - A second attempt that takes effect after one already did is `violated` (I2), "executed twice".
+  - The hold is released when the first attempt is shown not executed. Other operations proceed.
+  - Verifier state carries `operations_held` and `operations_done` across packets (spec 10.7).
+- **The limit, stated in 5.8.1:** the identifier is chosen by the party that retries, so it binds only what that party records.
+- **Suite v0.3.2:** 5 core vectors (3 must-reject, all `preserved` before this change; 2 positive). No existing vector changes. The core suite now has 256 vectors (68 positive, 188 must-reject), 292 across the three suites.
+- **Schemas:** `operation` is an optional string of 1 to 256 characters in `invocation.json` and the CDDL.
+- **Status:** a proposal. The expected answers are open for Andrii's review before this is merged.
+
 ## Two fixes from Andrii's review on the OpenID AIIM list (unreleased, 2026-11-24)
 
 Andrii (Radiolaria) reported both, with reproductions against the published code and vectors, on openid-aiim on 24 November.
