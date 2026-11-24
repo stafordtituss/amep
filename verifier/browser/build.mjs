@@ -3,7 +3,7 @@
 // paste a packet. Run from the repo root: node verifier/browser/build.mjs
 // Optional arguments build the same page over another vector set (a folder with keys.json, positive/, must-reject/):
 //   node verifier/browser/build.mjs <vectors dir> <output .html> "<page title>"
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -153,4 +153,7 @@ ed25519Supported().then(ok => { if (!ok) document.getElementById("unsupported").
 </html>
 `;
 writeFileSync(outFile, html);
+// The same page is served by GitHub Pages from docs/ (https://stafordtituss.github.io/amep/), so anyone can try AMEP
+// in a browser without installing anything. Written only for the default build, so it never drifts from the checked page.
+if (!argOut) { mkdirSync(join(root, "docs"), { recursive: true }); writeFileSync(join(root, "docs/index.html"), html); writeFileSync(join(root, "docs/.nojekyll"), ""); }
 console.log(`wrote ${outFile} (${suite.length} vectors, ${Math.round(html.length / 1024)} KB)`);
