@@ -2,6 +2,16 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+
+## An independent implementation, and four clarifications from it (unreleased, 2026-11-24)
+
+- **zambo-amep-verify 0.1.0,** by Brennan Zambo, was written from the specification and the published vectors alone, without reading either reference verifier. It agrees with all 228 single-packet vectors of the core suite: the deciding invariant as well as the outcome, for every positive and must-reject vector (stafordtituss/amep#18). Cross-packet state (Section 10.7) and the interop suites are its next rows. Recorded in spec 15.2 and LIMITS.md.
+- **What his reading found unclear,** now stated in the text (no verdict changes; every vector is unchanged):
+  - **Section 7.3:** the order in which the meet is folded along a chain. The narrower set is C₁ at each step.
+  - **Section 7.6, rule 5:** when a window's total is known. Verifier state or a counting observer's own figure anchors it, later effects add to it, and in-packet effects alone never anchor it.
+  - **Section 10.2:** where call statements (Section 5.14) and limits run. New steps 9a (statement rules 1 to 5), 14a (rule 6, receipt counts) and 15a (limits).
+  - **Section 10.2, step 13:** laid out so the `mediated` comparison is plainly the only one when `mediated` is present.
+
 ## Observer independence by operator, not only by name (unreleased, 2026-11-24)
 
 - **The gap,** listed in LIMITS.md: for high-impact effects, I10 requires an observer other than the actor, but AMEP compared identifiers only. A host could sign the invocation with one key and the receipt with another, under a different name, and I10 was met.

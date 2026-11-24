@@ -30,7 +30,7 @@ The entries fall into three groups:
 | Gap | Today | What would close it |
 |---|---|---|
 | **Some constraints have no field in the evidence:** the purpose of an executed effect, its audience or credential binding, counts across a principal's agents, and conflicting records. | A violation of one of these is invisible to AMEP: delegation-control-bench's [disagreements table](https://github.com/stafordtituss/delegation-control-bench/blob/main/results/RESULTS.md) (DEL-04, DEL-10 and others) | New evidence members, each with its own vectors. |
-| **Both reference verifiers have the same author,** so their agreement can't rule out a shared misreading of the specification (spec 15.2). | 282/282 agreement, by one author | An implementation by someone else, run against the suite with `packages/conformance`. |
+| **Both reference verifiers have the same author,** so their agreement can't rule out a shared misreading of the specification (spec 15.2). | **Partly closed:** an independent implementation, written from the spec and vectors alone, agrees with all 228 single-packet core vectors (stafordtituss/amep#18). Its reading also led to four clarifications of the spec text. | Its cross-packet row (Section 10.7) and the two interop suites, which are still open there; and further implementations. |
 
 **Outside AMEP:** AP2 payment receipts carry no amount, so AMEP's AP2 profile takes the executed amount from the closed mandate, on the processor's word (`interop/ap2/README.md`). AP2 adding an amount to its receipts would close this.
 

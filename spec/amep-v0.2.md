@@ -576,7 +576,7 @@ The observer's signed account of one call. Receipts say what was executed. A cal
 | `args_digest` | no | SHA-256 of the canonical form of the arguments the observer received. |
 | `proof` | **yes**¹ | Signed by a key with role `observer`. |
 
-Rules (applied in Section 10.2, before the receipts are checked):
+Rules (applied in Section 10.2: rules 1 to 5 at step 9a, before the receipts are checked; rule 6 at step 14a, after them):
 
 1. A statement that does not verify, has an unknown `disposition`, a negative or non-integer `effect_count`, or `not_executed` with a non-zero `effect_count` makes the result `unresolved` (I7).
 2. A statement or receipt whose `invocation_digest` differs from the digest of the invocation in the packet is not evidence for that invocation: `unresolved` (I7). A genuine receipt for one call therefore cannot be presented for another call that reuses its `id`.
@@ -665,7 +665,7 @@ The meet **C₁ ⊓ C₂** is computed component-wise:
 - purpose: C₁'s if present, else C₂'s;
 - `deny_actions` and `deny_resources`: the **union** of both, so that no hop and no intent can lift a deny.
 
-The **effective claims** of an invocation are the meet of every claim set on its chain, from the root mandate to its `authority_ref`, and then met with the IntentCertificate's claims when `intent_ref` is present.
+The **effective claims** of an invocation are the meet of every claim set on its chain, from the root mandate to its `authority_ref`, and then met with the IntentCertificate's claims when `intent_ref` is present. The meet is folded from the root, and at each step the narrower set is C₁: starting from the root's claims A, each later element's claims C give C ⊓ A, and the intent's claims I give I ⊓ A. Folding the other way (A ⊓ C) keeps the root's broad patterns that the child doesn't subsume and loses the child's narrower ones, so an ordinary chain can come out empty. (Clarified after an independent implementation, stafordtituss/amep#18.)
 
 ### 7.4 Satisfaction
 
@@ -698,7 +698,7 @@ For every effect x of the invocation (Section 10.2, with each observer's receipt
 2. If no applicable limit has x's unit: `violated` (I2) when x is `financial` or its unit is a money unit (an asset N does not authorize); otherwise `unresolved` (I7).
 3. If `amount > per_effect`, or the sum of the amounts of the invocation's effects under that limit exceeds `per_call`, and the invocation has no approval that passed I8: `violated` (I2).
 4. Each limit keeps its own running total per window, so two limits in one unit and period with different `actions` are separate caps. The period total is the Verifier's running total (in this packet, plus verifier state across packets, Section 10.7) plus `amount`. If the limit names x's observer in `counted_by`, and x carries `period_spent` for the limit's `period` whose `from` is the start of the window that contains x (the node's `nbf`, or 0, plus a whole number of periods): when that figure is below the running total, `violated` (I7, the counting observer's accounting is inconsistent); otherwise it is the total. A figure for another window, or one that names no window, isn't the limit's total. The observer's own window can start anywhere, so taking it for the limit's window could understate the total, or blame an honest observer. If the total exceeds `per_period` without an approval that passed I8: `violated` (I2).
-5. If no total from the counting observer applies and the Verifier has no earlier state for that window: `unresolved` (I7). A packet's assembler could leave out earlier effects, and an observer that is not named in `counted_by` sees only its own share of the principal's spending, so a period total is never assumed to start at zero or taken from a partial view.
+5. If no total from the counting observer applies and the Verifier has no earlier state for that window: `unresolved` (I7). A window's total is known once verifier state seeds it, or once a counting observer's own figure for that window (rule 4) anchors it; effects after that, from any observer, add to it. A figure from an observer the limit doesn't name never anchors it, and effects counted within this packet alone never do. (Clarified after an independent implementation, stafordtituss/amep#18.) A packet's assembler could leave out earlier effects, and an observer that is not named in `counted_by` sees only its own share of the principal's spending, so a period total is never assumed to start at zero or taken from a partial view.
 6. *Unknown outcomes are held.* An invocation may reach the receipt check of Section 10.2 (its chain, signatures and interpretation verified) with no receipt and no `not_executed` call statement. Such a call may still have moved value. Only a verified invocation is held, so evidence that doesn't verify can't place holds. For each node N on its chain, and each period limit of N that applies to its declared effect, the Verifier records a **hold** in its state (Section 10.7): the invocation's `reserve` if it is in the limit's unit, otherwise an unknown amount. In each later packet, every hold whose invocation is not in that packet counts toward the same window's total.
    - If the total, plus the holds, exceeds `per_period` without an approval that passed I8: `unresolved` (I7), gap `held_outcome` for the held invocation.
    - If a hold's amount is unknown, and the effect has no approval that passed I8: `unresolved` (I7), gap `held_outcome`. The total can't be bounded.
@@ -831,6 +831,9 @@ For each invocation `i` **in packet order**, the verifier MUST apply the followi
     finding labelled "trusted". If U is non-empty,
     i.declared.effect ≠ read, and i.principal_confirmed is not true    → violated    I4 if E is non-empty
                                                                          unresolved  I4 otherwise
+9a. Call statements (Section 5.14), rules 1 to 5, in that order. A verified
+    not_executed statement with no receipts ends the evaluation here
+    (rule 5).
 10. If E is empty                                                      → unresolved  I7  "no effect receipt"
 11–14. For each e in E, with x = e.executed:
     11. if e is not verified                                           → unresolved  I7
@@ -838,8 +841,10 @@ For each invocation `i` **in packet order**, the verifier MUST apply the followi
           if i.actor is absent                                         → unresolved  I10
           if e.observed_by = i.actor or e.assurance = L0               → unresolved  I10
           if operator(e's key) = operator(i's key), both declared       → unresolved  I10
-    13. if i.mediated is present: if canon(x) ≠ canon(i.mediated)     → violated    I2
-        else if x.action ≠ i.declared.action
+    13. if i.mediated is present:
+          if canon(x) ≠ canon(i.mediated)                              → violated    I2
+        otherwise (no i.mediated):
+          if x.action ≠ i.declared.action
              or x.resource ≠ i.declared.resource                       → violated    I2
         if x.resource is protected                                     → violated    I9
     14. let C = effective claims of i (Section 7.3);
@@ -851,6 +856,8 @@ For each invocation `i` **in packet order**, the verifier MUST apply the followi
         several observers is one effect; two receipts from one observer are two effects. (Until v0.3 identical bodies
         were always merged, so two equal payments in one call counted as one; found by C. Vendrell Felici,
         stafordtituss/amep#10.)
+14a. Call statements, rule 6 (Section 5.14): each statement's effect_count
+    against the receipts from its observer.
 15. If i.approval_ref is present:
       if no such approval exists, or it is not verified                → unresolved  I7
       for each body x in B:
@@ -859,6 +866,8 @@ For each invocation `i` **in packet order**, the verifier MUST apply the followi
         approval.expiry < max(i.t, x.t), or approval.nbf > i.t, or
         the approval was already used in this packet for a different
         invocation or body                                             → violated    I8
+15a. Limits (Section 7.6), for every applicable limit of every node on the
+    chain and of the intent.
 16. Apply risk-budget accounting (Section 9.2) with cost = Σ cost(x)
     over B                                                             → violated I7 or I2, if it fails
 17. Otherwise                                                          → preserved   -
@@ -1195,7 +1204,7 @@ Each vector file has the form:
   "packet": { ... } }
 ```
 
-A Verifier passes a vector when the packet verdict and deciding invariant (Section 10.5) equal `expect`. Suite v0.3.0 has 246 vectors (65 positive, 181 must-reject); Appendix B lists them. Two reference verifiers, written separately by the same author (Python, and JavaScript run both under Node.js and in the browser with WebCrypto), agree on all 246. Because they share an author, their agreement does not rule out a shared misreading of this specification; an implementation by another party is the stronger test. Suite v0.2.1 adds 16 vectors found by mutation analysis of the reference evaluator (`paper/eval/mutation.py`): each distinguishes a rule, or the inclusive edge of a time, budget or approval-window bound, that no earlier vector isolated. Suite v0.2.2 adds 3 vectors in which an agent acts directly under a mandate whose validity uses RFC 3339 times. Suite v0.2.3 adds 4 vectors for the number range of Section 12.1. Suite v0.3.0 adds 111 vectors for the v0.3 rules (Section 16) and for the fixes from independent review (see CHANGELOG.md). Every vector packet except `malformed-timestamp` validates against both the JSON Schemas in `schemas/v0.2/` and the CDDL.
+A Verifier passes a vector when the packet verdict and deciding invariant (Section 10.5) equal `expect`. Suite v0.3.0 has 246 vectors (65 positive, 181 must-reject); Appendix B lists them. Two reference verifiers, written separately by the same author (Python, and JavaScript run both under Node.js and in the browser with WebCrypto), agree on all 246. Because they share an author, their agreement does not rule out a shared misreading of this specification; an implementation by another party is the stronger test. One exists: zambo-amep-verify 0.1.0, written by Brennan Zambo from this specification and the vectors alone, without reading either reference verifier, agrees with all 228 single-packet vectors of the core suite (stafordtituss/amep#18). Cross-packet state (Section 10.7) and the two interop suites are not yet implemented there. Suite v0.2.1 adds 16 vectors found by mutation analysis of the reference evaluator (`paper/eval/mutation.py`): each distinguishes a rule, or the inclusive edge of a time, budget or approval-window bound, that no earlier vector isolated. Suite v0.2.2 adds 3 vectors in which an agent acts directly under a mandate whose validity uses RFC 3339 times. Suite v0.2.3 adds 4 vectors for the number range of Section 12.1. Suite v0.3.0 adds 111 vectors for the v0.3 rules (Section 16) and for the fixes from independent review (see CHANGELOG.md). Every vector packet except `malformed-timestamp` validates against both the JSON Schemas in `schemas/v0.2/` and the CDDL.
 
 ### 15.3 Requirements on changes
 
