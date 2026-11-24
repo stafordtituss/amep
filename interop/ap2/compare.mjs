@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { digest, evaluate, verdict } from "../../packages/js/src/core.mjs";
 import { Key, keyset, sigOk } from "../../packages/js/src/node.mjs";
-import { analyseBundle, b64u, claimsFromOpen, majorUnits, sha256b64u } from "../../packages/conformance/src/profiles/ap2.mjs";
+import { analyseBundle, b64u, claimsFromOpen, majorUnits, paymentResource, sha256b64u } from "../../packages/conformance/src/profiles/ap2.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIX = join(HERE, "..", "..", "packages", "conformance", "test", "fixtures", "ap2");
@@ -137,12 +137,12 @@ export function amepOf(an) {
     if (signedOk && value.amount && claims.exp) {
       objs.intents ??= [];
       objs.intents.push(H.sign({ id: `n-${p.n + 1}`, kind: "intent", prompt_ref: `ap2-closed:${p.hash}`, claims: {
-        actions: ["payments.send"], resources: [`payee:${c.payee?.id}`], ceiling: "financial", exp: claims.exp,
+        actions: ["payments.send"], resources: [paymentResource(c.payee?.id, p)], ceiling: "financial", exp: claims.exp,
         limits: [{ unit: value.unit, per_call: value.amount }] } }, { v: 2 }));
       intentRef = { intent_ref: `n-${p.n + 1}` };
     }
     const inv = { id: `i-${p.n + 1}`, kind: "invocation", authority_ref: "m-1", interpretation_ref: "a-1", ...intentRef, actor: "ap2-agent", t: c.iat ?? T0,
-      declared: { action: "payments.send", resource: `payee:${c.payee?.id}`, effect: "financial" },
+      declared: { action: "payments.send", resource: paymentResource(c.payee?.id, p), effect: "financial" },
       ...(value.amount ? { reserve: value } : {}), "x-ap2": { transaction_id: c.transaction_id, closed_hash: p.hash } };
     // the importer signs only what passed AP2's own checks; anything else stays unsigned, so AMEP can't rely on it
     const invObj = signedOk ? H.sign(inv, { v: 2 }) : inv;
@@ -151,7 +151,7 @@ export function amepOf(an) {
       if (!r.checks.every(x => x[1])) continue;
       if (r.claims.status === "Success" && value.amount)
         objs.effects.push(O.sign({ id: `e-${p.n + 1}-${k + 1}`, kind: "effect", invocation: inv.id, observed_by: `ap2-processor:${r.claims.iss}`,
-          assurance: "L2", invocation_digest: digest(invObj), executed: { action: "payments.send", resource: `payee:${c.payee?.id}`,
+          assurance: "L2", invocation_digest: digest(invObj), executed: { action: "payments.send", resource: paymentResource(c.payee?.id, p),
             effect: "financial", released: [], t: r.claims.iat, value }, "x-ap2": { payment_id: r.claims.payment_id, reference: r.claims.reference } }, { v: 2 }));
       if (r.claims.status === "Error")
         objs.call_statements.push(O.sign({ id: `c-${p.n + 1}`, kind: "call_statement", invocation: inv.id, observed_by: `ap2-processor:${r.claims.iss}`,

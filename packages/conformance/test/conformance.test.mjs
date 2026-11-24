@@ -522,3 +522,42 @@ describe("profile: AP2, on bundles produced by AP2's own Python SDK (e1ea56d)", 
     });
   });
 });
+
+describe("profile: AP2 checkout binding (payment.reference), on SDK bundles with checkouts (e1ea56d)", () => {
+  const V2 = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "fixtures", "ap2", "sdk-bundles-v2.json"), "utf8"));
+
+  test("every open payment mandate carries payment.reference, as AP2's schema requires", () => {
+    for (const [id, b] of Object.entries(V2.bundles))
+      assert.ok(analyseBundle(b, V2.trust).constraints.some(k => k.type === "payment.reference"), id);
+  });
+
+  test("checkout chains verify, and each payment is matched to the open checkout it was made under", () => {
+    for (const [id, b] of Object.entries(V2.bundles)) {
+      const an = analyseBundle(b, V2.trust);
+      const failed = [an.open, ...an.payments.map(p => p.closed)].flatMap(x => x.checks.filter(c => !c[1]).map(c => c[0]));
+      if (id === "sdk-ref-checkout-absent") { assert.deepEqual(failed, ["checkout chain presented for transaction_id (payment.reference)"]); continue; }
+      assert.deepEqual(failed, [], id);
+      const ref = an.constraints.find(k => k.type === "payment.reference").conditional_transaction_id;
+      for (const p of an.payments) assert.equal(p.checkout.matches, id !== "sdk-ref-other-checkout", `${id}: ${p.checkout.openHash} vs ${ref}`);
+    }
+  });
+
+  test("a tampered checkout JWT breaks the chain, so the payment can't be bound", () => {
+    const b = structuredClone(V2.bundles["sdk-within"]);
+    const [open, closed] = b.checkouts[0].split("~~");
+    b.checkouts[0] = `${open}~~${closed.replace(/^([^.]+\.[^.]+\.)./, (m, pre) => pre + (m.at(-1) === "A" ? "B" : "A"))}`;
+    const an = analyseBundle(b, V2.trust);
+    assert.ok(an.payments[0].closed.checks.some(c => c[0].startsWith("checkout chain presented") && !c[1]));
+  });
+
+  test("AMEP afterwards: the eight scenarios as before, plus the checkout binding", () => {
+    const got = Object.fromEntries(Object.entries(V2.bundles).map(([id, b]) =>
+      [id, amepOfAp2(analyseBundle(b, V2.trust)).results.map(x => `${x.outcome} ${x.invariant}`).join(", ")]));
+    assert.deepEqual(got, {
+      "sdk-within": "preserved -", "sdk-over-range": "violated I2", "sdk-wrong-payee": "violated I2", "sdk-declined": "preserved -",
+      "sdk-lost-receipt": "unresolved I7", "sdk-budget": "preserved -, violated I2", "sdk-issuer-jwt-hash": "preserved -",
+      "sdk-redeemed-twice": "violated I2",
+      "sdk-ref-other-checkout": "violated I2", "sdk-ref-checkout-absent": "unresolved I7",
+    });
+  });
+});
