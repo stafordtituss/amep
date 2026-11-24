@@ -475,7 +475,11 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   const operatorOf = o => { const kid = o && o.proof ? o.proof.kid : undefined;
     const k = typeof kid === "string" && Object.hasOwn(keys, kid) ? keys[kid] : null;
     return k && typeof k.operator === "string" ? k.operator : null; };
-  const sameOperator = (a, b) => { const x = operatorOf(a); return x !== null && x === operatorOf(b); };
+  // one party, for observer independence (I10): the same signing key, or keys of the same named operator (spec 12.5). The key
+  // matters, not the identifiers a record uses: a host that signs its own "not executed", or its own receipt, with its invocation
+  // key is the actor, whatever it puts in observed_by. Found by the exhaustive model check in formal/ (v0.3.2).
+  const kidOf = o => (o && typeof o === "object" && o.proof && typeof o.proof === "object" && typeof o.proof.kid === "string") ? o.proof.kid : null;
+  const sameOperator = (a, b) => { const ka = kidOf(a); if (ka !== null && ka === kidOf(b)) return true; const x = operatorOf(a); return x !== null && x === operatorOf(b); };
   // spec 10.5.1 (v0.3): why a refused signature was refused, in a fixed order every verifier shares
   const sigCause = o => {
     if (!o || typeof o !== "object" || Array.isArray(o) || !o.proof || typeof o.proof !== "object" || Array.isArray(o.proof)) return "missing";

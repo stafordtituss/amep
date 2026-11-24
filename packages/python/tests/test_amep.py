@@ -58,6 +58,28 @@ class SdkTest(unittest.TestCase):
         self.assertEqual(run("agent:x"), {"i-0": ("unresolved", "I10"), "i-1": ("unresolved", "I7")})
         self.assertEqual(run("server:tickets"), {"i-0": ("preserved", "-"), "i-1": ("preserved", "-")})
 
+    def test_the_actors_own_key_is_the_actor_whatever_name_it_uses(self):
+        # found by the exhaustive model check (formal/): I10 compared names only, so a host key that could also sign
+        # as an observer passed its own "not executed", or its own receipt, under another observed_by
+        from amep_protocol import sdk, evaluate
+        I, H, O = sdk.Key.generate("issuer-x", ["issuer"]), sdk.Key.generate("host-x", ["host", "observer"]), sdk.Key.generate("obs-x", ["observer"])
+        keys = sdk.keyset(I, H, O)
+        m = I.sign(sdk.mandate("m-1", "user:x", sdk.claims(["tickets.update"], ["tickets:*"], "write_shared", 2000000000)), v=2)
+        a = H.sign(sdk.interpretation("a-1", "tickets", "1"), v=2)
+        def inv(i, t):
+            return H.sign({**sdk.invocation(i, "m-1", "a-1", t, "tickets.update", "tickets:issue/1", "write_shared", actor="agent:x"),
+                           "operation": "op-1"}, v=2)
+        i0, i1 = inv("i-0", 5), inv("i-1", 10)
+        e1 = O.sign(sdk.effect("e-1", "i-1", "server:tickets", "L1", sdk.effect_body("tickets.update", "tickets:issue/1", "write_shared", 11)), v=2)
+        def run(*objs):
+            return {r.invocation: (r.outcome, r.invariant) for r in evaluate(sdk.packet(m, a, i0, i1, *objs, amep_version="0.3"), keys)}
+        # the host's key, naming the server: shows nothing, so the retry stays held
+        c0 = H.sign(sdk.call_statement("c-0", "i-0", "server:tickets", "not_executed", 0, 6), v=2)
+        self.assertEqual(run(c0, e1), {"i-0": ("unresolved", "I10"), "i-1": ("unresolved", "I7")})
+        # the host's key on a receipt for its own high-impact call, naming the server: not independent
+        e0 = H.sign(sdk.effect("e-0", "i-0", "server:tickets", "L1", sdk.effect_body("tickets.update", "tickets:issue/1", "write_shared", 6)), v=2)
+        self.assertEqual(run(e0)["i-0"], ("unresolved", "I10"))
+
     def test_round_trip_preserved(self):
         p, keys = build()
         self.assertEqual(verdict(evaluate(p, keys)).outcome, "preserved")

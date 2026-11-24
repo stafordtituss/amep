@@ -708,6 +708,13 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
         return k["operator"] if isinstance(k, dict) and isinstance(k.get("operator"), str) else None
 
     def same_operator(a, b):
+        # one party, for observer independence (I10): the same signing key, or keys of the same named operator (spec
+        # 12.5). The key matters, not the identifiers a record uses: a host that signs its own "not executed", or its
+        # own receipt, with its invocation key is the actor, whatever it puts in observed_by. Found by the exhaustive
+        # model check in formal/ (v0.3.2).
+        ka, kb = ((o.get("proof") or {}).get("kid") if isinstance(o, dict) else None for o in (a, b))
+        if isinstance(ka, str) and ka == kb:
+            return True
         x = operator_of(a)
         return x is not None and x == operator_of(b)
 
