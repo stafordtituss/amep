@@ -435,12 +435,27 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     }
   // signature valid AND the signing key holds a role allowed for this object kind (spec 12.5), under the exact
   // Ed25519 acceptance rule; AMEP 0.3 packets must use domain-separated (version 2) proofs
+  // spec 12.4: a key marked revoked, or used outside its nbf-exp interval, signs nothing. An object is placed in the
+  // key's interval by its own time (t, or executed.t); an object with no time of its own is checked for revocation only.
+  const keyStatusOk = (k, o) => {
+    if ("revoked" in k && k.revoked !== false) return false;
+    if (!("nbf" in k) && !("exp" in k)) return true;
+    const own = o.t !== undefined ? o.t : o.executed && typeof o.executed === "object" ? o.executed.t : undefined;
+    if (own === undefined) return true;
+    try {
+      const t = toTime(own);
+      if ("nbf" in k && t < toTime(k.nbf)) return false;
+      if ("exp" in k && t >= toTime(k.exp)) return false;
+      return true;
+    } catch { return false; }
+  };
   const verify = o => {
     if (!o || typeof o !== "object" || !o.proof || o.proof.alg !== "Ed25519") return false;
     const pv = "v" in o.proof ? o.proof.v : 1;
     if (![1, 2].includes(pv) || (v03 && pv !== 2)) return false;
     const k = keys[o.proof.kid]; if (!k || k.alg !== "Ed25519") return false;
     if (!(k.roles || []).some(r => (SIGNER_ROLES[o.kind] || []).includes(r))) return false;
+    if (!keyStatusOk(k, o)) return false;
     if (!ed25519StrictOk(k.x, o.proof.sig)) return false;
     try { return sigOk(o, k); } catch { return false; }
   };
@@ -458,6 +473,7 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     if (!k || typeof k !== "object" || Array.isArray(k)) return "unknown_key";
     const roles = Array.isArray(k.roles) ? k.roles.filter(r => typeof r === "string") : [];
     if (!roles.some(r => (SIGNER_ROLES[o.kind] || []).includes(r))) return "role";
+    if (!keyStatusOk(k, o)) return "key_status";
     return "invalid";
   };
   const firstCause = os => { const o = os.find(x => !verify(x)); return os.some(x => !verify(x)) ? sigCause(o) : undefined; };

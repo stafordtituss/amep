@@ -33,9 +33,9 @@ node packages/conformance/bin/amep-conformance.mjs verify \
 
 | Verifier | Result |
 |---|---|
-| Python `amep-protocol` | 282/282 |
-| JavaScript `@stafordtituss/amep` | 282/282 |
-| A verifier that answers "preserved" to everything | 74/282: every positive vector, no must-reject vector |
+| Python `amep-protocol` | 287/287 |
+| JavaScript `@stafordtituss/amep` | 287/287 |
+| A verifier that answers "preserved" to everything | 75/287: every positive vector, no must-reject vector |
 
 ## `import`: bring your own records
 

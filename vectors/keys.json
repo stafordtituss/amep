@@ -82,5 +82,33 @@
    "observer"
   ],
   "operator": "op:independent-audit.example"
+ },
+ "issuer-revoked": {
+  "kid": "issuer-revoked",
+  "alg": "Ed25519",
+  "x": "ce6da333c73317fc1c07cc3a27dfe4987e8bcde08d5e0a893436755be2f330ee",
+  "roles": [
+   "issuer"
+  ],
+  "revoked": true
+ },
+ "observer-revoked": {
+  "kid": "observer-revoked",
+  "alg": "Ed25519",
+  "x": "5db14b01f7840923aa881247b98c06dd5752fa460c59335ccbb401b251bb2e52",
+  "roles": [
+   "observer"
+  ],
+  "revoked": true
+ },
+ "observer-windowed": {
+  "kid": "observer-windowed",
+  "alg": "Ed25519",
+  "x": "82269ddab7b3f5a40c4828eeaafedb834aedf972915256584689b0d6f0d9f77e",
+  "roles": [
+   "observer"
+  ],
+  "nbf": 5,
+  "exp": 11
  }
 }

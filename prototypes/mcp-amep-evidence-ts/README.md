@@ -26,7 +26,7 @@ npm test
 ```js
 import { McpServer } from "@modelcontextprotocol/server";
 import { Key } from "@stafordtituss/amep";
-import { AmepEvidenceExtension, recordEffect } from "./src/extension.mjs";
+import { AmepEvidenceExtension, NotExecuted, recordEffect } from "./src/extension.mjs";
 
 const ext = new AmepEvidenceExtension({
   observerKey: Key.fromPem(pem, "tickets-observer-1", ["observer"]),
@@ -36,11 +36,20 @@ const ext = new AmepEvidenceExtension({
 
 const mcp = new McpServer({ name: "tickets", version: "1.0.0" });
 ext.registerTool(mcp, "update_ticket", { inputSchema }, async ({ ticket_id, status }) => {
+  if (!tickets.has(ticket_id)) throw new NotExecuted("unknown ticket");   // refused before acting
   await tickets.update(ticket_id, status);
   recordEffect("saas.update", `tickets:issue/${ticket_id}`, "write_shared", { reversible: true });
   return { content: [{ type: "text", text: "done" }] };
 });
 ```
+
+**When a call fails, which statement is signed:**
+- **The handler returns normally:** every effect on its path was recorded, so a call with no recorded effect is signed `not_executed`.
+- **The handler throws `NotExecuted`:** an explicit refusal before acting. It is signed `not_executed`. Throw it only before any effect.
+- **The handler throws anything else after recording an effect:** signed `failed_after_effects`, with the receipts.
+- **The handler throws anything else with nothing recorded:** the outcome is unknown. The effect may have happened just before the exception, as with a crash between `tickets.update` and `recordEffect` above. No statement is signed, and a verifier answers `unresolved`, never `preserved`. Earlier revisions signed `not_executed` here, which also released holds (spec 5.10, 7.6). Reported by Andrii (Radiolaria) on openid-aiim, 24 Nov 2026; `test/failure-window.test.mjs` pins all four cases.
+
+Call `recordEffect` as close to the effect as the backend allows, so this window stays small.
 
 ### Client
 
