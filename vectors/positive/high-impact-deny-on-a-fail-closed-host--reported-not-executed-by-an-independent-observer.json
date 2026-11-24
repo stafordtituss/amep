@@ -134,7 +134,8 @@
     "proof": {
      "kid": "host-1",
      "alg": "Ed25519",
-     "sig": "9c89094a6e750cc0bd6a5c86eeb89e88176454b3b283188a706b80e9e916d62bc3c0f46530f921148b0a826eeeaeaa712e32c4a745ef4d1bd223954bbedb8c02"
+     "v": 2,
+     "sig": "d5c11765552f25016f21bae293b44dcc51050dad43aa02ab5f165025f524592b909d9bf5e69f66ac2128e0072564b32d7bf18142684c98e51aac7a7529f39d0e"
     }
    }
   ]

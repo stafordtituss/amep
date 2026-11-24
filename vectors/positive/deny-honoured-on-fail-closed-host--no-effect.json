@@ -28,7 +28,8 @@
     "proof": {
      "kid": "issuer-1",
      "alg": "Ed25519",
-     "sig": "a304f205fe39051b7d74ed0834b3b2a037373d16b28549edc6e190520ed92801700c5a4cdfd80a5de5d27737fc39114f173721acaf52f6baec22343a153e3f01"
+     "v": 2,
+     "sig": "71a1c45384cea9f9903c7a93ce5a8b27af9bd96ad5f52fe6b02bcf9e97951fc417f4e2e532b3926490b6fa7f2c38ea4cd916693bc4d8f275ba75556d580daa06"
     }
    }
   ],
@@ -54,7 +55,8 @@
     "proof": {
      "kid": "issuer-1",
      "alg": "Ed25519",
-     "sig": "30b641f10bb3a83443762272c142231a860b948b58397c6ed14f8566e6f817edc1c06148bb0438043cde2cac99fdfeeb58a6ddb201aa19e1ec6abab03687150c"
+     "v": 2,
+     "sig": "957c8193fb37d4e3a104139fa1df83d17357076aec57015ae4de7e1d32b9da0cc61f3e84a75853d9e288193baefb4122d3ad6c1c60e35cf2542935d7a364c20f"
     }
    }
   ],
@@ -68,7 +70,8 @@
     "proof": {
      "kid": "host-1",
      "alg": "Ed25519",
-     "sig": "185d02d49c8440af31134eec4b820a71cfa92a89dd007f0b912acbcb9bf860641ff6e3ff58e7a08754e6bf9c27d2269d166521b86e39293ad09957a61fe75a09"
+     "v": 2,
+     "sig": "39a6a8663dcd45b7c212805d517d108e3864048bd5b8146837d1d638a4138dca2ed75e828946f9e33e507e9c2efc26a71c216a2e698d868963db309d5523380c"
     }
    }
   ],
@@ -84,14 +87,36 @@
      "resource": "repo:app/src/auth.ts",
      "effect": "write_local"
     },
+    "args_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "proof": {
      "kid": "host-1",
      "alg": "Ed25519",
-     "sig": "71490b9b0ba3d4f07e2c56fd46e94d12b6a67b2a961aacec4ecd9d055201ec03811d9d0dbb09a6ce53b49d2f129c94636be2a52d5fcee42c9ecf8460bca0a90b"
+     "v": 2,
+     "sig": "5990f8b8858903dff356c14e62a4dfbc1a54e953f48fb703eaf1eec9aada23be77a89eacb3b4e19796ee32ba5d496cbca6b4bd0414b5dcb8dbd05a8f145c3302"
     }
    }
   ],
   "effects": [],
+  "amep_version": "0.3",
+  "call_statements": [
+   {
+    "id": "c-1",
+    "kind": "call_statement",
+    "invocation": "i-1",
+    "observed_by": "hook:host",
+    "disposition": "not_executed",
+    "effect_count": 0,
+    "t": 12,
+    "invocation_digest": "0f012bfb5d9100c6ea6cb24b11aac0900fc7f4f831b068f72777739c6587ac85",
+    "args_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "69a55c683065aa4175fa34cb1bd2d54f798cd4436f7fbd9e0b96b2696de98c68998755e20f4d771b1df5ffc00a15749b834dfe6e82d45bf461ab9221d00a0d0f"
+    }
+   }
+  ],
   "decisions": [
    {
     "id": "cd-2",
@@ -108,7 +133,8 @@
     "proof": {
      "kid": "host-1",
      "alg": "Ed25519",
-     "sig": "35e20d77a00bf3c088b7aa346d0cc153bf21eab14abb9d09a80885493713d239a56084e71e0a395d4f5efb920a08eed587f6fc38fddc564c5d6aade03b963105"
+     "v": 2,
+     "sig": "b418356f49d1473d84eca2089cde8071ee2010dbff48f47f6db8deef15f98f5f2a437e8ac46444c99cea22616e988ce4f7308dcec1c88da9bf5ebc96b3190b04"
     }
    }
   ]

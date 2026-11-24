@@ -2,23 +2,25 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
-## A host's own enforcement claim no longer settles a high-impact deny (unreleased, 2026-11-24)
+## A host's own enforcement claim never settles a deny (unreleased, 2026-11-24)
 
-- **The question,** from issue #15. A pre-execution deny whose `enforcement` says `fail_mode: closed` or `applied: confirmed` used to make the call `preserved` ("denied; no effect") with no other record. The host that signs the deny declares both fields, so for a high-impact call that was self-reported evidence for "nothing executed", which I10 refuses everywhere else.
+- **The question,** from issue #15. A pre-execution deny whose `enforcement` says `fail_mode: closed` or `applied: confirmed` used to make the call `preserved` ("denied; no effect") with no other record. The host that signs the deny declares both fields, so that was self-reported evidence for "nothing executed".
   - Raised with delegation-control-bench, where 12 denied scenarios with only a decision log came out 12/12 `preserved` under AMEP and 0/12 under the bench's reference verifier.
-  - Brennan Zambo (AER-1) answered: a host's own declaration can't settle it.
-- **Now (spec 10.3):**
-  - for calls declared `read` or `write_local`, the host's declaration still settles "denied; no effect";
-  - for `write_shared` and above, it settles nothing. A `not_executed` call statement from an observer other than the actor still makes the call `preserved` (Section 5.14, rule 5). Without one, the result is `unresolved` (I10), need `independent_observer`;
-  - a result already `violated` on other evidence is left as it is.
+  - Brennan Zambo (AER-1) answered: a host's own declaration can't settle it. He proposed the independent route, with a floor for `read` and `write_local` "while that lands".
+- **Now (spec 10.3), for every effect class:**
+  - the host's declaration never settles "denied; no effect". A `not_executed` call statement from an observer does (Section 5.14, rule 5; for `write_shared` and above the observer must not be the actor, I10);
+  - without such a statement, the result stays `unresolved`: I7 for `read` and `write_local`, and I10, need `independent_observer`, for `write_shared` and above;
+  - a deny never replaces a `violated` result.
 - **Why not "require `applied: confirmed`":** that field is signed by the same host as `fail_mode`, so requiring it alone would close nothing.
-- **Section 17** names the residual risk for `read` and `write_local`.
-- **Three new core vectors for this** (one positive, two must-reject):
-  - `high-impact-deny-on-a-fail-closed-host--no-independent-record` (`unresolved`, I10);
-  - `high-impact-deny-on-a-fail-closed-host--reported-not-executed-by-an-independent-observer` (`preserved`);
-  - `deny-on-a-fail-closed-host-contradicted-by-an-observed-effect` (`violated`, I11), the test Brennan suggested.
-- **A host's claim never clears a violation.** Rerunning delegation-control-bench against this change showed a second gap. A host's `fail_mode: closed` replaced *any* result with `preserved`, including `violated` (I1 or I6) for an invocation under widened or revoked authority. In the bench's decision-log-only scenarios, the same denied read came out `violated` with the fail mode unknown and `preserved` with it declared closed. The declaration now answers only whether anything executed: on `read` and `write_local` calls it upgrades an `unresolved` result to `preserved` and leaves a `violated` one as it is. New vector: `deny-on-a-fail-closed-host-does-not-clear-an-invocation-under-revoked-authority` (`violated`, I6); under the previous rule it was `preserved`.
-- **The core suite now has 242 vectors, 278 across the three suites.** No existing vector changes its verdict. Both reference verifiers agree on all 278, and a verifier that answers "preserved" to everything scores 73/278.
+- **The floor came off in the same release.** A first version kept the host's word for `read` and `write_local`. Rerunning delegation-control-bench against it showed two things:
+  - the floor left 10 of the 12 denied reads `preserved` on the host's word;
+  - it also replaced *any* result, including `violated` (I1 or I6) for an invocation under widened or revoked authority, so the same denied read was `violated` with the fail mode unknown and `preserved` with it declared closed.
+
+  With the independent route in place, the floor went.
+- **Vectors:**
+  - `deny-honoured-on-fail-closed-host--no-effect` now carries the observer's `not_executed` statement and stays `preserved`. Without it, the same packet is the new `deny-on-a-fail-closed-host-with-no-other-record` (`unresolved`, I7). This is the one existing vector whose packet changed.
+  - New: `high-impact-deny-on-a-fail-closed-host--no-independent-record` (`unresolved`, I10); `high-impact-deny-on-a-fail-closed-host--reported-not-executed-by-an-independent-observer` (`preserved`); `deny-on-a-fail-closed-host-contradicted-by-an-observed-effect` (`violated`, I11), the test Brennan suggested; `deny-on-a-fail-closed-host-does-not-clear-an-invocation-under-revoked-authority` (`violated`, I6; `preserved` under the old rule).
+- **The core suite now has 243 vectors, 279 across the three suites.** Both reference verifiers agree on all 279, and a verifier that answers "preserved" to everything scores 73/279.
 
 ## AP2: one consent redeemed twice is caught afterwards (unreleased, 2026-11-24)
 

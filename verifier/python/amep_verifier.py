@@ -177,13 +177,11 @@ def vectors():
         budgets(p, I, H, 10, 5, 3),
         p["invocations"].append(H.sign({**p["invocations"][0], "id": "i-2", "t": 12, "budget_spent": 3})),
         p["effects"].append(O.sign({**p["effects"][0], "id": "e-2", "invocation": "i-2"}))))
-    def decision(H, did, mode="deny", phase="pre_execution", inv="i-1", **kw):
-        return H.sign({"id": did, "kind": "decision", "invocation": inv, "outcome": "violated", "mode": mode, "phase": phase, **kw})
+    def decision(H, did, mode="deny", phase="pre_execution", inv="i-1", v=1, **kw):
+        body = {"id": did, "kind": "decision", "invocation": inv, "outcome": "violated", "mode": mode, "phase": phase, **kw}
+        return H.sign(body, v=2) if v == 2 else H.sign(body)
     add("deny contradicted by executed effect", ("violated", "I11"), lambda p, I, H, O, X:
         p.update(decisions=[decision(H, "cd-1", enforcement={"pep": "host-hook/1.0", "fail_mode": "open", "encoded_as": "ask"})]))
-    add("deny honoured on fail-closed host (no effect)", ("preserved", "-"), lambda p, I, H, O, X: (
-        p.update(decisions=[decision(H, "cd-2", enforcement={"pep": "host-hook/2.0", "fail_mode": "closed", "applied": "confirmed"})]),
-        p.update(effects=[])))
     add("deny on fail-open host, no effect record", ("unresolved", "I7"), lambda p, I, H, O, X: (
         p.update(decisions=[decision(H, "cd-3", enforcement={"pep": "host-hook/1.0", "fail_mode": "open"})]),
         p.update(effects=[])))
@@ -785,9 +783,16 @@ def vectors():
     add("high-impact deny on a fail-closed host, reported not executed by an independent observer", ("preserved", "-"), lambda p, I, H, O, X: (
         high_impact(p), bound(p, I, H, O), p.update(effects=[]),
         stmt(p, O, disposition="not_executed", count=0, observed_by="proxy:egress"),
-        p.update(decisions=[decision(H, "cd-15b", enforcement=closed_deny)])))
+        p.update(decisions=[decision(H, "cd-15b", v=2, enforcement=closed_deny)])))
     add("deny on a fail-closed host contradicted by an observed effect", ("violated", "I11"), lambda p, I, H, O, X:
         p.update(decisions=[decision(H, "cd-15c", enforcement=closed_deny)]))
+    # the host's own fail_mode/applied never settles "nothing executed" (#15): the observer's not_executed statement does
+    add("deny honoured on fail-closed host (no effect)", ("preserved", "-"), lambda p, I, H, O, X: (
+        bound(p, I, H, O), p.update(effects=[]), stmt(p, O, disposition="not_executed", count=0),
+        p.update(decisions=[decision(H, "cd-2", v=2, enforcement={"pep": "host-hook/2.0", "fail_mode": "closed", "applied": "confirmed"})])))
+    add("deny on a fail-closed host with no other record", ("unresolved", "I7"), lambda p, I, H, O, X: (
+        p.update(decisions=[decision(H, "cd-2b", enforcement={"pep": "host-hook/2.0", "fail_mode": "closed", "applied": "confirmed"})]),
+        p.update(effects=[])))
     # the host's claim answers only "did anything execute?"; an invocation under revoked authority stays violated
     add("deny on a fail-closed host does not clear an invocation under revoked authority", ("violated", "I6"), lambda p, I, H, O, X: (
         p.update(revocations=[I.sign({"kind": "revocation", "target": "m-1", "t": 5})]), p.update(effects=[]),
