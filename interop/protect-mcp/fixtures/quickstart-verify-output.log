@@ -1,0 +1,199 @@
+
+protect-mcp init --starter
+───────────────────────────────────────────────────────
+
+  ✓ ./protect.cedar
+    The starter policy, v1. Every tool call is allowed except
+    these, and a forbid always wins:
+      starter.delete-root-or-home       Recursive delete of /, the home folder or the parent folder.
+      starter.force-push-main           Force-push to main or master, or a force-push that names no branch.
+      starter.read-secret-file          Reads a credential file such as .env, ~/.ssh or ~/.aws.
+      starter.grep-secret-path          Searches inside a credential file or folder.
+      starter.shell-reads-secret        Prints a credential file in the shell.
+      starter.pipe-network-to-shell     Runs a downloaded script without review.
+      starter.write-sensitive-location  Writes or deletes a system, shell-profile, SSH, credential or agent-control file.
+
+  ✓ ./protect-mcp.key (Ed25519 key that signs receipts; keep it secret)
+    Public key: deb516bdd67886e150fea0da92946ec1caa9f19d168e349879f02e9695bae78c
+  ✓ ./.gitignore lists /protect-mcp.key
+
+  Shell rules match the command text, so they are a guardrail for an agent working
+  in good faith, not a sandbox: a reworded command can get past them. A denied call
+  exits 2 and prints the rule and its reason on stderr. The file is yours to edit.
+
+  Check a call:  npx protect-mcp@0.32.5 evaluate --policy ./protect.cedar --tool Bash --input '{"command":"git push --force origin main"}'
+  Keep writes inside this folder too:  npx protect-mcp@0.32.5 init --starter --contain --force (rewrites protect.cedar)
+
+{"allowed":true,"policy_digest":"sha256:94428dedc59ccc1dc58578871f5b81893cb4bc376dbf97922cbda494083b2d1f"}
+{"allowed":false,"reason":"cedar_deny: starter.force-push-main: Force-push to main or master, or a force-push that names no branch. Push a named feature branch instead.","policy_digest":"sha256:94428dedc59ccc1dc58578871f5b81893cb4bc376dbf97922cbda494083b2d1f"}
+{"signed":true,"decision":"allow","policy_digest":"sha256:94428dedc59ccc1dc58578871f5b81893cb4bc376dbf97922cbda494083b2d1f","artifact_type":"decision_receipt","request_id":"tu-1795534979661-f1ea","log":"receipts/receipts.jsonl"}
+{"signed":true,"decision":"deny","policy_digest":"sha256:94428dedc59ccc1dc58578871f5b81893cb4bc376dbf97922cbda494083b2d1f","artifact_type":"gateway_restraint","request_id":"tu-1795534980148-2vrl","log":"receipts/receipts.jsonl"}
+{
+  "total": 2,
+  "verified": 2,
+  "failed": 0,
+  "undecidable": 0,
+  "chainBreaks": 0,
+  "byTier": {
+    "1": 2,
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0
+  },
+  "errors": [],
+  "receipts": [
+    {
+      "index": 0,
+      "valid": true,
+      "outcome": "valid",
+      "tier": 1,
+      "kid": "generated",
+      "type": "protectmcp:decision",
+      "checks": {
+        "signing_input": {
+          "result": "pass"
+        },
+        "signature": {
+          "result": "pass"
+        },
+        "carried_key": {
+          "result": "pass"
+        },
+        "issuer_kid": {
+          "result": "pass"
+        },
+        "chain_link": {
+          "result": "absent"
+        },
+        "key_window": {
+          "result": "not_established"
+        }
+      },
+      "keyStatus": {
+        "source": "provided",
+        "window": null,
+        "issued_at": "2026-11-24T15:42:59.661Z",
+        "applied": false,
+        "result": "not_established",
+        "detail": "The key was given directly, so no key source gives it a validity window: its validity at issuance is not established."
+      }
+    },
+    {
+      "index": 1,
+      "valid": true,
+      "outcome": "valid",
+      "tier": 1,
+      "kid": "generated",
+      "type": "protectmcp:decision",
+      "checks": {
+        "signing_input": {
+          "result": "pass"
+        },
+        "signature": {
+          "result": "pass"
+        },
+        "carried_key": {
+          "result": "pass"
+        },
+        "issuer_kid": {
+          "result": "pass"
+        },
+        "chain_link": {
+          "result": "pass"
+        },
+        "key_window": {
+          "result": "not_established"
+        },
+        "previous": {
+          "result": "pass"
+        }
+      },
+      "keyStatus": {
+        "source": "provided",
+        "window": null,
+        "issued_at": "2026-11-24T15:43:00.148Z",
+        "applied": false,
+        "result": "not_established",
+        "detail": "The key was given directly, so no key source gives it a validity window: its validity at issuance is not established."
+      }
+    }
+  ],
+  "valid": true,
+  "legacyLinks": 0,
+  "chains": 1,
+  "warnings": [],
+  "outcome": "valid"
+}
+{
+  "valid": false,
+  "outcome": "invalid",
+  "checks": {
+    "signing_input": {
+      "result": "pass"
+    },
+    "signature": {
+      "result": "fail",
+      "code": "invalid_signature"
+    },
+    "carried_key": {
+      "result": "pass"
+    },
+    "issuer_kid": {
+      "result": "pass"
+    },
+    "chain_link": {
+      "result": "pass"
+    },
+    "key_window": {
+      "result": "not_established"
+    }
+  },
+  "error": "invalid_signature",
+  "connectorAction": null,
+  "format": "passport",
+  "type": "protectmcp:decision",
+  "kid": "generated",
+  "issuer": null,
+  "keySource": "provided",
+  "publicKey": "deb516bdd67886e150fea0da92946ec1caa9f19d168e349879f02e9695bae78c",
+  "algorithm": "EdDSA",
+  "payloadFields": {
+    "decision": "allow",
+    "scope": "tu-1795534980148-2vrl",
+    "tool_name": "Bash",
+    "spec": "draft-farley-acta-signed-receipts-03",
+    "previousReceiptHash": "sha256:b8a521e7171faf1f356eb5427eebe506c700b35bebca6f626a264aa1230ff852"
+  },
+  "entitlementAttested": false,
+  "entitlementVerifiedByRuntime": false,
+  "hash": "b48d312024f45d440a7aac47532964ea4654bfc80feba2e1b99de582447874da",
+  "canonicalization": "jcs",
+  "chainLink": "sha256",
+  "keyStatus": {
+    "source": "provided",
+    "window": null,
+    "issued_at": "2026-11-24T15:43:00.148Z",
+    "applied": false,
+    "result": "not_established",
+    "detail": "The key was given directly, so no key source gives it a validity window: its validity at issuance is not established."
+  },
+  "scope": "tu-1795534980148-2vrl",
+  "tier": {
+    "tier": 0,
+    "label": "T0 not verified",
+    "features": [],
+    "declaredFeatures": [
+      "chain-linkage"
+    ]
+  },
+  "modeLabel": "Ed25519 Passport envelope (RFC 8032)",
+  "specVersion": "draft-farley-acta-signed-receipts-03",
+  "errorMeta": {
+    "code": "invalid_signature",
+    "description": "Cryptographic signature verification failed over the canonical payload.",
+    "class": "tampered",
+    "spec": "draft-farley-acta-signed-receipts-03 §6.6 Signature Scope",
+    "hint": "The receipt has been modified or signed by a different key than the one provided."
+  }
+}

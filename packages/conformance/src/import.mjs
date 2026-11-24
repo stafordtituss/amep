@@ -14,8 +14,9 @@ import { CEILING, digest, evaluate, verdict } from "@stafordtituss/amep/core";
 import { sigOk } from "@stafordtituss/amep";
 import { aer1 } from "./profiles/aer1.mjs";
 import { oidfActionReceipt } from "./profiles/oidf-action-receipt.mjs";
+import { protectMcp } from "./profiles/protect-mcp.mjs";
 
-export const PROFILES = { aer1, "oidf-action-receipt": oidfActionReceipt };
+export const PROFILES = { aer1, "oidf-action-receipt": oidfActionReceipt, "protect-mcp": protectMcp };
 
 function lookup(obj, path) {
   return path.split(".").reduce((o, k) => (o && typeof o === "object" ? o[k] : undefined), obj);
@@ -33,11 +34,14 @@ function fill(template, fields) {
 /**
  * Import one record. Returns { profile, integrity, mapping, effect (unsigned AMEP effect or null), gaps }.
  * `invocations` (optional): AMEP invocations the record may belong to; binding is made only by a matching digest.
+ * `issuerKey` (optional): the record issuer's public key, obtained separately, for profiles that check signatures.
+ * A decision-only profile (protect-mcp) never yields an effect; for a bound record it yields `decision`, an unsigned
+ * AMEP pre-execution decision.
  */
-export function importRecord(record, { profile: pid, map = { tools: {} }, expectedId, invocations = [], invocationId } = {}) {
+export function importRecord(record, { profile: pid, map = { tools: {} }, expectedId, invocations = [], invocationId, issuerKey } = {}) {
   const profile = pid ? PROFILES[pid] : Object.values(PROFILES).find(p => p.detect(record));
   if (!profile) throw new Error(pid ? `unknown profile ${pid}` : "no profile recognizes this record");
-  const integrity = profile.check(record, { expectedId });
+  const integrity = profile.check(record, { expectedId, issuerKey });
   const info = profile.extract(record, integrity.committed);
   const entry = map.tools?.[info.tool.name];
   const mapping = { mappedFrom: entry ? "map" : "missing", binding: "missing", released: entry?.released ?? null };
@@ -76,8 +80,17 @@ export function importRecord(record, { profile: pid, map = { tools: {} }, expect
       if (inv?.id && byDigest) effect.invocation_digest = digest(byDigest);
     }
   }
+  let decision = null;
+  if (profile.decisionOnly) {
+    mapping.authenticated = integrity.verdict === "pass";
+    const hex = (info.input_hash ?? "").replace(/^sha256:/, "");
+    const inv = hex ? invocations.find(i => i.args_digest && i.args_digest === hex) : null;
+    if (inv) mapping.binding = "digest";
+    if (inv && integrity.verdict === "pass")
+      decision = profile.toDecision(info, inv.id, `${profile.id}:${info.record_id}`);
+  }
   return { profile: profile.id, integrity: { verdict: integrity.verdict, id_verdict: integrity.id_verdict, checks: integrity.checks },
-    mapping, effect, not_imported: why, gaps: profile.gaps(info, mapping) };
+    mapping, effect, ...(profile.decisionOnly ? { decision } : {}), not_imported: why, gaps: profile.gaps(info, mapping) };
 }
 
 /** Sign imported effects as the importer (role observer) and evaluate them with the rest of an AMEP packet. */

@@ -1,0 +1,84 @@
+{
+ "amep_version": "0.3",
+ "mandates": [
+  {
+   "id": "m-1",
+   "kind": "mandate",
+   "principal": "user:quickstart",
+   "claims": {
+    "actions": [
+     "repo.read",
+     "repo.push"
+    ],
+    "resources": [
+     "repo:file/*",
+     "repo:git/origin/*"
+    ],
+    "ceiling": "external_send",
+    "exp": "2026-12-31T00:00:00Z"
+   },
+   "proof": {
+    "kid": "principal-1",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "e8c3cf8a4abc00c80fbad79b3a40bae6f08bc4fe7381818911eac4417526a4ad810ea6a1a12e71bf5eb570b9910f628808c5436300cf6c709ae3c0ced0e5510f"
+   }
+  }
+ ],
+ "interpretations": [
+  {
+   "id": "a-1",
+   "kind": "interpretation",
+   "source": "curated",
+   "adapter": "protect-mcp",
+   "version": "0.32.5",
+   "proof": {
+    "kid": "agent-host-1",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "62ee51919e8c1d33746fad5b7b118db8b29f77032d8705436673436c9b7bc1869bf885110e8d1c962c1dfc1a307580f7db9cd4a398457a8f8a144182fca3410c"
+   }
+  }
+ ],
+ "invocations": [
+  {
+   "id": "i-1",
+   "kind": "invocation",
+   "authority_ref": "m-1",
+   "interpretation_ref": "a-1",
+   "t": "2026-11-24T15:42:59Z",
+   "declared": {
+    "action": "repo.read",
+    "resource": "repo:file/README.md",
+    "effect": "read"
+   },
+   "args_digest": "7d6441497d2a000b8143602a7817c90abe7db88e139f89c062a1c36cfe0ad9d6",
+   "proof": {
+    "kid": "agent-host-1",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "86161e29cd988cd62914327cc375b09bc009894a8ef121c285ad16908bdfa9d4c30d5ea4a50bac90def6417863303c807b1c43a3f8594939180edf97ba8dea00"
+   }
+  },
+  {
+   "id": "i-2",
+   "kind": "invocation",
+   "authority_ref": "m-1",
+   "interpretation_ref": "a-1",
+   "t": "2026-11-24T15:43:00Z",
+   "actor": "agent:quickstart",
+   "declared": {
+    "action": "repo.push",
+    "resource": "repo:git/origin/main",
+    "effect": "external_send"
+   },
+   "args_digest": "2c29a8326969480173c60a2f1083c6dbf5b73aa28539723243a204c8793dc5e9",
+   "proof": {
+    "kid": "agent-host-1",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "d2e4cb51c6e2054521e69ca91976907c09d6e92e3b9a330ca11bdcb9c8ab3c5326f65f5e138c70261f6b94118500f86446f9e8530d6907ad644a2d4c8e30810b"
+   }
+  }
+ ]
+}

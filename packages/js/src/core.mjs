@@ -816,7 +816,7 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
         if (cur && cur.outcome === "unresolved") {
           out = out.filter(r => r.id !== d.invocation);
           out.push(result(d.invocation, "unresolved", "I10", "denied, but only the host says it held; a high-impact call needs an independent not_executed statement",
-            { need: "independent_observer", ref: d.invocation }));
+            null, [{ need: "independent_observer", ref: String(d.invocation) }]));
         }
       }
     }

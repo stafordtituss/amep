@@ -7,10 +7,12 @@
 //         amep-conformance verify --cmd "amep-protocol verify {packet} --keys {keys} {state} --json"
 //
 //   amep-conformance import RECORD.json --map TOOLMAP.json [--profile aer1] [--expected-id ID]
-//                    [--packet AMEP_PACKET.json --keys KEYS.json [--invocation ID]]
+//                    [--packet AMEP_PACKET.json --keys KEYS.json [--invocation ID]] [--issuer-key HEX]
 //       Checks a record in another format by that format's own rules, maps it to an AMEP effect, and reports what
 //       AMEP needs that the record does not carry. With --packet, signs the mapped effect as the importer and gives
-//       the AMEP verdict for the call.
+//       the AMEP verdict for the call. A decision receipt (protect-mcp) is authenticated with --issuer-key, the
+//       issuer's Ed25519 public key obtained separately; it yields no effect, and with --packet its decision is
+//       re-expressed as an AMEP pre-execution decision for the invocation it binds to by digest.
 //
 //   amep-conformance import-book BOOK.jsonl [--profile provared] [--map MAP.json] [--json FILE]
 //       Checks a whole book of records (a Provared book) by its format's own rules, re-expresses the verified records
@@ -39,6 +41,7 @@ async function main(argv) {
     cmd: { type: "string" }, suite: { type: "string", multiple: true }, name: { type: "string" }, version: { type: "string" },
     json: { type: "string" }, md: { type: "string" }, map: { type: "string" }, profile: { type: "string" },
     "expected-id": { type: "string" }, packet: { type: "string" }, keys: { type: "string" }, invocation: { type: "string" },
+    "issuer-key": { type: "string" },
     quiet: { type: "boolean" } } });
   switch (cmd) {
     case "verify": {
@@ -58,11 +61,12 @@ async function main(argv) {
       const map = o.map ? load(o.map) : { tools: {} };
       const packet = o.packet ? load(o.packet) : null;
       const out = importRecord(record, { profile: o.profile, map, expectedId: o["expected-id"],
-        invocations: packet?.invocations ?? [], invocationId: o.invocation });
+        invocations: packet?.invocations ?? [], invocationId: o.invocation, issuerKey: o["issuer-key"] });
       console.log(`profile ${out.profile}: format checks ${out.integrity.verdict} (id ${out.integrity.id_verdict})`);
       for (const c of out.integrity.checks) console.log(`  ${c.pass ? "ok  " : "FAIL"} ${c.rule}`);
       if (out.effect) console.log(`mapped to AMEP: ${out.effect.executed.action} ${out.effect.executed.resource} (${out.effect.executed.effect}), assurance ${out.effect.assurance}, binding ${out.mapping.binding}`);
       else console.log(`not imported: ${out.not_imported}`);
+      if (out.decision) console.log(`AMEP decision: ${out.decision.mode} (${out.decision.phase}) for invocation ${out.decision.invocation}, binding ${out.mapping.binding}`);
       if (out.mapping.conflict) console.log(`warning: ${out.mapping.conflict}`);
       console.log("what AMEP needs that this record does not carry:");
       for (const g of out.gaps) console.log(`  [${g.status}] ${g.need}: ${g.detail}`);
@@ -73,6 +77,18 @@ async function main(argv) {
         const ev = evaluateImported(packet, load(o.keys), [out], importer);
         console.log(`AMEP verdict for the call: ${ev.verdict.outcome} ${ev.verdict.invariant} (${ev.verdict.reason})`);
         code = ev.verdict.outcome === "preserved" ? 0 : 1;
+      }
+      if (packet && out.decision) {
+        // The gateway's decision, authenticated above, re-expressed as AMEP evidence signed by the importer (role host,
+        // since decisions are host statements). Under spec 10.3 it cannot settle whether the call ran.
+        if (!o.keys) throw new Usage("--packet needs --keys");
+        const importer = Key.generate("importer-1", ["host"]);
+        const pk = { ...packet, decisions: [...(packet.decisions || []), importer.sign(out.decision, { v: 2 })] };
+        const results = evaluate(pk, { ...load(o.keys), [importer.kid]: importer.publicEntry() }, sigOk);
+        const r = results.find(x => x.id === out.decision.invocation) ?? verdict(results);
+        const gap = r.gaps?.[0] ? ` gap ${r.gaps[0].need}` : "";
+        console.log(`AMEP verdict for the call: ${r.outcome} ${r.invariant} (${r.reason})${gap}`);
+        code = r.outcome === "preserved" ? 0 : 1;
       }
       if (o.json) writeFileSync(o.json, JSON.stringify(out, null, 1));
       return code;

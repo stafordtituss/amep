@@ -3,6 +3,16 @@
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
 
+## protect-mcp import profile (unreleased, 2026-11-24)
+
+- **`amep-conformance import --profile protect-mcp`** reads protect-mcp decision receipts (`protectmcp:decision` ACTA envelopes). It:
+  - authenticates them against an issuer key given separately (`--issuer-key`);
+  - binds them to an AMEP invocation when `payload_digest.input_hash` equals `args_digest`;
+  - re-expresses them as AMEP pre-execution decisions.
+
+  It never produces an effect: a decision made before execution shows neither that the tool ran nor that it didn't (spec 10.3). Run over the three fixtures of ScopeBlind's pinned quickstart (`95ecaa3`, `protect-mcp@0.32.5`): allow, `unresolved` (I7, `receipt`); deny, `unresolved` (I10, `independent_observer`); the altered copy, `invalid_signature`. See `interop/protect-mcp/` and ScopeBlind/scopeblind-gateway#31.
+- **Fix, JS core:** for a high-impact call denied with only the host's own enforcement claim, the I10 result now names its gap, `independent_observer`, with `blame` null, as the Python core already did. Outcome and invariant are unchanged, so no vector changes. The browser verifier is rebuilt.
+
 ## An independent implementation, and four clarifications from it (unreleased, 2026-11-24)
 
 - **zambo-amep-verify 0.1.0,** by Brennan Zambo, was written from the specification and the published vectors alone, without reading either reference verifier. It agrees with all 228 single-packet vectors of the core suite: the deciding invariant as well as the outcome, for every positive and must-reject vector (stafordtituss/amep#18). Cross-packet state (Section 10.7) and the interop suites are its next rows. Recorded in spec 15.2 and LIMITS.md.
