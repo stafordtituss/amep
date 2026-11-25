@@ -37,15 +37,27 @@ An agent issues calls, each naming an operation and, optionally, a single-use ap
 | Low-impact (`write_local`), honest observer | 33,825 | NoFalseAlarm, Settles, Stable | **Sound:** the actor's own "not executed" counts for low-impact calls (5.14 rule 5), so a host that lies about its first attempt gets its retry `preserved`. That's the documented limit, and the reason the actor's word doesn't count for high-impact calls. |
 | High-impact, observer may lie | 112,945 | NoFalseAlarm, Settles, Stable | **Sound:** an observer that signs "not executed", executes anyway and withholds the receipt defeats it. AMEP's soundness rests on the observer's statement being true, which is what VATE's exclusion of the old worker provides (`interop/authzen-receipts/vate-03-confirmed-nonexecution`). If the receipt surfaces, AMEP reports the contradiction (I11). |
 
-**Cross-check against the verifier:** AMEP's Python verifier agrees with the model on every call, in every reachable evidence view of all three configurations.
+**Cross-check against the verifier:** at 3 calls, AMEP's Python verifier agrees with the model on every call, in every reachable evidence view of all three configurations (14,425, 14,425 and 33,825 views; about five minutes).
 
 ## What it found
 
-The first run of the cross-check showed AMEP's verifier returning `preserved` where the model said `unresolved`. The case: a high-impact call's "not executed" statement signed by the host's own key, but naming someone else in `observed_by`.
+AMEP's verifier and the model first disagreed on hundreds of evidence views. Each disagreement was either a bug in the verifier, now fixed in both cores, or a rule the model had stated differently, now aligned and written down below.
 
-I10 compared names (`observed_by` against `actor`), and operators only where the key set names them. A host key that also had the `observer` role could vouch for itself and release a retry on its own word. That's the very thing operation identity is meant to prevent.
+**Verifier bugs, now fixed (all on stafordtituss/amep#24):**
+1. **The actor is its key, not its name** (commit `06a7e0c`).
+   - I10 compared names: `observed_by` against `actor`, and operators only where the key set names them.
+   - A host key that also had the `observer` role could sign its own "not executed", or its own high-impact receipt, under another `observed_by`. A retry was then released on the actor's own word.
+   - Now a record signed by the invocation's own key is the actor's, whatever name it gives.
+2. **No hold hides a double use** (commit `e71ed75`). Three orderings let an `unresolved` hold mask a violation that verified receipts already proved, against spec 5.10's rule that checks deciding `violated` come first:
+   - an approval's single-use check ran after its hold check;
+   - a call held on an approval didn't record its use, so a third use was held too;
+   - "executed twice" (5.8.1) ran last, after the approval hold.
 
-The fix is now in both verifiers and the spec: a record signed by the invocation's own key is the actor's, whatever name it gives. The bug isn't in any conformance vector, so the 256 vectors didn't catch it; tests in both packages pin it.
+**None of these was in the conformance vectors,** so all 256 passed throughout. The first bug appears with two calls, the others only with three.
+
+**Two counting rules the model now states as the verifier applies them:**
+- **An operation is done once a receipt for it verifies and no statement contradicts it,** even if the call is `violated` for another reason: the operation ran.
+- **A `violated` call is charged once, for its first violation.** Its use of an approval isn't counted against later calls. A double use is still reported, because the earlier call is `violated`, which is what Sound requires.
 
 ## Run it
 

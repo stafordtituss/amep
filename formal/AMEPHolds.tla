@@ -76,14 +76,15 @@ Pass(n) ==
            o == calls[n].op
            a == calls[n].ap
            unknown == ~HasR(n) /\ ~Shown(n)
-           counts  == HasR(n) /\ ~Stated(n)     \* an equivocating call is charged by I11, not counted
            r == CASE HasR(n) /\ Stated(n)                                   -> "violated"   \* I11
                   [] HasR(n) /\ a # NoAp /\ a \in s.apUsed                  -> "violated"   \* I8
                   [] HasR(n) /\ o \in s.opDone                              -> "violated"   \* I2
                   [] HasR(n) /\ ((a # NoAp /\ a \in s.apHeld) \/ o \in s.opHeld) -> "unresolved" \* held_outcome
                   [] HasR(n) \/ Shown(n)                                    -> "preserved"
                   [] OTHER                                                  -> "unresolved" \* receipt, or I10
-       IN [opDone |-> IF counts THEN s.opDone \cup {o} ELSE s.opDone,
+           ran     == HasR(n) /\ ~Stated(n)     \* a verified, uncontradicted receipt: the operation ran
+           counts  == HasR(n) /\ r # "violated"   \* a violated call is charged once, for its first violation
+       IN [opDone |-> IF ran THEN s.opDone \cup {o} ELSE s.opDone,
            opHeld |-> IF unknown /\ o \notin s.opDone THEN s.opHeld \cup {o} ELSE s.opHeld,
            apUsed |-> IF counts /\ a # NoAp THEN s.apUsed \cup {a} ELSE s.apUsed,
            apHeld |-> IF unknown /\ a # NoAp /\ a \notin s.apUsed THEN s.apHeld \cup {a} ELSE s.apHeld,

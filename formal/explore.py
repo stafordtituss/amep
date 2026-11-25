@@ -58,10 +58,10 @@ def model_results(calls, ev, high_impact):
         else:
             r = "unresolved"                                    # receipt gap (I7), or I10 for an actor-only statement
         unknown = not has_r and not shown
-        if has_r and not stated:                                # an equivocating call is charged by I11, not counted
+        if has_r and not stated:                                # a verified, uncontradicted receipt: the operation ran
             op_done.add(o)
-            if a != NONE:
-                ap_used.add(a)
+        if has_r and r != "violated" and a != NONE:             # a violated call is charged once, for its first violation
+            ap_used.add(a)
         if unknown and o not in op_done:
             op_held.add(o)
         if unknown and a != NONE and a not in ap_used:
