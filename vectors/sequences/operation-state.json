@@ -1977,6 +1977,283 @@
      }
     }
    ]
+  },
+  {
+   "name": "a single-use approval used in one packet is still used in the next",
+   "steps": [
+    {
+     "packet": {
+      "mandates": [
+       {
+        "id": "m-1",
+        "kind": "mandate",
+        "principal": "user:alice",
+        "claims": {
+         "actions": [
+          "fs.*",
+          "process.exec"
+         ],
+         "resources": [
+          "repo:app/*"
+         ],
+         "data": [
+          "source->internal"
+         ],
+         "ceiling": "write_local",
+         "exp": 100,
+         "depth": 2
+        },
+        "proof": {
+         "kid": "issuer-1",
+         "alg": "Ed25519",
+         "sig": "a304f205fe39051b7d74ed0834b3b2a037373d16b28549edc6e190520ed92801700c5a4cdfd80a5de5d27737fc39114f173721acaf52f6baec22343a153e3f01"
+        }
+       }
+      ],
+      "delegations": [
+       {
+        "id": "d-1",
+        "kind": "delegation",
+        "parent": "m-1",
+        "claims": {
+         "actions": [
+          "fs.write"
+         ],
+         "resources": [
+          "repo:app/src/*"
+         ],
+         "data": [
+          "source->internal"
+         ],
+         "ceiling": "write_local",
+         "exp": 90,
+         "depth": 1
+        },
+        "proof": {
+         "kid": "issuer-1",
+         "alg": "Ed25519",
+         "sig": "30b641f10bb3a83443762272c142231a860b948b58397c6ed14f8566e6f817edc1c06148bb0438043cde2cac99fdfeeb58a6ddb201aa19e1ec6abab03687150c"
+        }
+       }
+      ],
+      "interpretations": [
+       {
+        "id": "a-1",
+        "kind": "interpretation",
+        "source": "curated",
+        "adapter": "host_shell",
+        "version": "r9",
+        "proof": {
+         "kid": "host-1",
+         "alg": "Ed25519",
+         "sig": "185d02d49c8440af31134eec4b820a71cfa92a89dd007f0b912acbcb9bf860641ff6e3ff58e7a08754e6bf9c27d2269d166521b86e39293ad09957a61fe75a09"
+        }
+       }
+      ],
+      "invocations": [
+       {
+        "id": "i-1",
+        "kind": "invocation",
+        "authority_ref": "d-1",
+        "interpretation_ref": "a-1",
+        "t": 10,
+        "declared": {
+         "action": "fs.write",
+         "resource": "repo:app/src/auth.ts",
+         "effect": "write_local"
+        },
+        "approval_ref": "ap-1",
+        "proof": {
+         "kid": "host-1",
+         "alg": "Ed25519",
+         "sig": "d4185c9f80b4c753b1d81b4733b7ce1f58b117db315bc4a7ce18a00fc2de0aadf3e542f179a23528755cb5b131456fdb689c464e74bc73a03b67212983c8a80e"
+        }
+       }
+      ],
+      "effects": [
+       {
+        "id": "e-i-1",
+        "kind": "effect",
+        "invocation": "i-1",
+        "observed_by": "hook:host",
+        "assurance": "L1",
+        "executed": {
+         "action": "fs.write",
+         "resource": "repo:app/src/auth.ts",
+         "effect": "write_local",
+         "released": [],
+         "t": 11
+        },
+        "proof": {
+         "kid": "observer-1",
+         "alg": "Ed25519",
+         "sig": "3683c3ea4142fb1fba9e32022f76a45a23335b93ee71b16daf0791d3bc7b0934baebbbd6c04282c42591e8d74ad625d59bd8fd94f70b07d6801d9f1c7fc16208"
+        }
+       }
+      ],
+      "approvals": [
+       {
+        "id": "ap-1",
+        "kind": "approval",
+        "effect_digest": "1552a4eb969252887ce5452cb6d8d9e6ae4d30b0317db4b54cac9163f779b2a8",
+        "presence": "webauthn",
+        "proof": {
+         "kid": "issuer-1",
+         "alg": "Ed25519",
+         "sig": "fb3550d95db3a529ca19e53eeec7c7708e4cc6d599f31eb43438c27e3b84242dfd27bc8bf2218be7c475a1643e9ab6ceef5294dda4e05c0c0f4f56f76a014f03"
+        }
+       }
+      ]
+     },
+     "expect": {
+      "outcome": "preserved",
+      "invariant": "-"
+     },
+     "state_after": {
+      "operations_held": {},
+      "operations_done": {},
+      "approvals_used": {
+       "ap-1": "i-1"
+      }
+     }
+    },
+    {
+     "packet": {
+      "mandates": [
+       {
+        "id": "m-1",
+        "kind": "mandate",
+        "principal": "user:alice",
+        "claims": {
+         "actions": [
+          "fs.*",
+          "process.exec"
+         ],
+         "resources": [
+          "repo:app/*"
+         ],
+         "data": [
+          "source->internal"
+         ],
+         "ceiling": "write_local",
+         "exp": 100,
+         "depth": 2
+        },
+        "proof": {
+         "kid": "issuer-1",
+         "alg": "Ed25519",
+         "sig": "a304f205fe39051b7d74ed0834b3b2a037373d16b28549edc6e190520ed92801700c5a4cdfd80a5de5d27737fc39114f173721acaf52f6baec22343a153e3f01"
+        }
+       }
+      ],
+      "delegations": [
+       {
+        "id": "d-1",
+        "kind": "delegation",
+        "parent": "m-1",
+        "claims": {
+         "actions": [
+          "fs.write"
+         ],
+         "resources": [
+          "repo:app/src/*"
+         ],
+         "data": [
+          "source->internal"
+         ],
+         "ceiling": "write_local",
+         "exp": 90,
+         "depth": 1
+        },
+        "proof": {
+         "kid": "issuer-1",
+         "alg": "Ed25519",
+         "sig": "30b641f10bb3a83443762272c142231a860b948b58397c6ed14f8566e6f817edc1c06148bb0438043cde2cac99fdfeeb58a6ddb201aa19e1ec6abab03687150c"
+        }
+       }
+      ],
+      "interpretations": [
+       {
+        "id": "a-1",
+        "kind": "interpretation",
+        "source": "curated",
+        "adapter": "host_shell",
+        "version": "r9",
+        "proof": {
+         "kid": "host-1",
+         "alg": "Ed25519",
+         "sig": "185d02d49c8440af31134eec4b820a71cfa92a89dd007f0b912acbcb9bf860641ff6e3ff58e7a08754e6bf9c27d2269d166521b86e39293ad09957a61fe75a09"
+        }
+       }
+      ],
+      "invocations": [
+       {
+        "id": "i-2",
+        "kind": "invocation",
+        "authority_ref": "d-1",
+        "interpretation_ref": "a-1",
+        "t": 20,
+        "declared": {
+         "action": "fs.write",
+         "resource": "repo:app/src/auth.ts",
+         "effect": "write_local"
+        },
+        "approval_ref": "ap-1",
+        "proof": {
+         "kid": "host-1",
+         "alg": "Ed25519",
+         "sig": "56311ae57a6af20cea04c126e6c4d0e8433081d30ae52a0ef3da21173a4fd0ed0e52aea588da518ab68a8d90e8faccb835d007c6efe45979d9fbdfac27a14208"
+        }
+       }
+      ],
+      "effects": [
+       {
+        "id": "e-i-2",
+        "kind": "effect",
+        "invocation": "i-2",
+        "observed_by": "hook:host",
+        "assurance": "L1",
+        "executed": {
+         "action": "fs.write",
+         "resource": "repo:app/src/auth.ts",
+         "effect": "write_local",
+         "released": [],
+         "t": 21
+        },
+        "proof": {
+         "kid": "observer-1",
+         "alg": "Ed25519",
+         "sig": "27acbac3aea0d3176c9fe4f4b8b5ddfe51c4909e326e2431ea86fcb73b3a86c53cd1244a8e7bbc263e6319cad17dd2b4d66c769bbcb67423a5c19d41deee840a"
+        }
+       }
+      ],
+      "approvals": [
+       {
+        "id": "ap-1",
+        "kind": "approval",
+        "effect_digest": "1552a4eb969252887ce5452cb6d8d9e6ae4d30b0317db4b54cac9163f779b2a8",
+        "presence": "webauthn",
+        "proof": {
+         "kid": "issuer-1",
+         "alg": "Ed25519",
+         "sig": "fb3550d95db3a529ca19e53eeec7c7708e4cc6d599f31eb43438c27e3b84242dfd27bc8bf2218be7c475a1643e9ab6ceef5294dda4e05c0c0f4f56f76a014f03"
+        }
+       }
+      ]
+     },
+     "expect": {
+      "outcome": "violated",
+      "invariant": "I8"
+     },
+     "state_after": {
+      "operations_held": {},
+      "operations_done": {},
+      "approvals_used": {
+       "ap-1": "i-1"
+      }
+     }
+    }
+   ]
   }
  ]
 }
