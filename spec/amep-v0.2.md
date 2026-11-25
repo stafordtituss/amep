@@ -467,6 +467,8 @@ An **operation approval** (v0.3) covers one invocation whose call has several ef
   - if its outcome is still unknown, the hold stays.
 - Checks that decide `violated` (the approval is not bound to the effect, is consumed, has expired or is not yet valid) come first. A held approval only turns what would otherwise be `preserved` into `unresolved`.
 
+**Facts are counted completely; blame is charged once** *(v0.3.2)*. Checks that decide `violated` come before any hold, in both the approval and the operation rules (Section 5.8.1), and an approval's use is recorded before its hold is checked, so no hold hides a double use. An operation is done once a receipt for it verifies and no statement contradicts it, even if the call is `violated` for another reason. A call that is `violated` is charged once, for its first violation, and its use of an approval is not counted against later calls: a later call is judged on what it could see, and the double use is already reported on the earlier call. That holds only while the earlier call stays `violated`. If a later packet resolves its violation, its use of the approval MUST be counted again, so that the double use is not left charged to nobody. These orderings were found by checking the rules exhaustively against the reference verifier (`formal/`); the last point is from Brennan Zambo's review of #24.
+
 This follows Takao Sato's VATE case 2, accepted work interrupted (openid/authzen#795). Without it, a second runtime that re-ran an interrupted operation under the same single-use admission came out `preserved`, and only later evidence revealed the double use. It is the approval counterpart of held limits (Section 7.6, rule 6).
 
 ### 5.11 ContentFinding (`kind: "finding"`)
