@@ -32,7 +32,7 @@ How far do the answers agree, and where they differ, why?
   - APAF-1: approved / declined / escalated / not_evaluated.
 
 ## 4. Results *(to confirm)*
-- **Family 1, AMEP against AER-1:** 10 rows agree and 12 diverge. 10 of the divergences come from different questions (the record against the decision); 2 are the same facts drawing a different refusal (Brennan's join).
+- **Family 1, AMEP against AER-1:** 10 rows agree and 12 diverge. 10 of the divergences come from different questions (the record against the decision); 2 are the same facts drawing a different refusal (Brennan's join). *AER-1 column: confirmed by its owner, re-derived row by row from the aer1-kit join table at `a923247` (22 rows: 10 agree, 10 diverge on scope, 2 diverge on kind; AER-1 outcomes 17 verified, 2 verification failed, 3 absent, 0 not checked, 0 rejected).*
 - **APAF-1 against AMEP:** every row agrees on the AMEP side, including the `held_outcome` gap on s9 txn-2 and the signature gap on s8.
 - **Family 2:** both checkout-binding cases agree across AMEP and APAF-1 (another checkout: violated / declined; checkout chain absent: unresolved / escalated).
 
@@ -42,7 +42,12 @@ Offered by its authors on AP2#402. The family is pinned at DSHCorrectover/ccs-ap
 - **A2, unknown outcome held:** a pending payment stays a named unresolved, and is never promoted.
 - **A3, verdict naming:** violated carries what departed; unresolved carries what is missing.
 
-Each column's result on these vectors is *(to run)*. The family's authors confirm their own numbers.
+Each column's result on these vectors is *(to run)*, except the AER-1 column, run by its owner and posted on AP2 #402 (comment 7148415906). The bundle was read as data only; its SHA-256 recomputes to the manifest lock (`a9f49107…`). The bundle carries no digest material (no closed hop bytes, no disclosures, no sd_hash), so no vector earns a verified or a verification failed from the AER-1 column:
+- **A1, AER-1 column:** not checked. The amounts were recomputed: caller-claimed 27999 against the mandate's 35999, a departure of 8000 minor units (USD). That mismatch is a decision-layer fact; the receipt's reference is the literal `ref1` and there are no closed mandate bytes to recompute it against, and the AER-1 dictionary carries no "violated".
+- **A2, AER-1 column:** not checked, and never promoted. The receipt status `Pending` sits outside the {Success, Error} enum, and the receipt carries no reference and no payment_id, so no binding exists for a record check to run on.
+- **A3, AER-1 column:** not applicable as a record evaluation (the vector is verdict objects only, no receipts or digests). As a vocabulary mapping only: `v-bad-name` (violated, no departed named) and `u-bad-name` (unresolved, no missing named) would not meet the naming discipline; `v-good` carries its departed and does.
+
+The family's authors confirm their own numbers.
 
 ## 5. Findings that came out of the comparison
 1. **The fixtures lacked `payment.reference`.** Found by APAF-1 and fixed on AMEP's side with the second family; AMEP now checks checkout binding.
