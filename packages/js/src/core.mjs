@@ -384,6 +384,17 @@ function approvalsHeldOf(state) {
   if (!ok) throw new Malformed("state.approvals_held must map approval ids to {invocation, digest}");
   return h;
 }
+// Verifier state's operation records (spec 5.8.1, v0.3.2): operation -> {invocation, digest} of the attempt that holds it
+// (outcome unknown) or that took effect. One logical operation may be attempted several times; at most one attempt may
+// take effect, and while one attempt's outcome is unknown, later attempts are held, whatever authorizes them.
+function operationsOf(state, name) {
+  const h = name in state ? state[name] : {};
+  const ok = h && typeof h === "object" && !Array.isArray(h) && Object.values(h).every(v =>
+    v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).sort().join() === "digest,invocation"
+    && typeof v.invocation === "string" && typeof v.digest === "string" && /^[0-9a-f]{64}$/.test(v.digest));
+  if (!ok) throw new Malformed(`state.${name} must map operation ids to {invocation, digest}`);
+  return h;
+}
 // A limit with `actions` applies to effects whose action matches; without, to every financial effect.
 const limitApplies = (lim, x) => ("actions" in lim) ? lim.actions.some(p => patMatch(x.action, p)) : x.effect === "financial";
 // I1 for limits: a child may add limits, but never raise one the parent sets for the same unit and period.
@@ -464,7 +475,11 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   const operatorOf = o => { const kid = o && o.proof ? o.proof.kid : undefined;
     const k = typeof kid === "string" && Object.hasOwn(keys, kid) ? keys[kid] : null;
     return k && typeof k.operator === "string" ? k.operator : null; };
-  const sameOperator = (a, b) => { const x = operatorOf(a); return x !== null && x === operatorOf(b); };
+  // one party, for observer independence (I10): the same signing key, or keys of the same named operator (spec 12.5). The key
+  // matters, not the identifiers a record uses: a host that signs its own "not executed", or its own receipt, with its invocation
+  // key is the actor, whatever it puts in observed_by. Found by the exhaustive model check in formal/ (v0.3.2).
+  const kidOf = o => (o && typeof o === "object" && o.proof && typeof o.proof === "object" && typeof o.proof.kid === "string") ? o.proof.kid : null;
+  const sameOperator = (a, b) => { const ka = kidOf(a); if (ka !== null && ka === kidOf(b)) return true; const x = operatorOf(a); return x !== null && x === operatorOf(b); };
   // spec 10.5.1 (v0.3): why a refused signature was refused, in a fixed order every verifier shares
   const sigCause = o => {
     if (!o || typeof o !== "object" || Array.isArray(o) || !o.proof || typeof o.proof !== "object" || Array.isArray(o.proof)) return "missing";
@@ -486,14 +501,18 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   const priorWindows = new Set(totals.keys());
   // spec 7.6 rule 6 (v0.3): holds for earlier invocations whose outcome was unknown. A packet that contains a held
   // invocation decides it afresh, so its hold is set aside while this packet is evaluated, and never counted twice.
-  let heldIn, apprHeldIn;
-  try { heldIn = heldOf(state); apprHeldIn = approvalsHeldOf(state); } catch (e) { return allUnresolved(pk, `malformed verifier state: ${e.message}`); }
+  let heldIn, apprHeldIn, opsHeldIn, opsDoneIn;
+  try { heldIn = heldOf(state); apprHeldIn = approvalsHeldOf(state); opsHeldIn = operationsOf(state, "operations_held"); opsDoneIn = operationsOf(state, "operations_done"); }
+  catch (e) { return allUnresolved(pk, `malformed verifier state: ${e.message}`); }
   const present = new Set();
   for (const i of pk.invocations || []) { try { present.add(digest(i)); } catch { /* reported by its own evaluation */ } }
   const held = Object.fromEntries(Object.entries(heldIn).filter(([d]) => !present.has(d))), newHeld = {};
   // spec 5.10, held approvals (v0.3): approvals held for earlier invocations whose outcome is unknown; one held by an invocation
   // in this packet is set aside, since this packet decides that invocation afresh
   const apprHeld = Object.fromEntries(Object.entries(apprHeldIn).filter(([, h]) => !present.has(h.digest)));
+  // spec 5.8.1 (v0.3.2): an attempt recorded in state but present in this packet is decided afresh here
+  const opsHeld = Object.fromEntries(Object.entries(opsHeldIn).filter(([, h]) => !present.has(h.digest)));
+  const opsDone = Object.fromEntries(Object.entries(opsDoneIn).filter(([, h]) => !present.has(h.digest)));
   const approvalUse = Object.fromEntries(Object.entries(state.approvals_used || {}).map(([k, v]) => [k, [...v]]));
   let out = [];
   const invocations = pk.invocations || [];
@@ -523,10 +542,41 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       if (e instanceof Stop) out.push(result(id, e.outcome, e.invariant, e.reason, e.blame, e.gaps));
       else out.push(result(id, "unresolved", "I7", `malformed evidence: ${e.message}`, null, [{ need: "well_formed_evidence", ref: String(id) }]));
     }
+    settle(inv);
+  }
+
+  // spec 5.8.1 (v0.3.2): commit a change to carried outcome state only on evidence that passed its checks. A receipt that
+  // verifies, from an observer that counts for this call (I10), makes the operation done; a verified, independent
+  // not_executed statement settles the attempt. Anything else, a rejected receipt or statement included, leaves the state
+  // this attempt carried in as it was. From Andrii Akhtanin's review (Radiolaria) on the OpenID AIIM list, 25 Nov 2026.
+  function settle(inv) {
+    let d; try { d = digest(inv); } catch { return; }
+    const id = inv.id;
+    const op = typeof inv.operation === "string" && inv.operation ? inv.operation : undefined;
+    const effect = inv.declared && typeof inv.declared === "object" ? inv.declared.effect : undefined;
+    const hi = CEILING.includes(effect) && CEILING.indexOf(effect) >= CEILING.indexOf("write_shared");
+    const counts = o => !hi || (Boolean(inv.actor) && o.observed_by !== inv.actor && !sameOperator(o, inv));
+    const bound = o => !("invocation_digest" in o) || o.invocation_digest === d;
+    const recs = effects.filter(e => e && typeof e === "object" && e.invocation === id);
+    const executed = recs.some(e => verify(e) && typeof e.observed_by === "string" && bound(e) && !(hi && e.assurance === "L0") && counts(e));
+    const notRun = !recs.length && (pk.call_statements || []).some(c => c && typeof c === "object" && c.invocation === id && verify(c)
+      && c.disposition === "not_executed" && c.effect_count === 0 && bound(c) && counts(c));
+    if (executed && op !== undefined) {
+      if (!Object.hasOwn(opsDone, op)) opsDone[op] = { invocation: id, digest: d };
+      if (Object.hasOwn(opsHeld, op) && opsHeld[op].invocation === id) delete opsHeld[op];
+    }
+    if (executed || notRun || !present.has(d)) return;
+    for (const [o, h] of Object.entries(opsHeldIn)) if (h.digest === d && !Object.hasOwn(opsDone, o) && !Object.hasOwn(opsHeld, o)) opsHeld[o] = h;
+    for (const [o, h] of Object.entries(opsDoneIn)) if (h.digest === d && !Object.hasOwn(opsDone, o)) opsDone[o] = h;
+    for (const [a, h] of Object.entries(apprHeldIn)) if (h.digest === d && !Object.hasOwn(apprHeld, a)) apprHeld[a] = h;
+    if (Object.hasOwn(heldIn, d) && !Object.hasOwn(newHeld, d) && !Object.hasOwn(held, d)) held[d] = heldIn[d];
   }
 
   function evalInvocation(inv) {
     const id = inv.id, tInv = toTime(inv.t);
+    const op = "operation" in inv ? inv.operation : undefined;
+    check(op !== undefined && (typeof op !== "string" || op.length === 0 || op.length > MAX_NAME), "unresolved", "I7",
+      "operation must be a non-empty string", { need: "well_formed_evidence", ref: id });
     const chain = []; const seen = new Set(); let n = objs[inv.authority_ref];
     while (n && !seen.has(n.id)) { seen.add(n.id); chain.unshift(n); n = objs[n.parent]; }
     check(!chain.length || chain[0].kind !== "mandate", "unresolved", "I7", "no root mandate", { need: "root_mandate", ref: inv.authority_ref ?? "-" });
@@ -621,18 +671,9 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     check(rewritten.length > 0 && !notExecuted, "violated", "I2", "the arguments the server received differ from those the host signed (changed in transit)", { blame: "transport" });
     check(rewritten.length > 0, "unresolved", "I7", "the arguments were changed in transit; the server executed nothing", { need: "unaltered_call", ref: id });
     check(notExecuted && mine.length > 0, "violated", "I11", "effect receipts contradict a signed not_executed statement", { blame: "server" });
-    if (!mine.length && notExecuted) {
-      // provably nothing was executed; for a high-impact call the statement must come from a party other than the actor (I10)
-      const hi = CEILING.indexOf(inv.declared.effect) >= CEILING.indexOf("write_shared");
-      check(hi && stmts.filter(c => c.disposition === "not_executed").every(c => c.observed_by === inv.actor || sameOperator(c, inv)),
-        "unresolved", "I10", "high-impact call reported not executed only by the actor itself, or by a key of the host's own operator", { need: "independent_observer", ref: id });
-      // say why it is preserved: nothing ran, on the observer's signed word, not "within authority"
-      const who = [...new Set(stmts.filter(c => c.disposition === "not_executed").map(c => String(c.observed_by)))].sort().join(", ");
-      return `nothing executed: ${who} signed a not_executed call statement`;
-    }
-    // effect receipts. With none and no not_executed statement, the call may still have moved value: hold its reserve (or
-    // an unknown amount) against every period limit on its chain that applies to it (spec 7.6 rule 6).
-    if (!mine.length) {
+    // An unknown outcome holds what the call could have used: its reserve against period limits (spec 7.6 rule 6), its
+    // approval (5.10) and its operation (5.8.1), until evidence another party can check shows what happened.
+    const holdUnknown = () => {
       const reserve = v03 ? inv.reserve : undefined, amounts = {};
       for (const node of limited) for (const lim of node.claims.limits)
         if ("per_period" in lim && limitApplies(lim, inv.declared))
@@ -642,8 +683,28 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       // outcome is known (from Takao Sato's VATE case 2)
       const ref = inv.approval_ref;
       if (typeof ref === "string" && !Object.hasOwn(apprHeld, ref)) apprHeld[ref] = { invocation: id, digest: invDigest };
+      // spec 5.8.1 (v0.3.2): likewise the operation, so a retry under fresh authorization can't take effect unnoticed
+      if (op !== undefined && !Object.hasOwn(opsHeld, op) && !Object.hasOwn(opsDone, op)) opsHeld[op] = { invocation: id, digest: invDigest };
+    };
+    if (!mine.length && notExecuted) {
+      // provably nothing was executed; for a high-impact call the statement must come from a party other than the actor (I10).
+      // A statement that fails that test shows nothing, so the outcome stays unknown and the holds stay (v0.3.2; a release
+      // must not rest on the word of the party that benefits from it, from Brennan Zambo's review of #24).
+      const hi = CEILING.indexOf(inv.declared.effect) >= CEILING.indexOf("write_shared");
+      const selfOnly = hi && stmts.filter(c => c.disposition === "not_executed").every(c => c.observed_by === inv.actor || sameOperator(c, inv));
+      if (selfOnly) holdUnknown();
+      check(selfOnly, "unresolved", "I10", "high-impact call reported not executed only by the actor itself, or by a key of the host's own operator", { need: "independent_observer", ref: id });
+      // say why it is preserved: nothing ran, on the observer's signed word, not "within authority"
+      const who = [...new Set(stmts.filter(c => c.disposition === "not_executed").map(c => String(c.observed_by)))].sort().join(", ");
+      return `nothing executed: ${who} signed a not_executed call statement`;
     }
+    // effect receipts. With none and no not_executed statement, the call may still have moved value: hold its reserve (or
+    // an unknown amount) against every period limit on its chain that applies to it (spec 7.6 rule 6).
+    if (!mine.length) holdUnknown();
     check(!mine.length, "unresolved", "I7", "no executed-effect receipt", { need: "receipt", ref: id });
+    // spec 5.8.1 (v0.3.2): an earlier attempt at this operation that took effect. Recording this attempt as done is left
+    // to settle(), after this evaluation, and only on a receipt that passes its checks.
+    const opPrev = op !== undefined && Object.hasOwn(opsDone, op) ? opsDone[op] : null;
     const highImpact = CEILING.indexOf(inv.declared.effect) >= CEILING.indexOf("write_shared");
     let claims = chain[0].claims; for (const c of chain.slice(1)) claims = meet(c.claims, claims, v03);
     if (intent) claims = meet(intent.claims, claims, v03);
@@ -696,6 +757,9 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       for (const e of byObserver.get(obs).get(d)) effectsOf.push([e.executed, d, obs]);
     }
     const bodies = new Map(effectsOf.map(([x, d]) => [d, x]));
+    // spec 5.8.1 (v0.3.2): one operation takes effect at most once, checked as soon as this call's receipts have verified and
+    // before any check that can only hold, so no hold hides the second effect (found by the model check in formal/)
+    check(opPrev !== null && opPrev.invocation !== id, "violated", "I2", `operation ${op} already took effect under ${opPrev?.invocation}: executed twice`, { blame: "agent" });
     // every receipt a statement promises must be present, and no more (spec 5.14)
     for (const c of stmts) {
       const k = mine.filter(e => e.observed_by === c.observed_by).length;
@@ -731,15 +795,19 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
         check("expiry" in ap && toTime(ap.expiry) < Math.max(tInv, toTime(x.t)), "violated", "I8", "approval expired", { blame: "agent" });
         check("nbf" in ap && toTime(ap.nbf) > tInv, "violated", "I8", "approval not yet valid", { blame: "agent" });
       }
-      // spec 5.10, held approvals: after every check that decides violated, so a hold never hides a violation
+      // single use first: an approval another call already used is a violation, whatever holds it (spec 5.10)
+      for (const d of bodies.keys()) {
+        const use = listed === null ? d : opUse;
+        const first = approvalUse[ap.id] ?? [id, use];
+        check(first[0] !== id || first[1] !== use, "violated", "I8", `approval already used by ${first[0]}`, { blame: "agent" });
+      }
+      // spec 5.10, held approvals: after every check that decides violated, so a hold never hides a violation (the single-use
+      // check used to come after it, so a hold placed after the approval's first use hid a double use; found by formal/)
+      // this call's receipts show it used the approval, held or not: record the use first, so a third call is a double use
+      for (const d of bodies.keys()) approvalUse[ap.id] ??= [id, listed === null ? d : opUse];
       const holder = Object.hasOwn(apprHeld, ap.id) && bodies.size ? apprHeld[ap.id] : null;
       check(holder !== null && holder.invocation !== id, "unresolved", "I7",
         `approval ${ap.id} is held for ${holder?.invocation}, whose outcome is unknown`, { need: "held_outcome", ref: holder?.invocation });
-      for (const d of bodies.keys()) {
-        const use = listed === null ? d : opUse;
-        const first = approvalUse[ap.id] ??= [id, use];
-        check(first[0] !== id || first[1] !== use, "violated", "I8", `approval already used by ${first[0]}`, { blame: "agent" });
-      }
     }
     // quantity limits (spec 7.6, v0.3), on every node of the chain and on the intent. An approval that passed I8
     // authorizes going over a limit; the amount still counts toward the period total. Every applicable limit is checked
@@ -813,6 +881,11 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     const over = chain.find(n => "budget" in n.claims && (spent[n.id] || 0) + c > n.claims.budget);
     check(!!over && !ap, "violated", "I2", `risk budget of ${over && over.id} exceeded without approval`, { blame: "agent" });
     for (const n of chain) spent[n.id] = (spent[n.id] || 0) + c;
+    // spec 5.8.1 (v0.3.2), after every other check: an attempt whose operation is held for an earlier attempt with an
+    // unknown outcome is held too, whatever authorization it carries
+    const opHolder = op !== undefined && Object.hasOwn(opsHeld, op) ? opsHeld[op] : null;
+    check(opHolder !== null && opHolder.invocation !== id, "unresolved", "I7",
+      `operation ${op} is held for ${opHolder?.invocation}, whose outcome is unknown`, { need: "held_outcome", ref: opHolder?.invocation });
   }
 
   // spec 10.3 decision reconciliation: only PRE-execution decisions can be contradicted or confirm a block
@@ -844,6 +917,8 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   state.approvals_used = approvalUse;
   if (totals.size) state.period_totals = Object.fromEntries([...totals].map(([k, v]) => [k, unitsStr(v)]));
   if (Object.keys(apprHeld).length || "approvals_held" in state) state.approvals_held = apprHeld;
+  if (Object.keys(opsHeld).length || "operations_held" in state) state.operations_held = opsHeld;
+  if (Object.keys(opsDone).length || "operations_done" in state) state.operations_done = opsDone;
   const heldOut = { ...held, ...newHeld };
   if (Object.keys(heldOut).length || "held" in state) state.held = heldOut;
   return out;

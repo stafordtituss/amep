@@ -3,6 +3,23 @@
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
 
+## Operation identity: a retry can't take effect unnoticed (proposal, unreleased, 2026-11-25)
+
+- **The gap, from Andrii's review (Radiolaria) on the OpenID AIIM list:** an attempt whose outcome is unknown, retried under a fresh authorization, started clean. If both attempts took effect, the operation ran twice and no rule was broken. AAuth Budgets has the same gap across auth tokens.
+- **Now (spec 5.8.1):** an invocation may carry `operation`, the same identifier on every attempt.
+  - An unknown outcome holds the operation, and a later attempt is `unresolved` with gap `held_outcome`, whatever authorization it carries.
+  - A second attempt that takes effect after one already did is `violated` (I2), "executed twice".
+  - The hold is released when the first attempt is shown not executed. Other operations proceed.
+  - Verifier state carries `operations_held` and `operations_done` across packets (spec 10.7).
+- **The limit, stated in 5.8.1:** the identifier is chosen by the party that retries, so it binds only what that party records.
+- **Suite v0.3.2:** 5 core vectors (3 must-reject, all `preserved` before this change; 2 positive). No existing vector changes. The core suite now has 256 vectors (68 positive, 188 must-reject), 292 across the three suites.
+- **Schemas:** `operation` is an optional string of 1 to 256 characters in `invocation.json` and the CDDL.
+- **What releases a hold (from Brennan Zambo's review on #24):** only a showing someone other than the actor can check. A high-impact first attempt reported not executed only by the actor's own side stays unknown, and every hold it had stays (operation, approval, period reserve). Before this, such a statement failed I10 for the first attempt but still let a retry through; tests in both packages pin it.
+- **The actor is its key, not its name (found by the exhaustive model check in `formal/`).** I10 compared `observed_by` with `actor`, and operators where the key set names them. A host key that also had the `observer` role could sign its own `not_executed` statement, or its own receipt for a high-impact call, under another `observed_by`, and pass: a retry was then released on the actor's own word. A record signed by the invocation's own key is now the actor's, whatever name it gives (spec 5.14 rule 5, 8 I10, 12.5; both cores). No vector changes; tests in both packages fail without the fix.
+- **No hold hides a double use (found by the same model check).** Three orderings let an `unresolved` hold mask a violation that verified receipts had already proved, against spec 5.10's rule that checks deciding `violated` come first. First, an approval's single-use check ran after its hold check. Second, a call held on an approval didn't record its use, so a third use was held too. Third, "executed twice" (5.8.1) ran last, after the approval hold. Both cores now check single use and "executed twice" before any hold. No vector changes; the cases need three calls, and the model check (`formal/`) covers them.
+- **Rejected evidence changes nothing (rule 5, from Andrii Akhtanin's review on the OpenID AIIM list, 25 November):** an unverifiable `not_executed` statement had released the hold, and an unverifiable receipt had recorded the operation as done. Carried state now changes only on evidence that passed its checks (`settle()` in both cores). Five cross-packet sequences in `vectors/sequences/operation-state.json` check the verdict and the operation state after every step, including Andrii's two sequences and three controls.
+- **Status:** a proposal. Brennan Zambo agreed with all five expected answers (#24); Andrii's review is open.
+
 ## Twelve payment-limit vectors, written by Carlos Vendrell Felici (unreleased, 2026-11-25)
 
 - **The first vectors written by someone outside the project** ([#30](https://github.com/stafordtituss/amep/pull/30)): 4 positive and 8 must-reject, on the readings invited in #10. They cover:

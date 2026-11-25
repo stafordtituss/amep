@@ -145,6 +145,7 @@ invocation = {                                 ; [host]
   ? budget_spent: uint
   ? args_digest: hex-digest                    ; SHA-256 of JCS(arguments sent) (spec 5.14)
   ? reserve: { amount: amount, unit: unit }    ; the most this call can move (spec 5.8, 7.6 rule 6; v0.3)
+  ? operation: tstr .size (1..256)            ; the logical operation, the same on every attempt (spec 5.8.1; v0.3.2)
   ? correlation: { ? session_ref: tstr, ? prompt_ref: tstr, ? tool_use_ref: tstr, ? traceparent: tstr }
   ? proof: proof
   * extension-key => any

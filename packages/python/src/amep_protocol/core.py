@@ -548,6 +548,19 @@ def held_of(state: dict) -> dict:
     return h
 
 
+def operations_of(state: dict, name: str) -> dict:
+    """Verifier state's operation records (spec 5.8.1, v0.3.2): operation -> {invocation, digest} of the attempt that
+    holds it (outcome unknown) or that took effect. One logical operation may be attempted several times; at most one
+    attempt may take effect, and while one attempt's outcome is unknown, later attempts are held, whatever authorizes them."""
+    h = state.get(name, {})
+    if not isinstance(h, dict) or not all(
+            isinstance(k, str) and isinstance(v, dict) and set(v) == {"invocation", "digest"}
+            and isinstance(v["invocation"], str) and isinstance(v["digest"], str) and HEX64.match(v["digest"])
+            for k, v in h.items()):
+        raise Malformed(f"state.{name} must map operation ids to {{invocation, digest}}")
+    return h
+
+
 def approvals_held_of(state: dict) -> dict:
     """Verifier state's approval holds (spec 5.10, held approvals, v0.3): approval id -> {invocation, digest} of the earlier
     invocation that cited it and whose outcome is still unknown."""
@@ -657,6 +670,8 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
     try:
         held_in = held_of(state)
         appr_held_in = approvals_held_of(state)
+        ops_held_in = operations_of(state, "operations_held")
+        ops_done_in = operations_of(state, "operations_done")
     except Malformed as e:
         return _all_unresolved(packet, f"malformed verifier state: {e}")
     present = set()
@@ -693,6 +708,13 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
         return k["operator"] if isinstance(k, dict) and isinstance(k.get("operator"), str) else None
 
     def same_operator(a, b):
+        # one party, for observer independence (I10): the same signing key, or keys of the same named operator (spec
+        # 12.5). The key matters, not the identifiers a record uses: a host that signs its own "not executed", or its
+        # own receipt, with its invocation key is the actor, whatever it puts in observed_by. Found by the exhaustive
+        # model check in formal/ (v0.3.2).
+        ka, kb = ((o.get("proof") or {}).get("kid") if isinstance(o, dict) else None for o in (a, b))
+        if isinstance(ka, str) and ka == kb:
+            return True
         x = operator_of(a)
         return x is not None and x == operator_of(b)
 
@@ -700,7 +722,54 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
            "held": {d: h for d, h in held_in.items() if d not in present}, "new_held": {}, "first_cause": first_cause,
            # spec 5.10, held approvals (v0.3): approvals held for earlier invocations whose outcome is unknown; one held by an
            # invocation in this packet is set aside, since this packet decides that invocation afresh
-           "appr_held": {a: h for a, h in appr_held_in.items() if h["digest"] not in present}}
+           "appr_held": {a: h for a, h in appr_held_in.items() if h["digest"] not in present},
+           # spec 5.8.1 (v0.3.2): an attempt recorded in state but present in this packet is decided afresh here
+           "ops_held": {o: h for o, h in ops_held_in.items() if h["digest"] not in present},
+           "ops_done": {o: h for o, h in ops_done_in.items() if h["digest"] not in present}}
+    call_statements = [c for c in packet.get("call_statements", []) if isinstance(c, dict)]
+
+    def settle(inv):
+        """spec 5.8.1 (v0.3.2): commit a change to carried outcome state only on evidence that passed its checks. A receipt
+        that verifies, from an observer that counts for this call (I10), makes the operation done; a verified, independent
+        not_executed statement settles the attempt. Anything else, a rejected receipt or statement included, leaves the
+        state this attempt carried in as it was: its holds stay, and a completed operation stays completed. From Andrii
+        Akhtanin's review (Radiolaria) on the OpenID AIIM list, 25 Nov 2026: an unverifiable not_executed statement had
+        released the hold, and an unverifiable receipt had recorded the operation as done."""
+        try:
+            d = digest(inv)
+        except Exception:
+            return
+        rid = inv.get("id")
+        op = inv.get("operation") if isinstance(inv.get("operation"), str) and inv.get("operation") else None
+        effect = (inv.get("declared") or {}).get("effect") if isinstance(inv.get("declared"), dict) else None
+        hi = effect in CEILING and CEILING.index(effect) >= CEILING.index("write_shared")
+
+        def counts(o):
+            return not hi or (bool(inv.get("actor")) and o.get("observed_by") != inv.get("actor") and not same_operator(o, inv))
+        recs = [e for e in effects if isinstance(e, dict) and e.get("invocation") == rid]
+        executed = any(vsig(e) and isinstance(e.get("observed_by"), str) and e.get("invocation_digest", d) == d
+                       and not (hi and e.get("assurance") == "L0") and counts(e) for e in recs)
+        not_run = not recs and any(vsig(c) and c.get("disposition") == "not_executed" and c.get("effect_count") == 0
+                                   and c.get("invocation_digest", d) == d and counts(c)
+                                   for c in call_statements if c.get("invocation") == rid)
+        if executed and op is not None:
+            ctx["ops_done"].setdefault(op, {"invocation": rid, "digest": d})
+            if op in ctx["ops_held"] and ctx["ops_held"][op]["invocation"] == rid:
+                del ctx["ops_held"][op]
+        if executed or not_run or d not in present:
+            return
+        for o, h in ops_held_in.items():
+            if h["digest"] == d and o not in ctx["ops_done"]:
+                ctx["ops_held"].setdefault(o, h)
+        for o, h in ops_done_in.items():
+            if h["digest"] == d:
+                ctx["ops_done"].setdefault(o, h)
+        for a, h in appr_held_in.items():
+            if h["digest"] == d:
+                ctx["appr_held"].setdefault(a, h)
+        if d in held_in and d not in ctx["new_held"]:
+            ctx["held"].setdefault(d, held_in[d])
+
     for n, inv in enumerate(invocations):
         rid = inv.get("id", "?")
         try:
@@ -712,6 +781,7 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
             out.append(Result(rid, *s.r))
         except (Malformed, KeyError, TypeError, ValueError, AttributeError) as e:
             out.append(Result(rid, "unresolved", "I7", f"malformed evidence: {e}", gaps=[{"need": "well_formed_evidence", "ref": str(rid)}]))
+        settle(inv)
 
     # spec 10.3: decision reconciliation. Only PRE-execution decisions can be contradicted or confirm a block;
     # a post-execution decision is detection and a simulation is hypothetical (spec 5.13).
@@ -747,6 +817,10 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
         state["period_totals"] = {k: _units_str(v) for k, v in totals.items()}
     if ctx["appr_held"] or "approvals_held" in state:
         state["approvals_held"] = ctx["appr_held"]
+    if ctx["ops_held"] or "operations_held" in state:
+        state["operations_held"] = ctx["ops_held"]
+    if ctx["ops_done"] or "operations_done" in state:
+        state["operations_done"] = ctx["ops_done"]
     held_out = {**ctx["held"], **ctx["new_held"]}
     if held_out or "held" in state:
         state["held"] = held_out
@@ -819,6 +893,9 @@ def _check_limit(n, i, lim, x, v, unit, amt, obs, appr, call_sum, ctx):
 def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects, spent, approval_use, extra_protected, order, taint, ctx):
     rid, t_inv = inv["id"], to_time(inv["t"])
     first_cause = ctx["first_cause"]
+    op = inv["operation"] if "operation" in inv else None
+    _check("operation" in inv and (not isinstance(op, str) or len(op) == 0 or len(op) > MAX_NAME), "unresolved", "I7",
+           "operation must be a non-empty string", need="well_formed_evidence", ref=rid)
     # 1. chain
     chain, node, seen = [], objs.get(inv.get("authority_ref")), set()
     while node and node["id"] not in seen:
@@ -934,19 +1011,9 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
            "the arguments the server received differ from those the host signed (changed in transit)", blame="transport")
     _check(bool(rewritten), "unresolved", "I7", "the arguments were changed in transit; the server executed nothing", need="unaltered_call", ref=rid)
     _check(not_executed and bool(mine), "violated", "I11", "effect receipts contradict a signed not_executed statement", blame="server")
-    if not mine and not_executed:
-        # provably nothing was executed, so the call cannot have exceeded its authority; for a high-impact call the
-        # statement must come from a party other than the actor (I10)
-        hi = CEILING.index(inv["declared"]["effect"]) >= CEILING.index("write_shared")
-        _check(hi and all(c.get("observed_by") == inv.get("actor") or ctx["same_operator"](c, inv) for c in stmts if c["disposition"] == "not_executed"),
-               "unresolved", "I10", "high-impact call reported not executed only by the actor itself, or by a key of the host's own operator",
-               need="independent_observer", ref=rid)
-        # say why it is preserved: nothing ran, on the observer's signed word, not "within authority"
-        who = ", ".join(sorted({str(c.get("observed_by")) for c in stmts if c["disposition"] == "not_executed"}))
-        return f"nothing executed: {who} signed a not_executed call statement"
-    # 11. effect receipts. With none and no not_executed statement, the call may still have moved value: hold its
-    # reserve (or an unknown amount) against every period limit on its chain that applies to it (spec 7.6 rule 6).
-    if not mine:
+    def hold_unknown():
+        """An unknown outcome holds what the call could have used: its reserve against period limits (spec 7.6 rule 6),
+        its approval (5.10) and its operation (5.8.1), until evidence another party can check shows what happened."""
         reserve = inv.get("reserve") if ctx["v03"] else None
         amounts = {}
         for n in limited:
@@ -962,7 +1029,31 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         ref = inv.get("approval_ref")
         if isinstance(ref, str) and ref not in ctx["appr_held"]:
             ctx["appr_held"][ref] = {"invocation": rid, "digest": inv_digest}
+        # spec 5.8.1 (v0.3.2): likewise the operation, so a retry under fresh authorization can't take effect unnoticed
+        if op is not None and op not in ctx["ops_held"] and op not in ctx["ops_done"]:
+            ctx["ops_held"][op] = {"invocation": rid, "digest": inv_digest}
+
+    if not mine and not_executed:
+        # provably nothing was executed, so the call cannot have exceeded its authority; for a high-impact call the
+        # statement must come from a party other than the actor (I10). A statement that fails that test shows nothing, so
+        # the outcome stays unknown and the holds stay (v0.3.2, from Brennan Zambo's review of #24).
+        hi = CEILING.index(inv["declared"]["effect"]) >= CEILING.index("write_shared")
+        self_only = hi and all(c.get("observed_by") == inv.get("actor") or ctx["same_operator"](c, inv) for c in stmts if c["disposition"] == "not_executed")
+        if self_only:
+            hold_unknown()
+        _check(self_only, "unresolved", "I10", "high-impact call reported not executed only by the actor itself, or by a key of the host's own operator",
+               need="independent_observer", ref=rid)
+        # say why it is preserved: nothing ran, on the observer's signed word, not "within authority"
+        who = ", ".join(sorted({str(c.get("observed_by")) for c in stmts if c["disposition"] == "not_executed"}))
+        return f"nothing executed: {who} signed a not_executed call statement"
+    # 11. effect receipts. With none and no not_executed statement, the call may still have moved value: hold its
+    # reserve (or an unknown amount) against every period limit on its chain that applies to it (spec 7.6 rule 6).
+    if not mine:
+        hold_unknown()
     _check(not mine, "unresolved", "I7", "no executed-effect receipt", need="receipt", ref=rid)
+    # spec 5.8.1 (v0.3.2): an earlier attempt at this operation that took effect. Recording this attempt as done is left
+    # to settle() in evaluate(), after this evaluation, and only on a receipt that passes its checks.
+    op_prev = ctx["ops_done"].get(op) if op is not None else None
     high_impact = CEILING.index(inv["declared"]["effect"]) >= CEILING.index("write_shared")
     eff_claims = chain[0]["claims"]
     for n in chain[1:]:
@@ -1016,6 +1107,11 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         obs = max(sorted(o for o in by_observer if d in by_observer[o]), key=lambda o: len(by_observer[o][d]))
         effects_of += [(e["executed"], d, obs) for e in by_observer[obs][d]]
     bodies = {d: x for x, d, _ in effects_of}
+    # spec 5.8.1 (v0.3.2): one operation takes effect at most once. Checked as soon as this call's receipts have verified,
+    # before any check that can only hold (held approvals, call statements, period limits), so no hold hides the second
+    # effect (found by the model check in formal/: an approval held for another call used to hide it).
+    _check(op_prev is not None and op_prev["invocation"] != rid, "violated", "I2",
+           f"operation {op} already took effect under {op_prev['invocation'] if op_prev else None}: executed twice", blame="agent")
     # every receipt a statement promises must be present, and no more (spec 5.14)
     for c in stmts:
         k = sum(1 for e in mine if e.get("observed_by") == c.get("observed_by"))
@@ -1048,15 +1144,22 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
             _check(bool(appr.get("consumed")), "violated", "I8", "approval already consumed", blame="agent")
             _check("expiry" in appr and to_time(appr["expiry"]) < max(t_inv, t_x), "violated", "I8", "approval expired", blame="agent")
             _check("nbf" in appr and to_time(appr["nbf"]) > t_inv, "violated", "I8", "approval not yet valid", blame="agent")
-        # spec 5.10, held approvals: after every check that decides violated, so a hold never hides a violation
+        # single use first: an approval another call already used is a violation, whatever holds it (spec 5.10)
+        for d in bodies:
+            use = (rid, d) if listed is None else op_use
+            first = approval_use.get(appr["id"], use)
+            _check(first != use, "violated", "I8", f"approval already used by {first[0]}", blame="agent")
+        # spec 5.10, held approvals: after every check that decides violated, so a hold never hides a violation. (The
+        # single-use check used to come after it, so a hold placed by a call after the approval's first use hid a third
+        # call's double use as held_outcome. Found by the model check in formal/.)
+        # this call's receipts show it used the approval, held or not: record the use first, so a third call is a
+        # double use even while an earlier call's outcome is unknown
+        for d in bodies:
+            approval_use.setdefault(appr["id"], (rid, d) if listed is None else op_use)
         holder = ctx["appr_held"].get(appr["id"]) if bodies else None
         _check(holder is not None and holder["invocation"] != rid, "unresolved", "I7",
                f"approval {appr['id']} is held for {holder and holder['invocation']}, whose outcome is unknown",
                need="held_outcome", ref=holder and holder["invocation"])
-        for d in bodies:
-            use = (rid, d) if listed is None else op_use
-            first = approval_use.setdefault(appr["id"], use)
-            _check(first != use, "violated", "I8", f"approval already used by {first[0]}", blame="agent")
     # 16. quantity limits (spec 7.6, v0.3), on every node of the chain and on the intent. An approval that passed I8
     # authorizes going over a limit; the amount still counts toward the period total. Every applicable limit is
     # checked before the result is decided, and a violation beats an unresolved check, so the verdict doesn't depend on
@@ -1097,6 +1200,12 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
     _check(bool(over) and not appr, "violated", "I2", f"risk budget of {over} exceeded without approval", blame="agent")
     for n in chain:
         spent[n["id"]] = spent.get(n["id"], 0) + c
+    # spec 5.8.1 (v0.3.2), after every other check: an attempt whose operation is held for an earlier attempt with an
+    # unknown outcome is held too, whatever authorization it carries
+    holder = ctx["ops_held"].get(op) if op is not None else None
+    _check(holder is not None and holder["invocation"] != rid, "unresolved", "I7",
+           f"operation {op} is held for {holder['invocation'] if holder else None}, whose outcome is unknown",
+           need="held_outcome", ref=holder["invocation"] if holder else None)
 
 
 def verdict(results: list[Result]) -> Result:

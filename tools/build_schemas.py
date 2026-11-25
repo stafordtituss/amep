@@ -117,6 +117,8 @@ schemas["invocation"] = obj("invocation", "Invocation (spec 5.8). Signed by role
     "derived_from": {"type": "array", "items": ref("ref")},
     "budget_spent": {"type": "integer", "minimum": 0},
     "args_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "operation": {"description": "The logical operation this call attempts, the same on every attempt (spec 5.8.1, v0.3.2).",
+                  "type": "string", "minLength": 1, "maxLength": 256},
     "reserve": {"description": "The most this call can move in the unit (spec 5.8, 7.6 rule 6; v0.3).", "type": "object",
                 "required": ["amount", "unit"], "additionalProperties": False,
                 "properties": {"amount": ref("amount"), "unit": ref("unit")}},
