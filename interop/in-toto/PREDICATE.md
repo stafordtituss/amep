@@ -122,7 +122,7 @@ amep-protocol verify packet.json --keys keys.json --verdict-out verdict.dsse.jso
 - Python: `amep-protocol` (PyPI), `amep_protocol.verdicts`.
 - JavaScript: `@stafordtituss/amep` (npm), `@stafordtituss/amep/verdict`.
 
-`tools/compare_verifiers.py` checks that the two produce byte-identical statements over all 292 AMEP conformance vectors (all three suites). Both implementations are by the same author.
+`tools/compare_verifiers.py` checks that the two produce byte-identical statements over all 297 AMEP conformance vectors (all three suites). Both implementations are by the same author.
 
 Outside use: in the Verifiable Agent Trust Envelope project, signed verdict envelopes for a lost-response and recovery case are kept under `reference/amep/case-01-lost-response/`. Its maintainer re-ran the pinned Python verifier on them and reported that all five verdicts matched ([VATE PR #138](https://github.com/Poke-nushi/Verifiable-Agent-Trust-Envelope/pull/138)).
 
