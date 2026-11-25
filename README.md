@@ -1,4 +1,12 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/banner-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/banner-light.svg">
+  <img alt="AMEP: Agentic Mandate Evidence Protocol. An agent's path lands inside the delegation, inside the mandate: preserved." src="docs/assets/banner-light.svg" width="100%">
+</picture>
+
 # AMEP™: Agentic Mandate Evidence Protocol
+
+<p><a href="https://stafordtituss.github.io/amep/"><b>Project site</b></a> · <a href="https://stafordtituss.github.io/amep/verify/"><b>Verifier in your browser</b></a> · <a href="spec/amep-v0.2.md">Specification</a> · <a href="vectors/">Conformance vectors</a> · <a href="LIMITS.md">Limits</a></p>
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24317758.svg)](https://doi.org/10.5281/zenodo.24317758) [![PyPI](https://img.shields.io/pypi/v/amep-protocol)](https://pypi.org/project/amep-protocol/) [![npm](https://img.shields.io/npm/v/@stafordtituss/amep)](https://www.npmjs.com/package/@stafordtituss/amep)
 
@@ -12,7 +20,7 @@ AMEP defines portable, signed evidence for that chain, from a person's mandate t
 - `violated`: it went beyond, and the result names the broken invariant;
 - `unresolved`: evidence is missing, which is never treated as permission.
 
-**Try it in your browser, with nothing to install:** [stafordtituss.github.io/amep](https://stafordtituss.github.io/amep/) runs the full conformance suite and checks any packet you paste in, offline, in the page.
+**Try it in your browser, with nothing to install:** the [browser verifier](https://stafordtituss.github.io/amep/verify/) runs the full conformance suite and checks any packet you paste in, offline, in the page. The [project site](https://stafordtituss.github.io/amep/) shows how it works.
 
 ## Install
 
@@ -101,7 +109,7 @@ AMEP evaluates evidence *after* authority has been granted and exercised. Relate
 
 AMEP needs outside scrutiny more than anything else.
 
-**Five minutes:** open the [browser verifier](https://stafordtituss.github.io/amep/) and run the suite; star the repository if it's useful to you; or open an issue with a case you think AMEP gets wrong. Every case that turns out to be right becomes a vector with your name on it.
+**Five minutes:** open the [browser verifier](https://stafordtituss.github.io/amep/verify/) and run the suite; star the repository if it's useful to you; or open an issue with a case you think AMEP gets wrong. Every case that turns out to be right becomes a vector with your name on it.
 
 **Longer, and worth the most:**
 
