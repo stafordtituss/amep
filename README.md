@@ -45,10 +45,7 @@ Two verifiers given the same records and keys return the same verdict, byte for 
 
 ## How it works
 
-```mermaid
-flowchart LR
-  M[Mandate] --> D[Delegation] --> I[Invocation] --> E[Effect receipt] --> V{{"Verdict: preserved · violated · unresolved"}}
-```
+<p align="center"><b>Mandate</b> &nbsp;→&nbsp; <b>Delegation</b> &nbsp;→&nbsp; <b>Invocation</b> &nbsp;→&nbsp; <b>Effect receipt</b> &nbsp;→&nbsp; <b>Verdict</b><br><sub>each link signed by the party that made it · checked offline by anyone</sub></p>
 
 | Record | Says | Signed by |
 |---|---|---|
