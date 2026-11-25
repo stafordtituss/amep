@@ -4,7 +4,7 @@
 
 **Source:** the event behaviour below comes from a Teleport engineer's answers, including a check of this mapping's two readings against 18.11.10, in [gravitational/teleport#70011](https://github.com/gravitational/teleport/discussions/70011), with code references, and from the [MCP session audit reference](https://goteleport.com/docs/reference/audit-events/mcp-sessions/).
 
-**No endorsement:** Teleport has not reviewed or endorsed this mapping, and says its event fields may change between releases. Treat the mapping as tied to the pinned version.
+**No endorsement:** the Teleport engineer checked two readings against 18.11.10 (`a2409e7`), from the source, without running a deployment: a pre-forward denial, and a forwarded call whose outcome is unknown. Teleport has not reviewed or endorsed the rest of this mapping, and says its event fields may change between releases. Treat the mapping as tied to the pinned version.
 
 ## Why a proxy's record matters to AMEP
 
