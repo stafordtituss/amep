@@ -69,3 +69,12 @@ env = sign_envelope(statement(packet_bytes, keys, results, {"name": "amep-protoc
 ```
 
 The statement names the packet by digest and lists every result, so anyone with the packet can re-run the check rather than trust the signer. Attach it next to the release, deployment or payment it covers.
+
+## Find the evidence from a trace, and the trace from the evidence
+
+With OpenTelemetry installed (`pip install "amep-agents[otel]"`) and a span recording, the recorder joins the two by id and digest. Nothing to configure:
+- **On the tool span:** `amep.invocation.id`, `amep.invocation.digest` and, once the receipt is signed, `amep.effect.id`.
+- **On the span current at `recorder.evaluate()`:** `amep.verdict.outcome` and `amep.verdict.invariant`.
+- **On each invocation:** the span's W3C `traceparent` and the tool-call id, in its signed `correlation` member.
+
+A trace backend can then filter for calls whose evidence is `violated` or `unresolved`. No tool argument or output is ever put on a span. To turn the join off, pass `trace=False` to the recorder. The mapping is in [`interop/otel-genai/MAPPING.md`](../../interop/otel-genai/MAPPING.md).
