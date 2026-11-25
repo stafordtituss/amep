@@ -572,6 +572,25 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     if (Object.hasOwn(heldIn, d) && !Object.hasOwn(newHeld, d) && !Object.hasOwn(held, d)) held[d] = heldIn[d];
   }
 
+  // spec 8, I10 (v0.3.2): the actor's own record cannot establish that it stayed within authority, but it can establish
+  // that it did not. A receipt from the actor, or from a key of its own operator, showing it executed what it declared
+  // outside its authority is an admission: violated, charged to the actor. It never convicts another party, so a record
+  // in which the executed effect differs from the declared one stays unresolved, as does every other self-report.
+  function admission(e, inv, claims) {
+    const x = e.executed;
+    let ok, why;
+    const note = " (on the actor's own record; not independently observed)";
+    try {
+      if (!x || typeof x !== "object" || x.action !== inv.declared.action || x.resource !== inv.declared.resource) return;
+      check(isGuardrail(x.resource, extraProtected), "violated", "I9", "executed effect targets guardrail/evidence store" + note, { blame: "agent" });
+      [ok, why] = effectOk(x, claims, v03);
+    } catch (err) {
+      if (err instanceof Stop) throw err;
+      return;
+    }
+    check(!ok, "violated", why.startsWith("released") ? "I5" : "I2", why + note, { blame: "agent" });
+  }
+
   function evalInvocation(inv) {
     const id = inv.id, tInv = toTime(inv.t);
     const op = "operation" in inv ? inv.operation : undefined;
@@ -716,6 +735,7 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       check("invocation_digest" in e && e.invocation_digest !== invDigest, "unresolved", "I7", `receipt ${e.id ?? "?"} is bound to a different invocation (invocation_digest mismatch)`, { need: "receipt_binding", ref: e.id ?? "?" });
       if (highImpact) {
         check(!inv.actor, "unresolved", "I10", "actor not recorded; observer independence cannot be shown", { need: "actor", ref: id });
+        if (e.observed_by === inv.actor || sameOperator(e, inv)) admission(e, inv, claims);
         check(e.observed_by === inv.actor || e.assurance === "L0", "unresolved", "I10", "high-impact effect only self-reported", { need: "independent_observer", ref: e.id ?? "?" });
         check(sameOperator(e, inv), "unresolved", "I10", "high-impact effect observed only by a key of the host's own operator", { need: "independent_observer", ref: e.id ?? "?" });
       }

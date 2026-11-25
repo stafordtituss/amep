@@ -850,6 +850,24 @@ def _revocation_window(node) -> float:
     return w
 
 
+def _admission(e, inv, eff_claims, extra_protected, ctx):
+    """spec 8, I10 (v0.3.2): the actor's own record cannot establish that it stayed within authority, but it can establish
+    that it did not. A receipt signed by the actor, or by a key of the actor's own operator, that shows the actor executing
+    what it declared, outside its authority, is an admission: the result is violated, charged to the actor, and says the
+    effect was not independently observed. It never convicts another party: a record in which the executed effect
+    differs from the declared one would charge the server, so it stays unresolved, as does every other self-report."""
+    x = e.get("executed")
+    try:
+        if not isinstance(x, dict) or (x["action"], x["resource"]) != (inv["declared"]["action"], inv["declared"]["resource"]):
+            return
+        note = " (on the actor's own record; not independently observed)"
+        _check(is_guardrail(x["resource"], extra_protected), "violated", "I9", "executed effect targets guardrail/evidence store" + note, blame="agent")
+        ok, why = effect_ok(x, eff_claims, ctx["v03"])
+    except (Malformed, KeyError, TypeError, ValueError, AttributeError):
+        return
+    _check(not ok, "violated", "I5" if why.startswith("released") else "I2", why + note, blame="agent")
+
+
 def _check_limit(n, i, lim, x, v, unit, amt, obs, appr, call_sum, ctx):
     """One applicable limit of node n for one effect x (spec 7.6 rules 3 to 6). Raises Stop on the first failed check."""
     _check("per_effect" in lim and amt > amount_units(lim.get("per_effect", "0")) and not appr, "violated", "I2",
@@ -1071,6 +1089,8 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
                f"receipt {e.get('id', '?')} is bound to a different invocation (invocation_digest mismatch)", need="receipt_binding", ref=e.get('id', '?'))
         if high_impact:
             _check(not inv.get("actor"), "unresolved", "I10", "actor not recorded; observer independence cannot be shown", need="actor", ref=rid)
+            if e.get("observed_by") == inv["actor"] or ctx["same_operator"](e, inv):
+                _admission(e, inv, eff_claims, extra_protected, ctx)
             _check(e.get("observed_by") == inv["actor"] or e.get("assurance") == "L0", "unresolved", "I10", "high-impact effect only self-reported", need="independent_observer", ref=e.get('id', '?'))
             _check(ctx["same_operator"](e, inv), "unresolved", "I10", "high-impact effect observed only by a key of the host's own operator",
                    need="independent_observer", ref=e.get('id', '?'))

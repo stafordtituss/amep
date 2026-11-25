@@ -853,6 +853,22 @@ def vectors():
         by_operator(p, O2))
     add("high-impact effect observed by a key of another operator", ("preserved", "-"), lambda p, I, H, O, X:
         by_operator(p, O3))
+
+    # Admissions (spec 8, I10, v0.3.2): the actor's own record can't show it stayed within authority, but it can show it
+    # didn't. Found in the MasDrift analysis: an agent's own log of a forbidden external send stayed unresolved.
+    def admit(p, signer, observed_by, executed_res="repo:app/docs/launch.md", declared_res="repo:app/docs/launch.md"):
+        high_impact(p, observed_by=observed_by, assurance="L1")
+        inv = {**p["invocations"][0], "declared": {**p["invocations"][0]["declared"], "resource": declared_res}}
+        p["invocations"] = [(H2 if signer is O2 else H).sign(inv)]
+        p["effects"] = [signer.sign({**p["effects"][0], "executed": {**p["effects"][0]["executed"], "resource": executed_res}})]
+    add("high-impact effect outside authority, recorded only by the actor", ("violated", "I2"), lambda p, I, H, O, X:
+        admit(p, O, "agent:assistant-1"))
+    add("high-impact effect outside authority, recorded only by a key of the actor's own operator", ("violated", "I2"), lambda p, I, H, O, X:
+        admit(p, O2, "proxy:egress"))
+    add("the actor's own record says something else was executed", ("unresolved", "I10"), lambda p, I, H, O, X:
+        admit(p, O, "agent:assistant-1", executed_res="repo:app/src/other.ts", declared_res="repo:app/src/auth.ts"))
+    add("high-impact effect within authority, recorded only by the actor", ("unresolved", "I10"), lambda p, I, H, O, X:
+        admit(p, O, "agent:assistant-1", executed_res="repo:app/src/auth.ts", declared_res="repo:app/src/auth.ts"))
     add("high-impact call reported not executed only by a key of the host's own operator", ("unresolved", "I10"), lambda p, I, H, O, X: (
         high_impact(p), bound(p, I, H, O), p.update(effects=[]),
         p.update(invocations=[H2.sign(p["invocations"][0], v=2)]),
