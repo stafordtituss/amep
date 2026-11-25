@@ -10,7 +10,7 @@
 
 ## 1. Summary
 
-**The idea:** let a producer sign a record so that some of its members can later be withheld without breaking the signature. The pattern is SD-JWT's (RFC 9901): salted digests of the members are signed, and the members themselves travel as separate disclosures.
+**The idea:** let a producer sign a record so that some of its members can later be withheld without breaking the signature. The pattern is that of SD-JWT (Selective Disclosure for JWTs, IETF OAuth working group): salted digests of the members are signed, and the members themselves travel as separate disclosures.
 
 **What a verifier then does:** it checks what was disclosed. Where a rule needs a member that was withheld, the result is `unresolved`, with gap `disclosure`, naming the member. Never `preserved`.
 
