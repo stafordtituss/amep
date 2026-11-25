@@ -1,4 +1,12 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/banner-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/banner-light.svg">
+  <img alt="AMEP: Agentic Mandate Evidence Protocol. An agent's path lands inside the delegation, inside the mandate: preserved." src="docs/assets/banner-light.svg" width="100%">
+</picture>
+
 # AMEP™: Agentic Mandate Evidence Protocol
+
+<p><a href="https://stafordtituss.github.io/amep/"><b>Project site</b></a> · <a href="https://stafordtituss.github.io/amep/verify/"><b>Verifier in your browser</b></a> · <a href="spec/amep-v0.2.md">Specification</a> · <a href="vectors/">Conformance vectors</a> · <a href="LIMITS.md">Limits</a></p>
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24317758.svg)](https://doi.org/10.5281/zenodo.24317758) [![PyPI](https://img.shields.io/pypi/v/amep-protocol)](https://pypi.org/project/amep-protocol/) [![npm](https://img.shields.io/npm/v/@stafordtituss/amep)](https://www.npmjs.com/package/@stafordtituss/amep)
 
@@ -11,6 +19,8 @@ AMEP defines portable, signed evidence for that chain, from a person's mandate t
 - `preserved`: the effect stayed within authority;
 - `violated`: it went beyond, and the result names the broken invariant;
 - `unresolved`: evidence is missing, which is never treated as permission.
+
+**Try it in your browser, with nothing to install:** the [browser verifier](https://stafordtituss.github.io/amep/verify/) runs the full conformance suite and checks any packet you paste in, offline, in the page. The [project site](https://stafordtituss.github.io/amep/) shows how it works.
 
 ## Install
 
@@ -97,13 +107,19 @@ AMEP evaluates evidence *after* authority has been granted and exercised. Relate
 
 ## Review AMEP
 
-AMEP needs outside scrutiny more than anything else. Three ways to help, all public:
+AMEP needs outside scrutiny more than anything else.
+
+**Five minutes:** open the [browser verifier](https://stafordtituss.github.io/amep/verify/) and run the suite; star the repository if it's useful to you; or open an issue with a case you think AMEP gets wrong. Every case that turns out to be right becomes a vector with your name on it.
+
+**Longer, and worth the most:**
 
 1. **Run it against your own system.** Run the vectors against your implementation or system, publish the results (failures included) in your own repository, and open an [implementation report](https://github.com/stafordtituss/amep/issues/new?template=implementation-report.yml).
 2. **Cite it where relevant.** If your Internet-Draft, paper or specification overlaps with AMEP, an informative reference, or a note on where the approaches differ, is welcome.
 3. **Review it in public.** Open an [independent technical review](https://github.com/stafordtituss/amep/issues/new?template=independent-review.yml), or comment on an IETF, W3C, DIF or OpenID Foundation list and link the message.
 
-Every review, implementation and citation by others is logged, as written and including critical ones, in [`REVIEWS.md`](REVIEWS.md).
+Every review, implementation and citation by others is logged, as written and including critical ones, in [`REVIEWS.md`](REVIEWS.md). Everyone whose work changed AMEP is credited in [`CONTRIBUTORS.md`](CONTRIBUTORS.md).
+
+**Ports wanted:** a Go or Rust verifier written from the specification and vectors alone would be a third independent implementation. Open an [implementation report](https://github.com/stafordtituss/amep/issues/new?template=implementation-report.yml) when it passes, and it will be listed and credited.
 
 **Independent implementations:** [zambo-amep-verify](https://github.com/zambodotdev/zambo-amep-verify) by Brennan Zambo, written from the specification and vectors alone, agrees with all 228 single-packet core vectors ([#19](https://github.com/stafordtituss/amep/issues/19)). More are welcome: see [#18](https://github.com/stafordtituss/amep/issues/18).
 
