@@ -28,5 +28,5 @@ A trace backend can then filter for tool calls whose evidence is `violated` or `
 
 ## Next steps
 
-- `amep-agents` already sees every tool call. It could set these attributes on the current span when OpenTelemetry is present.
+- **Done:** `amep-agents` sets these attributes when OpenTelemetry is present (`packages/agents/src/amep_agents/otel.py`, tested in `tests/test_otel.py`).
 - If useful to the GenAI SIG, a proposal for an `evidence` reference on tool spans: a pointer to a signed record of the call, whatever its format.

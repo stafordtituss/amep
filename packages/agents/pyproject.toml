@@ -23,6 +23,7 @@ dependencies = ["amep-protocol>=0.2.0a5"]
 [project.optional-dependencies]
 openai-agents = ["openai-agents>=0.25"]
 langgraph = ["langchain-core>=1.0", "langgraph>=1.0"]
+otel = ["opentelemetry-api>=1.20"]
 
 [project.urls]
 Homepage = "https://github.com/stafordtituss/amep/tree/main/packages/agents"
