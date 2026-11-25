@@ -146,6 +146,24 @@ class CliTest(unittest.TestCase):
             self.assertEqual(json.loads(out.getvalue())["proof"]["kid"], "issuer-1")
 
 
+
+class TestSequences(unittest.TestCase):
+    """vectors/sequences: verifier state carried across packets; each step's verdict and the operation state it leaves
+    (spec 5.8.1). From Andrii Akhtanin's review: rejected evidence must not release a hold or record an operation done."""
+
+    def test_operation_state_sequences(self):
+        here = os.path.dirname(os.path.abspath(__file__))
+        doc = json.load(open(os.path.join(here, "..", "..", "..", "vectors", "sequences", "operation-state.json")))
+        self.assertEqual(len(doc["sequences"]), 5)
+        for seq in doc["sequences"]:
+            state = {}
+            for n, step in enumerate(seq["steps"]):
+                r = verdict(evaluate(step["packet"], doc["keys"], state=state))
+                got = {k: {o: h["invocation"] for o, h in state.get(k, {}).items()} for k in ("operations_held", "operations_done")}
+                with self.subTest(seq=seq["name"], step=n + 1):
+                    self.assertEqual((r.outcome, r.invariant), (step["expect"]["outcome"], step["expect"]["invariant"]))
+                    self.assertEqual(got, step["state_after"])
+
 if __name__ == "__main__":
     unittest.main()
 

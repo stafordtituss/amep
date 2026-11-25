@@ -726,6 +726,50 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
            # spec 5.8.1 (v0.3.2): an attempt recorded in state but present in this packet is decided afresh here
            "ops_held": {o: h for o, h in ops_held_in.items() if h["digest"] not in present},
            "ops_done": {o: h for o, h in ops_done_in.items() if h["digest"] not in present}}
+    call_statements = [c for c in packet.get("call_statements", []) if isinstance(c, dict)]
+
+    def settle(inv):
+        """spec 5.8.1 (v0.3.2): commit a change to carried outcome state only on evidence that passed its checks. A receipt
+        that verifies, from an observer that counts for this call (I10), makes the operation done; a verified, independent
+        not_executed statement settles the attempt. Anything else, a rejected receipt or statement included, leaves the
+        state this attempt carried in as it was: its holds stay, and a completed operation stays completed. From Andrii
+        Akhtanin's review (Radiolaria) on the OpenID AIIM list, 25 Nov 2026: an unverifiable not_executed statement had
+        released the hold, and an unverifiable receipt had recorded the operation as done."""
+        try:
+            d = digest(inv)
+        except Exception:
+            return
+        rid = inv.get("id")
+        op = inv.get("operation") if isinstance(inv.get("operation"), str) and inv.get("operation") else None
+        effect = (inv.get("declared") or {}).get("effect") if isinstance(inv.get("declared"), dict) else None
+        hi = effect in CEILING and CEILING.index(effect) >= CEILING.index("write_shared")
+
+        def counts(o):
+            return not hi or (bool(inv.get("actor")) and o.get("observed_by") != inv.get("actor") and not same_operator(o, inv))
+        recs = [e for e in effects if isinstance(e, dict) and e.get("invocation") == rid]
+        executed = any(vsig(e) and isinstance(e.get("observed_by"), str) and e.get("invocation_digest", d) == d
+                       and not (hi and e.get("assurance") == "L0") and counts(e) for e in recs)
+        not_run = not recs and any(vsig(c) and c.get("disposition") == "not_executed" and c.get("effect_count") == 0
+                                   and c.get("invocation_digest", d) == d and counts(c)
+                                   for c in call_statements if c.get("invocation") == rid)
+        if executed and op is not None:
+            ctx["ops_done"].setdefault(op, {"invocation": rid, "digest": d})
+            if op in ctx["ops_held"] and ctx["ops_held"][op]["invocation"] == rid:
+                del ctx["ops_held"][op]
+        if executed or not_run or d not in present:
+            return
+        for o, h in ops_held_in.items():
+            if h["digest"] == d and o not in ctx["ops_done"]:
+                ctx["ops_held"].setdefault(o, h)
+        for o, h in ops_done_in.items():
+            if h["digest"] == d:
+                ctx["ops_done"].setdefault(o, h)
+        for a, h in appr_held_in.items():
+            if h["digest"] == d:
+                ctx["appr_held"].setdefault(a, h)
+        if d in held_in and d not in ctx["new_held"]:
+            ctx["held"].setdefault(d, held_in[d])
+
     for n, inv in enumerate(invocations):
         rid = inv.get("id", "?")
         try:
@@ -737,6 +781,7 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
             out.append(Result(rid, *s.r))
         except (Malformed, KeyError, TypeError, ValueError, AttributeError) as e:
             out.append(Result(rid, "unresolved", "I7", f"malformed evidence: {e}", gaps=[{"need": "well_formed_evidence", "ref": str(rid)}]))
+        settle(inv)
 
     # spec 10.3: decision reconciliation. Only PRE-execution decisions can be contradicted or confirm a block;
     # a post-execution decision is detection and a simulation is hypothetical (spec 5.13).
@@ -1006,12 +1051,9 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
     if not mine:
         hold_unknown()
     _check(not mine, "unresolved", "I7", "no executed-effect receipt", need="receipt", ref=rid)
-    # spec 5.8.1 (v0.3.2): this attempt took effect. The operation is done; a hold it had on the operation is released.
+    # spec 5.8.1 (v0.3.2): an earlier attempt at this operation that took effect. Recording this attempt as done is left
+    # to settle() in evaluate(), after this evaluation, and only on a receipt that passes its checks.
     op_prev = ctx["ops_done"].get(op) if op is not None else None
-    if op is not None and op_prev is None:
-        ctx["ops_done"][op] = {"invocation": rid, "digest": inv_digest}
-    if op is not None and op in ctx["ops_held"] and ctx["ops_held"][op]["invocation"] == rid:
-        del ctx["ops_held"][op]
     high_impact = CEILING.index(inv["declared"]["effect"]) >= CEILING.index("write_shared")
     eff_claims = chain[0]["claims"]
     for n in chain[1:]:
