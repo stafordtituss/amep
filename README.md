@@ -47,13 +47,7 @@ Two verifiers given the same records and keys return the same verdict, byte for 
 
 ```mermaid
 flowchart LR
-  M["Mandate<br><sub>signed by the person or organization</sub>"] --> D["Delegation<br><sub>only ever narrower</sub>"]
-  D --> I["Invocation<br><sub>signed by the agent's host</sub>"]
-  I --> E["Effect receipt<br><sub>signed by whoever executed it</sub>"]
-  E --> V{"Verifier<br><sub>offline</sub>"}
-  V --> P[preserved]
-  V --> X[violated]
-  V --> U[unresolved]
+  M[Mandate] --> D[Delegation] --> I[Invocation] --> E[Effect receipt] --> V{{"Verdict: preserved · violated · unresolved"}}
 ```
 
 | Record | Says | Signed by |
