@@ -152,7 +152,7 @@ export function malformedReason(v, path = "$", depth = 0) {
       if (utf8Len(k) > MAX_NAME) return `member name longer than ${MAX_NAME} bytes at ${path}`;
       const bad = badChar(k); if (bad) return `${bad} in a member name at ${path}`;
       if ((k === "action" || k === "resource")) { const p = identProblem(x); if (p) return `identifier with ${p} at ${path}.${k}`; }
-      if (["actions", "resources", "deny_actions", "deny_resources"].includes(k) && Array.isArray(x)) {
+      if (["actions", "resources", "deny_actions", "deny_resources", "audiences"].includes(k) && Array.isArray(x)) {
         const p = x.map(identProblem).find(Boolean); if (p) return `identifier pattern with ${p} at ${path}.${k}`;
       }
       const r = malformedReason(x, `${path}.${k}`, depth + 1); if (r) return r;
@@ -251,6 +251,8 @@ function narrower(c, p, v03 = false) {
   // spec 7.1: denies only grow; every parent deny must be covered by an equal-or-broader child deny
   for (const key of ["deny_actions", "deny_resources"])
     if (!(p[key] || []).every(d => subsumed([d], c[key] || []))) return [false, `${key} removed`];
+  // spec 5.3 (v0.3.2): audiences only narrow. A parent that names audiences binds every child to a subset of them.
+  if ("audiences" in p && !("audiences" in c && subsumed(c.audiences, p.audiences))) return [false, "audiences widened"];
   if ("budget" in p && (c.budget ?? p.budget) > p.budget) return [false, "risk budget widened"];
   if ("depth" in p) {
     if (p.depth === 0) return [false, "parent may not be delegated (depth 0)"];
@@ -269,6 +271,8 @@ function meet(a, b, v03 = false) {
     ceiling: CEILING[Math.min(CEILING.indexOf(a.ceiling), CEILING.indexOf(b.ceiling))], exp: Math.min(toTime(a.exp), toTime(b.exp)) };
   const nbfs = [a, b].filter(c => "nbf" in c).map(c => toTime(c.nbf)); if (nbfs.length) m.nbf = Math.max(...nbfs);
   if ("purpose" in a || "purpose" in b) m.purpose = a.purpose ?? b.purpose;
+  if ("audiences" in a || "audiences" in b) // audiences intersect (v0.3.2)
+    m.audiences = ("audiences" in a && "audiences" in b) ? a.audiences.filter(x => subsumed([x], b.audiences)) : (a.audiences ?? b.audiences);
   for (const key of ["deny_actions", "deny_resources"]) // denies are unioned: no hop or intent can lift one
     if (key in a || key in b) m[key] = [...new Set([...(a[key] || []), ...(b[key] || [])])].sort();
   return m;
@@ -281,6 +285,8 @@ function effectOk(x, c, v03 = false) {
   if (!act.some(g => g.resources.some(p => patMatch(x.resource, p)))) return [false, "resource outside claims"];
   if ((c.deny_resources || []).some(p => patMatch(x.resource, p))) return [false, "resource denied"];
   if (CEILING.indexOf(x.effect) > CEILING.indexOf(c.ceiling)) return [false, "effect above ceiling"];
+  // spec 5.3 (v0.3.2), from stafordtituss/amep#16: an effect sent to a service the principal never named is outside authority
+  if ("audiences" in c && typeof x.audience === "string" && !c.audiences.some(p => patMatch(x.audience, p))) return [false, "audience outside claims"];
   for (const d of x.released || []) if (!(c.data || []).includes(d)) return [false, `released ${d} not allowed`];
   if (toTime(x.t) > toTime(c.exp)) return [false, "after validity"];
   if ("nbf" in c && toTime(x.t) < toTime(c.nbf)) return [false, "before validity"];
@@ -298,7 +304,7 @@ const cost = x => {
 const AMOUNT = /^(0|[1-9][0-9]{0,38})(\.[0-9]{1,18})?$/, UNIT = /^[a-z][a-z0-9-]{0,31}:[!-~]{1,128}$/;
 const SCALE = 10n ** 18n;
 const MONEY_UNITS = ["iso4217:", "caip19:"];
-export const CLAIM_MEMBERS = new Set(["actions", "resources", "grants", "data", "ceiling", "exp", "nbf", "purpose", "deny_actions", "deny_resources", "depth", "budget", "limits"]);
+export const CLAIM_MEMBERS = new Set(["actions", "resources", "grants", "data", "ceiling", "exp", "nbf", "purpose", "deny_actions", "deny_resources", "depth", "budget", "limits", "audiences"]);
 const LIMIT_MEMBERS = new Set(["unit", "per_effect", "per_call", "per_period", "period", "actions", "counted_by"]);
 const INTEGER_AMOUNT = /^(0|[1-9][0-9]{0,38})$/, PERIOD_KEY = /^[1-9][0-9]{0,15}$/;
 // Amounts in caip19: units are integers in the asset's smallest unit, as the chain records them (spec 5.9.2).
@@ -571,6 +577,8 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     // producer meant to narrow, so an unversioned packet that uses them is malformed instead.
     if (!v03) for (const x of nodes)
       check("grants" in x.claims, "unresolved", "I7", `${x.id}: grants require amep_version 0.3`, { need: "well_formed_evidence", ref: x.id });
+    if (!v03) for (const x of nodes)
+      check("audiences" in x.claims, "unresolved", "I7", `${x.id}: audiences require amep_version 0.3`, { need: "well_formed_evidence", ref: x.id });
     if (v03 && "reserve" in inv) {
       try { checkReserve(inv.reserve); }
       catch (e) { if (!(e instanceof Malformed)) throw e; check(true, "unresolved", "I7", `${id}: ${e.message}`, { need: "reserve", ref: id }); }
@@ -585,6 +593,11 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
             && ["actions", "resources"].every(k => Array.isArray(e[k]) && e[k].length > 0 && e[k].every(p => typeof p === "string")));
         check(!ok, "unresolved", "I7", `${x.id}: grants must be a non-empty list of {actions, resources}, without actions or resources beside it`,
           { need: "well_formed_evidence", ref: x.id });
+      }
+      if ("audiences" in x.claims) {
+        const au = x.claims.audiences;
+        check(!(Array.isArray(au) && au.length > 0 && au.every(p => typeof p === "string" && p.length > 0)), "unresolved", "I7",
+          `${x.id}: audiences must be a non-empty list of audience patterns`, { need: "well_formed_evidence", ref: x.id });
       }
       for (const lim of x.claims.limits || []) {
         unknown = Object.keys(lim).filter(k => !LIMIT_MEMBERS.has(k) && !isExtensionMember(k)).sort();
@@ -702,6 +715,9 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       check(isGuardrail(x.resource, extraProtected), "violated", "I9", "executed effect targets guardrail/evidence store", { blame: "agent" });
       const [ok, why] = effectOk(x, claims, v03);
       check(!ok, "violated", why.startsWith("released") ? "I5" : "I2", why, { blame: "agent" });
+      // spec 5.3 (v0.3.2): where the claims name audiences, the receipt must say where the effect was sent
+      check("audiences" in claims && !(typeof x.audience === "string" && x.audience.length > 0), "unresolved", "I7",
+        `receipt ${e.id ?? "?"} does not record the audience the claims are bound to`, { need: "audience", ref: e.id ?? "?" });
       // spec 5.9.1: data classes carried in through lineage (or read by this effect) reach the recipient too
       if ("recipient" in x) {
         const inherited = new Set(x.accessed || []);
