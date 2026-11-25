@@ -1225,12 +1225,26 @@ def sequences():
             (first(), ("unresolved", "I7"), held, {}),
             (retry("op-9c21", fresh=False), ("preserved", "-"), held, {"op-9c21": "i-1"})]),
     ]
+    # carried approval use (spec 5.10): an approval used in one packet stays used in the next. From Andrii Akhtanin's
+    # review: the approval-use accounting needs a carried-state test, not only single-packet vectors.
+    def approved(inv_id, t):
+        p = base(I, H, O)
+        body = {**p["effects"][0]["executed"], "t": t + 1}
+        ap = I.sign({"id": "ap-1", "kind": "approval", "effect_digest": approval_digest(body), "presence": "webauthn"})
+        inv = H.sign({**{k: v for k, v in p["invocations"][0].items() if k != "proof"}, "id": inv_id, "t": t, "approval_ref": "ap-1"})
+        eff = O.sign({**{k: v for k, v in p["effects"][0].items() if k != "proof"}, "id": f"e-{inv_id}", "invocation": inv_id, "executed": body})
+        p.update(invocations=[inv], effects=[eff], approvals=[ap])
+        return p
+    S.append(("a single-use approval used in one packet is still used in the next", [
+        (approved("i-1", 10), ("preserved", "-"), {}, {}, {"ap-1": "i-1"}),
+        (approved("i-2", 20), ("violated", "I8"), {}, {}, {"ap-1": "i-1"})]))
     keys = {s.kid: s.public() for s in (I, H, O)}
     out = []
     for name, steps in S:
         out.append({"name": name, "steps": [
             {"packet": p, "expect": {"outcome": o, "invariant": inv},
-             "state_after": {"operations_held": hd, "operations_done": dn}} for p, (o, inv), hd, dn in steps]})
+             "state_after": {"operations_held": st[0], "operations_done": st[1], **({"approvals_used": st[2]} if len(st) > 2 else {})}}
+            for p, (o, inv), *st in steps]})
     return keys, out
 
 
@@ -1240,6 +1254,8 @@ def run_sequence(seq, keys):
     for n, step in enumerate(seq["steps"]):
         r = verdict(evaluate(step["packet"], keys, state=state))
         got = {k: {o: h["invocation"] for o, h in state.get(k, {}).items()} for k in ("operations_held", "operations_done")}
+        if "approvals_used" in step["state_after"]:
+            got["approvals_used"] = {a: u[0] for a, u in state.get("approvals_used", {}).items()}
         if (r.outcome, r.invariant) != (step["expect"]["outcome"], step["expect"]["invariant"]) or got != step["state_after"]:
             fails.append(f"{seq['name']}, step {n + 1}: got {r.outcome}/{r.invariant} {got} ({r.reason})")
     return fails
