@@ -1,0 +1,32 @@
+{
+  "name": "@stafordtituss/amep-mcp-evidence",
+  "version": "0.1.0-alpha.1",
+  "description": "The io.github.stafordtituss/amep-evidence MCP extension (signed effect receipts and call statements) on the MCP TypeScript SDK's extension API",
+  "type": "module",
+  "exports": {
+    ".": "./src/extension.mjs",
+    "./gateway": "./src/gateway.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/",
+    "server": "node src/tickets-server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/client": ">=2.5.0",
+    "@modelcontextprotocol/server": ">=2.5.0"
+  },
+  "dependencies": {
+    "@stafordtituss/amep": "file:../js",
+    "zod": "4.6.7"
+  },
+  "license": "Apache-2.0",
+  "author": "Staford Titus Selvaraj",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stafordtituss/amep.git",
+    "directory": "packages/mcp-evidence"
+  }
+}

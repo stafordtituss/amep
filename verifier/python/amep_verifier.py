@@ -716,6 +716,52 @@ def vectors():
         p, ["300.00"], EUR(per_period="500.00", period=MONTH), spent=["300.00"], window_from=20 * 86400),
         state={"period_totals": {"m-1|iso4217:EUR|2592000|0": "400.00"}, "spent": {}, "approvals_used": {}})
 
+    # Cases invited on stafordtituss/amep#10 (22 Nov 2026), on the readings adopted there. A monthly figure doesn't
+    # settle a daily limit. A share from an observer the limit doesn't name adds to a total that verifier state anchors.
+    # Identical receipts in the same second still count twice. caip19 amounts beyond 2^53 compare exactly, up to the
+    # grammar's 39 digits (a uint128). For money the amount is the debit (spec 5.9.2): fees are included, so an approval
+    # of the amount before fees doesn't bind, and with currency conversion only a limit in the debit's unit applies.
+    def same_second(p):
+        """Every receipt of the call at the first receipt's time, so the bodies are identical, t included."""
+        t = p["effects"][0]["executed"]["t"]
+        p.update(effects=[B.sign({**e, "executed": {**e["executed"], "t": t}}, v=2) for e in p["effects"]])
+
+    def approved_before_fees(p, amount):
+        """Replace the approval with one signed for `amount`, the payment before fees, instead of the debit."""
+        x = p["effects"][0]["executed"]
+        p.update(approvals=[I.sign({**p["approvals"][0],
+                                    "effect_digest": approval_digest({**x, "value": {**x["value"], "amount": amount}})}, v=2)])
+
+    add("a monthly figure does not settle a daily limit", ("unresolved", "I7"), lambda p, *a: pay(
+        p, ["80.00"], [DAYLIM, MONTHLIM], spent=[{str(MONTH): "880.00"}]))
+    add("payment through a second service adds to the total in verifier state", ("violated", "I2"), lambda p, *a: pay(
+        p, ["300.00"], EUR(per_period="500.00", period=MONTH), spent=["300.00"], observers=["psp"]),
+        state={"period_totals": {"m-1|iso4217:EUR|2592000|0": "300.00"}})
+    add("payment through a second service within the total in verifier state", ("preserved", "-"), lambda p, *a: pay(
+        p, ["300.00"], EUR(per_period="500.00", period=MONTH), spent=["300.00"], observers=["psp"]),
+        state={"period_totals": {"m-1|iso4217:EUR|2592000|0": "100.00"}})
+    add("one approval, the approved payment executed twice in the same second", ("violated", "I8"), lambda p, *a: (
+        pay(p, ["840000.00", "840000.00"], EUR(per_call="500.00"), approve_n=(1,), one_call=True), same_second(p)))
+    add("two identical payments in the same second count twice toward the period limit", ("violated", "I2"), lambda p, *a: (
+        pay(p, ["300.00", "300.00"], EUR(per_period="500.00", period=MONTH), one_call=True), same_second(p)),
+        state={"period_totals": {"m-1|iso4217:EUR|2592000|0": "0.00"}})
+    NEAR, ONE_NEAR = "caip19:near:mainnet/slip44:397", "1" + "0" * 24   # 24 decimals: 1 NEAR is 10^24 yoctoNEAR
+    U128 = str(2 ** 128 - 1)   # 39 digits, the most the amount grammar allows
+    add("caip19 amount of 25 digits, one unit over the limit", ("violated", "I2"), lambda p, *a:
+        pay(p, [ONE_NEAR[:-1] + "1"], [{"unit": NEAR, "per_call": ONE_NEAR}], unit=NEAR))
+    add("caip19 amount of 25 digits, exactly at the limit", ("preserved", "-"), lambda p, *a:
+        pay(p, [ONE_NEAR], [{"unit": NEAR, "per_call": ONE_NEAR}], unit=NEAR))
+    add("caip19 amount at the largest uint128", ("preserved", "-"), lambda p, *a:
+        pay(p, [U128], [{"unit": NEAR, "per_call": U128}], unit=NEAR))
+    add("amount with 40 integer digits", ("unresolved", "I7"), lambda p, *a:
+        pay(p, [U128 + "0"], [{"unit": NEAR, "per_call": U128}], unit=NEAR))
+    add("an approval of the amount before fees does not bind the debit", ("violated", "I8"), lambda p, *a: (
+        pay(p, ["606.00"], EUR(per_call="500.00"), approve_n=(1,)), approved_before_fees(p, "600.00")))
+    add("converted payment within the limit in the debit currency", ("preserved", "-"), lambda p, *a:
+        pay(p, ["460.00"], [{"unit": "iso4217:USD", "per_call": "100.00"}] + EUR(per_call="500.00")))
+    add("converted payment over the limit in the debit currency", ("violated", "I2"), lambda p, *a:
+        pay(p, ["560.00"], [{"unit": "iso4217:USD", "per_call": "1000.00"}] + EUR(per_call="500.00")))
+
     # 6. Call statements and binding (spec 5.14). From the review of the MCP extension proposal by Brennan Zambo
     # (modelcontextprotocol/agents-ig#31): a missing receipt must be distinguishable from "nothing was executed", a
     # genuine receipt must not be presentable for a different call, and arguments rewritten in transit must show.

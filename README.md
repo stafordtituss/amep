@@ -4,138 +4,230 @@
   <img alt="AMEP: Agentic Mandate Evidence Protocol. An agent's path lands inside the delegation, inside the mandate: preserved." src="docs/assets/banner-light.svg" width="100%">
 </picture>
 
-# AMEP™: Agentic Mandate Evidence Protocol
+<h1 align="center">AMEP™ · Agentic Mandate Evidence Protocol</h1>
 
-<p><a href="https://stafordtituss.github.io/amep/"><b>Project site</b></a> · <a href="https://stafordtituss.github.io/amep/verify/"><b>Verifier in your browser</b></a> · <a href="spec/amep-v0.2.md">Specification</a> · <a href="vectors/">Conformance vectors</a> · <a href="LIMITS.md">Limits</a></p>
+<p align="center"><b>Signed evidence that an AI agent stayed within the authority it was given,<br>and a verdict anyone can re-run.</b></p>
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24317758.svg)](https://doi.org/10.5281/zenodo.24317758) [![PyPI](https://img.shields.io/pypi/v/amep-protocol)](https://pypi.org/project/amep-protocol/) [![npm](https://img.shields.io/npm/v/@stafordtituss/amep)](https://www.npmjs.com/package/@stafordtituss/amep)
+<p align="center">
+  <a href="https://stafordtituss.github.io/amep/">Project site</a> ·
+  <a href="https://stafordtituss.github.io/amep/verify/">Verifier in your browser</a> ·
+  <a href="spec/amep-v0.2.md">Specification</a> ·
+  <a href="https://datatracker.ietf.org/doc/draft-stafordtituss-agentic-mandate-evidence/">IETF draft</a> ·
+  <a href="https://doi.org/10.20944/preprints202611.1865.v1">Paper</a>
+</p>
 
-**Status:** draft v0.3.0-draft.1 (packages 0.3.0a4) · **Independent implementation:** [zambo-amep-verify](https://github.com/zambodotdev/zambo-amep-verify), 228/228 single-packet core vectors · **Author and editor:** Staford Titus Selvaraj ([ORCID 0009-0004-8227-7595](https://orcid.org/0009-0004-8227-7595)) · **IETF:** [draft-stafordtituss-agentic-mandate-evidence](https://datatracker.ietf.org/doc/draft-stafordtituss-agentic-mandate-evidence/) · **Paper:** [Preprints.org, doi:10.20944/preprints202611.1865.v1](https://doi.org/10.20944/preprints202611.1865.v1)
+<p align="center">
+  <a href="https://doi.org/10.5281/zenodo.24317758"><img alt="DOI" src="https://zenodo.org/badge/DOI/10.5281/zenodo.24317758.svg"></a>
+  <a href="https://pypi.org/project/amep-protocol/"><img alt="PyPI" src="https://img.shields.io/pypi/v/amep-protocol"></a>
+  <a href="https://www.npmjs.com/package/@stafordtituss/amep"><img alt="npm" src="https://img.shields.io/npm/v/@stafordtituss/amep"></a>
+  <a href="LIMITS.md"><img alt="Limits published" src="https://img.shields.io/badge/limits-published-586474"></a>
+</p>
 
-AI agents act for people through chains of delegation, tools and adapters. Identity tells you *who* acted, and authorization tells you what a token *allowed*. Neither proves that **what actually happened stayed within what a person authorized**.
+---
 
-AMEP defines portable, signed evidence for that chain, from a person's mandate through delegations, interpretations and invocations to an **independently observed effect**. It also defines a deterministic outcome:
+**Contents:** [The question](#the-question) · [How it works](#how-it-works) · [Quick start](#quick-start) · [Checked in the open](#checked-in-the-open) · [In this repository](#in-this-repository) · [Standards and interop](#standards-and-interop) · [Limits](#limits) · [Help AMEP](#help-amep) · [Develop](#develop) · [Cite](#cite) · [License](#license-and-trademarks) · [Contact](#contact)
 
-- `preserved`: the effect stayed within authority;
-- `violated`: it went beyond, and the result names the broken invariant;
-- `unresolved`: evidence is missing, which is never treated as permission.
+---
 
-**Try it in your browser, with nothing to install:** the [browser verifier](https://stafordtituss.github.io/amep/verify/) runs the full conformance suite and checks any packet you paste in, offline, in the page. The [project site](https://stafordtituss.github.io/amep/) shows how it works.
+<a name="the-question"></a>
 
-## Install
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/h-question-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/h-question-light.svg">
+  <img alt="I. The question: did the agent stay inside?" src="docs/assets/readme/h-question-light.svg" width="100%">
+</picture>
 
-| Language | Package | Install |
+AI agents act for people through chains of delegation, tools and adapters. Identity tells you *who* acted, and authorization tells you what a token *allowed*. Neither shows that **what actually happened stayed within what a person authorized**.
+
+AMEP defines signed records for each link of that chain, from a person's mandate to an independently observed effect, and one deterministic answer:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/verdicts-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/verdicts-light.svg">
+  <img alt="Three verdicts. Preserved: everything stayed inside what was allowed. Violated: it crossed a boundary, and the result names the rule and the party. Unresolved: a record is missing, and a gap is never read as permission." src="docs/assets/readme/verdicts-light.svg" width="100%">
+</picture>
+
+Two verifiers given the same records and keys return the same verdict, byte for byte.
+
+<a name="how-it-works"></a>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/h-how-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/h-how-light.svg">
+  <img alt="II. How it works: one signed chain" src="docs/assets/readme/h-how-light.svg" width="100%">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/chain-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/chain-light.svg">
+  <img alt="The chain: mandate, delegation, invocation and effect, each signed by the party that made it, then a verdict any verifier can reach offline." src="docs/assets/readme/chain-light.svg" width="100%">
+</picture>
+
+<details>
+<summary><b>What each record says</b></summary>
+
+| Record | Says | Signed by |
+|---|---|---|
+| **Mandate** | Which actions, on which resources, up to which effect class, until when | The person or organization granting authority |
+| **Delegation** | The part handed on to an agent, never more than its parent (I1) | The delegator |
+| **Invocation** | The call the agent made, and the authority it cites | The agent's host |
+| **Effect receipt** | What was actually executed | The executing party. For high-impact effects, not the agent's host (I10) |
+| **Verdict record** | The outcome of every call, naming the packet by digest | Any verifier, as an in-toto attestation |
+
+</details>
+
+Eleven invariants decide the verdict. They are listed, with every rule, in the [specification](spec/amep-v0.2.md#8-invariants).
+
+<a name="quick-start"></a>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/h-start-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/h-start-light.svg">
+  <img alt="III. Quick start: check a packet" src="docs/assets/readme/h-start-light.svg" width="100%">
+</picture>
+
+**In your browser, nothing to install:** the [verifier](https://stafordtituss.github.io/amep/verify/) runs the full conformance suite and checks any packet you paste in, offline, in the page.
+
+**Install:**
+
+| Use | Package | Install |
 |---|---|---|
 | Python 3.10+ | `amep-protocol` | `pip install --pre amep-protocol` |
 | Node.js 20+ | `@stafordtituss/amep` | `npm install @stafordtituss/amep` |
-| Any MCP client | `amep-mcp` (MCP server) | `uvx amep-mcp` |
+| Any MCP client | `amep-mcp` | `uvx amep-mcp` |
 | OpenAI Agents SDK, LangGraph | `amep-agents` | `pip install --pre "amep-agents[openai-agents]"` or `[langgraph]` |
 
-Both include a verifier, a producer SDK (keys, signing, and builders for every AMEP object) and the `amep-protocol` command-line tool:
+**Check a packet:**
 
-```
+```bash
 amep-protocol verify packet.json --keys keys.json      # exit 0 preserved, 1 violated, 2 unresolved
 amep-protocol keygen --kid issuer-1 --roles issuer,approver --out issuer-1
 amep-protocol check-suite vectors/
 ```
 
-The MCP server exposes the verifier as tools (`verify_packet`, `explain_invariant`, `list_vectors`, `get_vector`, `check_suite`) so that agents and MCP clients can check evidence themselves; see `packages/mcp/README.md`.
+**Record an agent:** five runnable guides cover LangGraph, the OpenAI Agents SDK, saving and checking evidence, keeping the observer key away from the agent, and publishing a signed verdict. CI runs every one: [packages/agents/HOWTO.md](packages/agents/HOWTO.md).
 
-See `packages/python/README.md` and `packages/js/README.md`. Published at [amep-protocol on PyPI](https://pypi.org/project/amep-protocol/) and [@stafordtituss/amep on npm](https://www.npmjs.com/package/@stafordtituss/amep); releases are described in `PUBLISHING.md`.
+<a name="checked-in-the-open"></a>
 
-## What's here
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/h-open-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/h-open-light.svg">
+  <img alt="IV. Checked in the open: checked by others" src="docs/assets/readme/h-open-light.svg" width="100%">
+</picture>
 
-| Path | Contents |
-|---|---|
-| `spec/amep-v0.2.md` | The core specification |
-| `spec/bindings/` | AuthZEN, MCP and agent-host bindings |
-| `spec/profiles/` | Biscuit, Macaroon, PASETO, UCAN and Verifiable Credential profiles |
-| `schemas/` | JSON Schemas (one per object) and CDDL |
-| `vectors/` | The conformance suite: positive and must-reject packets (also on Hugging Face: [stafordtituss/amep-conformance](https://huggingface.co/datasets/stafordtituss/amep-conformance)) |
-| `packages/python/` | The `amep-protocol` Python package: verifier, SDK, CLI |
-| `packages/js/` | The `@stafordtituss/amep` npm package: the same, in JavaScript (written separately from the Python package, by the same author) |
-| `packages/mcp/` | The `amep-mcp` MCP server: the verifier and both conformance suites as MCP tools |
-| `packages/agents/` | The `amep-agents` package: evidence for every tool call in OpenAI Agents SDK and LangGraph/LangChain agents |
-| `verifier/python/` | Conformance-vector generator (uses the Python package) |
-| `verifier/typescript/` | Repository CLI for the JavaScript verifier |
-| `verifier/browser/` | The JavaScript verifier as an offline web page |
-| `packages/conformance/` | `amep-conformance`: runs the suites against any verifier, and imports other receipt formats (AER-1, OpenID action receipts, Provared books) with a gap report |
-| `interop/` | Mappings and runs against other work. [`interop/COVERAGE.md`](interop/COVERAGE.md) shows which parts of AMEP's question each receipt format can settle |
-| `tools/` | Schema builder and validators, Appendix B generator, attribution check |
+| Who | What | Record |
+|---|---|---|
+| **Brennan Zambo** | An independent verifier, [zambo-amep-verify](https://github.com/zambodotdev/zambo-amep-verify), written from the specification and vectors alone. Agrees on all 228 single-packet core vectors. | [#19](https://github.com/stafordtituss/amep/issues/19) |
+| **Takao Sato, VATE** | AMEP's evaluation of VATE's recovery cases, pinned to both projects and re-run by VATE's maintainer | [VATE `reference/amep/`](https://github.com/Poke-nushi/Verifiable-Agent-Trust-Envelope/tree/main/reference/amep) |
+| **Agent Payments Protocol** | AMEP, AER-1 and APAF-1 run over the same pinned AP2 payments, joined row by row | [AP2 #402](https://github.com/google-agentic-commerce/AP2/issues/402) |
+| **Reviewers** | Reviews that found real bugs, from the IETF audit list, the OpenID AIIM list, Zealynx Security and others | [REVIEWS.md](REVIEWS.md) · [CONTRIBUTORS.md](CONTRIBUTORS.md) · [vectors/CREDITS.md](vectors/CREDITS.md) |
+| **A model of the hold rules** | Every reachable state at three calls, checked against the verifier | [`formal/`](formal/) |
 
-## Check everything
+<a name="standards-and-interop"></a>
 
-```
-python3 -I verifier/python/amep_verifier.py
-python3 -I verifier/python/amep_verifier.py --check vectors
-node verifier/typescript/amep_verifier.mjs vectors
-node verifier/browser/build.mjs && node verifier/browser/test_page.mjs
-python3 tools/validate_schemas.py           # uses the jsonschema library too, if installed
-python3 -I tools/validate_cddl.py          # needs the cddl tool: gem install cddl
-python3 -I tools/vector_index.py --check
-python3 -I tools/attribution_check.py
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/h-standards-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/h-standards-light.svg">
+  <img alt="V. Standards: where AMEP fits" src="docs/assets/readme/h-standards-light.svg" width="100%">
+</picture>
 
-GitHub Actions runs all of these on every push and pull request (`.github/workflows/conformance.yml`), and also fails if the committed vectors, schemas or browser page differ from what the generators produce.
+AMEP isn't an identity provider, a policy engine or a prompt-injection detector. It checks, afterwards, what those systems decided and what then happened, and composes with them:
 
-The IETF Internet-Draft is in `ietf/`: Markdown source, with XML, text and HTML rendered by kramdown-rfc and xml2rfc.
+| With | How | Notes |
+|---|---|---|
+| **IETF WIMSE** (agent identity) | Evidence for the Agent Compliance component of draft-ietf-wimse-aims | [interop/ietf/WIMSE-AIMS.md](interop/ietf/WIMSE-AIMS.md) |
+| **IETF SCITT** (RFC 9943) | Verdicts as signed statements, beside action receipts | [interop/ietf/SCITT.md](interop/ietf/SCITT.md) |
+| **in-toto** | Signed verdicts as an attestation predicate; completeness from Observed Effect records | [PREDICATE.md](interop/in-toto/PREDICATE.md) · [OBSERVED-EFFECT.md](interop/in-toto/OBSERVED-EFFECT.md) |
+| **Agent Payments Protocol and x402** | Mandates, checkout binding, settlement as observed effect | [interop/ap2/](interop/ap2/) · [interop/x402/](interop/x402/NOTES.md) |
+| **OpenID AuthZEN, MCP** | Decisions and tool calls as evidence | [`spec/bindings/`](spec/bindings/) |
+| **OpenTelemetry GenAI** | Joining traces to evidence by id and digest | [interop/otel-genai/](interop/otel-genai/MAPPING.md) |
+| **EU AI Act Article 12** | Signed, re-checkable event records for auditors | [interop/eu-ai-act/](interop/eu-ai-act/ARTICLE-12.md) |
 
-## What AMEP is not
-
-Not an identity provider, a policy engine or a prompt-injection detector. AMEP binds to OAuth and OpenID AuthZEN for decisions, SCITT for transparency, MCP and A2A for carriage, and OpenTelemetry for tracing.
-
-What AMEP can't show, each limit pinned by a vector or test: [LIMITS.md](LIMITS.md).
-
-## Related work
+<details>
+<summary><b>Related work</b></summary>
 
 AMEP evaluates evidence *after* authority has been granted and exercised. Related work, mostly on granting and checking authority *before* an action:
 
 - **Delegation Receipt Protocol** ([draft-nelson-agent-delegation-receipts](https://datatracker.ietf.org/doc/draft-nelson-agent-delegation-receipts/), R. Nelson). A user-signed Authorization Object, anchored before the agent runs and checked before execution. A DRP receipt is a natural mandate input for AMEP.
 - **Authenticated Delegation and Authorized AI Agents** ([arXiv:2501.09674](https://arxiv.org/abs/2501.09674), South et al., 2025). Scoped, verifiable delegation credentials for agents, extending OpenID Connect and OAuth 2.0.
 - **Infrastructure for AI Agents** ([arXiv:2501.10114](https://arxiv.org/abs/2501.10114), Chan et al., TMLR 2025) and **IDs for AI Systems** ([arXiv:2406.12137](https://arxiv.org/abs/2406.12137), Chan et al., 2024). Attribution and response infrastructure; AMEP's evidence is one form of it.
-- **DIF Threat Model for Delegated Authority in AI-Mediated Systems** ([identity.foundation](https://identity.foundation/delegated-authority-threat-model/)) and **DIF Delegated Authority Evaluations** ([identity.foundation](https://identity.foundation/delegated-authority-evaluations/)), Trusted AI Agents Working Group. The threat model argues that delegated authority fails at the moment of action; the evaluations compare OAuth, UCAN, zCaps, KYA-OS, AuthZEN and others.
-- **NIST NCCoE, Accelerating the Adoption of Software and AI Agent Identity and Authorization** ([concept paper, 2026](https://www.nccoe.nist.gov/projects/software-and-ai-agent-identity-and-authorization)). Identification, authorization, auditing and non-repudiation for agents using existing standards.
+- **DIF Threat Model for Delegated Authority in AI-Mediated Systems** ([identity.foundation](https://identity.foundation/delegated-authority-threat-model/)) and **DIF Delegated Authority Evaluations** ([identity.foundation](https://identity.foundation/delegated-authority-evaluations/)), Trusted AI Agents Working Group.
+- **NIST NCCoE, Software and AI Agent Identity and Authorization** ([concept paper, 2026](https://www.nccoe.nist.gov/projects/software-and-ai-agent-identity-and-authorization)).
 - **GNAP** ([RFC 9635](https://www.rfc-editor.org/rfc/rfc9635)). Delegated authorization negotiation across multiple parties.
-- **AgentDojo** ([arXiv:2406.13352](https://arxiv.org/abs/2406.13352)) and **CaMeL** ([arXiv:2503.18813](https://arxiv.org/abs/2503.18813)), Debenedetti, Tramèr et al. Prompt-injection evaluation and data-flow-based defenses for agents. A successful injection is an effect outside the user's mandate, which AMEP reports as `violated`.
+- **AgentDojo** ([arXiv:2406.13352](https://arxiv.org/abs/2406.13352)) and **CaMeL** ([arXiv:2503.18813](https://arxiv.org/abs/2503.18813)), Debenedetti, Tramèr et al. A successful prompt injection is an effect outside the user's mandate, which AMEP reports as `violated`.
 
-## Licenses, attribution and trademarks
+</details>
 
-- Specification text: Community Specification License 1.0 (`LICENSE-SPEC.md`), with `Scope.md` and `Notices.md`. Derivative works must credit the AMEP project and its original author, Staford Titus Selvaraj. (The license calls the project its "Working Group"; AMEP is an open-source project, not a standards-body working group.)
-- Code, schemas and vectors: Apache License 2.0 (`LICENSE-CODE`). Redistributions must keep `NOTICE`.
-- "AMEP" and "AMEP Conformant" are trademarks of Staford Titus Selvaraj; see `TRADEMARKS.md`. Forks are welcome under a different name.
-- To cite AMEP, see `CITATION.cff`.
+<a name="help-amep"></a>
 
-## Review AMEP
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/h-help-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/h-help-light.svg">
+  <img alt="VI. Help AMEP: scrutiny wanted" src="docs/assets/readme/h-help-light.svg" width="100%">
+</picture>
 
 AMEP needs outside scrutiny more than anything else.
 
-**Five minutes:** open the [browser verifier](https://stafordtituss.github.io/amep/verify/) and run the suite; star the repository if it's useful to you; or open an issue with a case you think AMEP gets wrong. Every case that turns out to be right becomes a vector with your name on it.
+**Five minutes:** run the suite in the [browser verifier](https://stafordtituss.github.io/amep/verify/), star the repository if it's useful, or [open an issue](https://github.com/stafordtituss/amep/issues/new/choose) with a case you think AMEP gets wrong. Every case that turns out to be right becomes a vector with your name on it.
 
 **Longer, and worth the most:**
+1. **Run it against your own system,** publish the results (failures included), and open an [implementation report](https://github.com/stafordtituss/amep/issues/new?template=implementation-report.yml).
+2. **Write a port.** A Go or Rust verifier written from the specification and vectors alone would be a further independent implementation. It will be listed and credited ([#18](https://github.com/stafordtituss/amep/issues/18)).
+3. **Review it in public:** an [independent technical review](https://github.com/stafordtituss/amep/issues/new?template=independent-review.yml), or a comment on an IETF, W3C, DIF or OpenID Foundation list.
+4. **Cite it where relevant:** if your draft, paper or specification overlaps, an informative reference or a note on where the approaches differ is welcome.
 
-1. **Run it against your own system.** Run the vectors against your implementation or system, publish the results (failures included) in your own repository, and open an [implementation report](https://github.com/stafordtituss/amep/issues/new?template=implementation-report.yml).
-2. **Cite it where relevant.** If your Internet-Draft, paper or specification overlaps with AMEP, an informative reference, or a note on where the approaches differ, is welcome.
-3. **Review it in public.** Open an [independent technical review](https://github.com/stafordtituss/amep/issues/new?template=independent-review.yml), or comment on an IETF, W3C, DIF or OpenID Foundation list and link the message.
+Every review, implementation and citation is logged as written, critical ones included, in [REVIEWS.md](REVIEWS.md).
 
-Every review, implementation and citation by others is logged, as written and including critical ones, in [`REVIEWS.md`](REVIEWS.md). Everyone whose work changed AMEP is credited in [`CONTRIBUTORS.md`](CONTRIBUTORS.md).
+---
 
-**Ports wanted:** a Go or Rust verifier written from the specification and vectors alone would be a third independent implementation. Open an [implementation report](https://github.com/stafordtituss/amep/issues/new?template=implementation-report.yml) when it passes, and it will be listed and credited.
+<p align="center"><sub>REFERENCE</sub></p>
 
-**Independent implementations:** [zambo-amep-verify](https://github.com/zambodotdev/zambo-amep-verify) by Brennan Zambo, written from the specification and vectors alone, agrees with all 228 single-packet core vectors ([#19](https://github.com/stafordtituss/amep/issues/19)). More are welcome: see [#18](https://github.com/stafordtituss/amep/issues/18).
+## Limits
 
-## Contributing
+What AMEP can't show is written down, and each limit is pinned by a vector or a test: **[LIMITS.md](LIMITS.md)**. The main ones:
+- **A signer that lies consistently can't be caught;** contradictions between signed records can.
+- **An effect nobody recorded can't be seen,** except where an observer below the agent covers it (Observed Effect).
+- **Verifiers say what the evidence shows,** not whether the authority itself was wise.
 
-Questions, vectors, implementations in other languages and research results are all welcome; see [`CONTRIBUTING.md`](CONTRIBUTING.md). Open problems suitable for papers and theses are in [`RESEARCH.md`](RESEARCH.md), and changes are listed in [`CHANGELOG.md`](CHANGELOG.md).
+## In this repository
 
-Open an issue, then an `AMEP-Proposal-N` document. Every normative change needs at least one positive and one must-reject vector.
+| Path | Contents |
+|---|---|
+| [`spec/`](spec/) | The core specification, bindings (AuthZEN, MCP, agent hosts) and profiles (Biscuit, Macaroon, PASETO, UCAN, Verifiable Credentials) |
+| [`vectors/`](vectors/) | The conformance suite: positive and must-reject packets. Also on Hugging Face: [stafordtituss/amep-conformance](https://huggingface.co/datasets/stafordtituss/amep-conformance) |
+| [`schemas/`](schemas/) | JSON Schemas, one per object, and CDDL |
+| [`packages/python/`](packages/python/) · [`packages/js/`](packages/js/) | The two reference verifiers, with SDK and command-line tool (written separately, by the same author) |
+| [`packages/mcp/`](packages/mcp/) | The verifier and suites as MCP tools |
+| [`packages/agents/`](packages/agents/) | Evidence for every tool call in OpenAI Agents SDK and LangGraph agents |
+| [`packages/conformance/`](packages/conformance/) | Runs the suites against any verifier, and imports other formats (AER-1, OpenID action receipts, Provared, Observed Effect) with a gap report |
+| [`verifier/browser/`](verifier/browser/) | The offline browser verifier |
+| [`interop/`](interop/) | Mappings and runs against other work. [COVERAGE.md](interop/COVERAGE.md) shows which parts of AMEP's question each format can settle |
+| [`proposals/`](proposals/) | Proposed changes: evaluation records, accountable owners, selective disclosure |
+| [`ietf/`](ietf/) | The Internet-Draft, in Markdown with rendered XML, text and HTML |
+| [`formal/`](formal/) | A TLA+ model of the hold and single-use rules, with an explorer that checks it against the verifier |
 
-**Implementations.** Python (`amep-protocol`), JavaScript (`@stafordtituss/amep`) and the browser verifier, all by the specification's author. **Run by others:** Brennan Zambo ran the conformance import over 12 live AER-1 receipts from the Zambo MCP server, and published the results ([amep#11](https://github.com/stafordtituss/amep/issues/11)). Implementations by others are especially welcome; open an [implementation report](https://github.com/stafordtituss/amep/issues/new?template=implementation-report.yml) and yours will be listed here and in [`REVIEWS.md`](REVIEWS.md).
+## Develop
 
-## Citation
+```bash
+python3 -I verifier/python/amep_verifier.py                 # regenerate the vectors and check them
+python3 -I verifier/python/amep_verifier.py --check vectors # check the vectors as committed
+node verifier/typescript/amep_verifier.mjs vectors          # the JavaScript verifier on the same vectors
+node verifier/browser/build.mjs && node verifier/browser/test_page.mjs
+python3 tools/validate_schemas.py
+python3 -I tools/validate_cddl.py                           # needs: gem install cddl
+python3 -I tools/vector_index.py --check
+```
 
-If you use AMEP, its conformance suite or its results in your work, please cite it. GitHub's **Cite this repository** button (from [`CITATION.cff`](CITATION.cff)) gives the same entries.
+CI runs all of these on every push and pull request, and fails if the committed vectors, schemas or browser page differ from what the generators produce.
 
-The specification, conformance suite and verifiers (Zenodo; this DOI always resolves to the latest version):
+**Changing the specification:** open an issue, then an `AMEP-Proposal-N` document in [`proposals/`](proposals/). Every normative change needs at least one positive and one must-reject vector. See [CONTRIBUTING.md](CONTRIBUTING.md), [RESEARCH.md](RESEARCH.md) for open problems, and [CHANGELOG.md](CHANGELOG.md).
+
+## Cite
+
+The Zenodo DOI always resolves to the latest version. GitHub's **Cite this repository** button, from [CITATION.cff](CITATION.cff), gives the same entries.
+
+<details>
+<summary><b>BibTeX</b></summary>
 
 ```bibtex
 @software{selvaraj2026amep,
@@ -146,11 +238,7 @@ The specification, conformance suite and verifiers (Zenodo; this DOI always reso
   doi       = {10.5281/zenodo.24317758},
   url       = {https://github.com/stafordtituss/amep}
 }
-```
 
-The IETF Internet-Draft:
-
-```bibtex
 @techreport{selvaraj2026amepdraft,
   author      = {Selvaraj, Staford Titus},
   title       = {Continuity Evaluation of Agent Delegation Records},
@@ -161,11 +249,7 @@ The IETF Internet-Draft:
   month       = nov,
   url         = {https://datatracker.ietf.org/doc/draft-stafordtituss-agentic-mandate-evidence/}
 }
-```
 
-The paper (preprint):
-
-```bibtex
 @misc{selvaraj2026ameppaper,
   author = {Selvaraj, Staford Titus},
   title  = {{AMEP}: Verifiable Evidence That Agent Actions Stayed Within Delegated Authority},
@@ -175,10 +259,17 @@ The paper (preprint):
 }
 ```
 
+</details>
+
+## License and trademarks
+
+- **Specification text:** Community Specification License 1.0 ([LICENSE-SPEC.md](LICENSE-SPEC.md)), with [Scope.md](Scope.md) and [Notices.md](Notices.md). Derivative works must credit the AMEP project and its original author. The license calls the project its "Working Group"; AMEP is an open-source project, not a standards-body working group.
+- **Code, schemas and vectors:** Apache License 2.0 ([LICENSE-CODE](LICENSE-CODE)). Redistributions must keep [NOTICE](NOTICE).
+- **Trademarks:** "AMEP" and "AMEP Conformant" are trademarks of Staford Titus Selvaraj ([TRADEMARKS.md](TRADEMARKS.md)). Forks are welcome under a different name.
+
 ## Contact
 
 - **Questions, bugs and proposals:** [open an issue](https://github.com/stafordtituss/amep/issues/new/choose). Public discussion helps everyone who reads the repository later.
-- **Reviews and implementation reports:** use the [review](https://github.com/stafordtituss/amep/issues/new?template=independent-review.yml) and [implementation report](https://github.com/stafordtituss/amep/issues/new?template=implementation-report.yml) forms.
-- **Standards discussion:** the IETF agent2agent and audit lists, and the W3C Agent Identity Community Group.
-- **Security issues in the verifiers:** open a [private security advisory](https://github.com/stafordtituss/amep/security/advisories/new) rather than a public issue.
-- **Collaboration:** Staford Titus Selvaraj, Charlemagne Labs · [ORCID 0009-0004-8227-7595](https://orcid.org/0009-0004-8227-7595)
+- **Reviews and implementation reports:** the [review](https://github.com/stafordtituss/amep/issues/new?template=independent-review.yml) and [implementation report](https://github.com/stafordtituss/amep/issues/new?template=implementation-report.yml) forms.
+- **Security issues in the verifiers:** a [private security advisory](https://github.com/stafordtituss/amep/security/advisories/new), not a public issue.
+- **Author and editor:** Staford Titus Selvaraj · [ORCID 0009-0004-8227-7595](https://orcid.org/0009-0004-8227-7595)
