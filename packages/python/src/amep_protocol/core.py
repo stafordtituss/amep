@@ -211,7 +211,7 @@ def malformed_reason(v, path: str = "$", depth: int = 0):
                 return f"{bad} in a member name at {path}"
             if k in _IDENT_FIELDS and (p := _ident_problem(x)):
                 return f"identifier with {p} at {path}.{k}"
-            if k in ("actions", "resources", "deny_actions", "deny_resources") and isinstance(x, list):
+            if k in ("actions", "resources", "deny_actions", "deny_resources", "audiences") and isinstance(x, list):
                 if (p := next((q for q in map(_ident_problem, x) if q), None)):
                     return f"identifier pattern with {p} at {path}.{k}"
             r = malformed_reason(x, f"{path}.{k}", depth + 1)
@@ -384,6 +384,9 @@ def narrower(child: dict, parent: dict, v03: bool = False) -> tuple[bool, str]:
     for key in ("deny_actions", "deny_resources"):
         if not all(subsumed([p], child.get(key, [])) for p in parent.get(key, [])):
             return False, f"{key} removed"
+    # spec 5.3 (v0.3.2): audiences only narrow. A parent that names audiences binds every child to a subset of them.
+    if "audiences" in parent and not ("audiences" in child and subsumed(child["audiences"], parent["audiences"])):
+        return False, "audiences widened"
     if "budget" in parent and child.get("budget", parent["budget"]) > parent["budget"]: return False, "risk budget widened"
     # spec 7.2: absent depth on the parent = unbounded; depth 0 = no further delegation;
     # otherwise the child MUST carry a strictly smaller depth
@@ -409,6 +412,9 @@ def meet(a: dict, b: dict, v03: bool = False) -> dict:
     nbfs = [to_time(c["nbf"]) for c in (a, b) if "nbf" in c]
     if nbfs: m["nbf"] = max(nbfs)
     if "purpose" in a or "purpose" in b: m["purpose"] = a.get("purpose", b.get("purpose"))
+    if "audiences" in a or "audiences" in b:          # audiences intersect (v0.3.2)
+        m["audiences"] = ([x for x in a["audiences"] if subsumed([x], b["audiences"])] if "audiences" in a and "audiences" in b
+                          else a.get("audiences", b.get("audiences")))
     for key in ("deny_actions", "deny_resources"):   # denies are unioned: no hop or intent can lift one
         if key in a or key in b: m[key] = sorted(set(a.get(key, [])) | set(b.get(key, [])))
     return m
@@ -423,6 +429,10 @@ def effect_ok(x: dict, c: dict, v03: bool = False) -> tuple[bool, str]:
     if not any(any(pat_match(x["resource"], p) for p in g["resources"]) for g in act): return False, "resource outside claims"
     if any(pat_match(x["resource"], p) for p in c.get("deny_resources", [])): return False, "resource denied"
     if CEILING.index(x["effect"]) > CEILING.index(c["ceiling"]): return False, "effect above ceiling"
+    # spec 5.3 (v0.3.2), from stafordtituss/amep#16: an effect sent to a service the principal never named is outside
+    # authority, even when its action and resource are in scope (a presentation replayed to another audience)
+    if "audiences" in c and isinstance(x.get("audience"), str) and not any(pat_match(x["audience"], p) for p in c["audiences"]):
+        return False, "audience outside claims"
     for d in x.get("released", []):
         if d not in c.get("data", []): return False, f"released {d} not allowed"
     if to_time(x["t"]) > to_time(c["exp"]): return False, "after validity"
@@ -445,7 +455,7 @@ UNIT = re.compile(r"^[a-z][a-z0-9-]{0,31}:[!-~]{1,128}$")
 _SCALE = 10 ** 18
 MONEY_UNITS = ("iso4217:", "caip19:")
 CLAIM_MEMBERS = {"actions", "resources", "grants", "data", "ceiling", "exp", "nbf", "purpose", "deny_actions", "deny_resources",
-                 "depth", "budget", "limits"}
+                 "depth", "budget", "limits", "audiences"}
 LIMIT_MEMBERS = {"unit", "per_effect", "per_call", "per_period", "period", "actions", "counted_by"}
 INTEGER_AMOUNT = re.compile(r"^(0|[1-9][0-9]{0,38})$")
 PERIOD_KEY = re.compile(r"^[1-9][0-9]{0,15}$")
@@ -943,6 +953,8 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         for n in chain + ([intent] if intent else []):
             _check("grants" in n["claims"], "unresolved", "I7", f"{n['id']}: grants require amep_version 0.3",
                    need="well_formed_evidence", ref=n['id'])
+            _check("audiences" in n["claims"], "unresolved", "I7", f"{n['id']}: audiences require amep_version 0.3",
+                   need="well_formed_evidence", ref=n['id'])
     if ctx["v03"] and "reserve" in inv:
         try:
             check_reserve(inv["reserve"])
@@ -960,6 +972,10 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
                           for e in g))
                 _check(not ok, "unresolved", "I7", f"{n['id']}: grants must be a non-empty list of {{actions, resources}}, without actions or resources beside it",
                        need="well_formed_evidence", ref=n['id'])
+            if "audiences" in n["claims"]:
+                au = n["claims"]["audiences"]
+                _check(not (isinstance(au, list) and au and all(isinstance(p, str) and p for p in au)), "unresolved", "I7",
+                       f"{n['id']}: audiences must be a non-empty list of audience patterns", need="well_formed_evidence", ref=n['id'])
             for lim in n["claims"].get("limits", []):
                 unknown = sorted(k for k in lim if k not in LIMIT_MEMBERS and not is_extension_member(k))
                 _check(bool(unknown), "unresolved", "I7", f"{n['id']}: limit member not understood ({', '.join(unknown)})", need="verifier_support", ref=n['id'])
@@ -1106,6 +1122,9 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         _check(is_guardrail(x["resource"], extra_protected), "violated", "I9", "executed effect targets guardrail/evidence store", blame="agent")
         ok, why = effect_ok(x, eff_claims, ctx["v03"])
         _check(not ok, "violated", "I5" if why.startswith("released") else "I2", why, blame="agent")
+        # spec 5.3 (v0.3.2): where the claims name audiences, the receipt must say where the effect was sent
+        _check("audiences" in eff_claims and not (isinstance(x.get("audience"), str) and x["audience"]), "unresolved", "I7",
+               f"receipt {e.get('id', '?')} does not record the audience the claims are bound to", need="audience", ref=e.get('id', '?'))
         # spec 5.9.1: data classes carried in through lineage (or read by this effect) reach the recipient too
         if "recipient" in x:
             inherited = set(x.get("accessed", []))

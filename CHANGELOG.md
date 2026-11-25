@@ -2,6 +2,17 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+## Audience binding (proposal, unreleased, 2026-11-25)
+
+- **The gap, stafordtituss/amep#16 (found with delegation-control-bench, scenario VC-03):** the core claims had no audience. A presentation bound to one service, replayed to another with an action and resource in scope, was `preserved`.
+- **Now (spec 5.3):** claims may carry `audiences`, a list of patterns, and a receipt's executed body may carry `audience`.
+  - An effect sent to an audience the claims don't name is `violated` (I2).
+  - Where the claims name audiences, a receipt without `audience` is `unresolved` (I7), gap `audience`.
+  - A delegation can only narrow its parent's audiences (I1), and along a chain they intersect.
+  - `audiences` is an AMEP 0.3 member: in an unversioned packet it is malformed (`unresolved`, I7), as for `grants`.
+- **Suite v0.3.2:** 5 more core vectors (1 positive, 4 must-reject). The core suite now has 261 vectors (69 positive, 192 must-reject), 297 across the three suites. No existing vector changes.
+- **Schemas:** `audiences` in claims, `audience` in the executed body, in the JSON Schemas and the CDDL.
+
 
 
 ## Admissions: the actor's own record can show a violation (proposal, unreleased, 2026-11-25)
@@ -11,6 +22,7 @@ Specification drafts, conformance-suite versions and package versions are listed
   - Where it shows the actor executing what it declared, outside its authority, the result is `violated`, charged to the actor, with "on the actor's own record; not independently observed" in the reason.
   - It never convicts another party: a self-record in which the executed effect differs from the declared one, which would charge the server, stays `unresolved`. So does every self-report of an in-scope action.
 - **The vectors:** four new ones, two `violated` and two `unresolved`. No existing vector changes.
+
 ## Operation identity: a retry can't take effect unnoticed (proposal, unreleased, 2026-11-25)
 
 - **The gap, from Andrii's review (Radiolaria) on the OpenID AIIM list:** an attempt whose outcome is unknown, retried under a fresh authorization, started clean. If both attempts took effect, the operation ran twice and no rule was broken. AAuth Budgets has the same gap across auth tokens.
