@@ -18,7 +18,7 @@ How far do the answers agree, and where they differ, why?
 
 ## 2. Fixtures and pins
 - **Family 1:** AP2's Python SDK at `e1ea56d`; 22 payment rows (`sdk-bundles.json` `7e1dd6d9…`, `bundles.json` `bd530228…`).
-- **Family 2:** the same SDK with checkouts and `payment.reference`; 33 rows (pin `70626262…`).
+- **Family 2:** the same SDK with checkouts and `payment.reference`; 11 payment rows (`sdk-bundles-v2.json`: 10 bundles, one with two payments; pin `70626262…`). The APAF-1 column's 33 rows are its total across all three families it covers (correction from nmatt1).
 - **Each column, pinned:**
   - AMEP: `verdicts.json` `93aa9005…` and `verdicts-checkout.json`;
   - AER-1: aer1-kit join table at `a923247`;
