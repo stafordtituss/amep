@@ -3,7 +3,7 @@
 // paste a packet. Run from the repo root: node verifier/browser/build.mjs
 // Optional arguments build the same page over another vector set (a folder with keys.json, positive/, must-reject/):
 //   node verifier/browser/build.mjs <vectors dir> <output .html> "<page title>"
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,30 +28,45 @@ const html = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${htmlEsc(title)}</title>
 <style>
-:root { --bg:#f7f8fa; --panel:#ffffff; --text:#1b1f24; --muted:#5b6470; --line:#dde1e6; --accent:#2457c5;
-  --ok:#1a7f45; --ok-bg:#e6f4ec; --bad:#b42318; --bad-bg:#fdecea; --warn:#9a6700; --warn-bg:#fff4d6; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0f1216; --panel:#171b21; --text:#e6e9ee;
-  --muted:#9aa4b0; --line:#2a3039; --accent:#7aa2ff; --ok:#56d08a; --ok-bg:#12291d; --bad:#ff8a80; --bad-bg:#2e1513; --warn:#f2c14e; --warn-bg:#2b2310; } }
-:root[data-theme="dark"] { --bg:#0f1216; --panel:#171b21; --text:#e6e9ee; --muted:#9aa4b0; --line:#2a3039; --accent:#7aa2ff;
-  --ok:#56d08a; --ok-bg:#12291d; --bad:#ff8a80; --bad-bg:#2e1513; --warn:#f2c14e; --warn-bg:#2b2310; }
+/* The site's design language (docs/index.html): ink ground, condensed display, mono for anything checkable.
+   No web fonts or other outside requests, so the page stays fully offline. */
+:root { --bg:#0a0e13; --panel:#111821; --panel-2:#17212d; --text:#ece8df; --muted:#8c99a8; --line:#243140; --accent:#8fc3ff; --warm:#e08a3c;
+  --ok:#67d39b; --ok-bg:rgba(103,211,155,.12); --bad:#ff6b57; --bad-bg:rgba(255,107,87,.12); --warn:#f2c14e; --warn-bg:rgba(242,193,78,.12);
+  --display:"Big Shoulders Display","Avenir Next Condensed","Arial Narrow","Roboto Condensed",sans-serif;
+  --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace; color-scheme:dark; }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --bg:#f4f1ea; --panel:#fbfaf6; --panel-2:#ffffff; --text:#121a26; --muted:#586474;
+  --line:#d6d0c2; --accent:#1f5fa6; --warm:#b65f14; --ok:#1d8350; --ok-bg:#e3f2e9; --bad:#c4321e; --bad-bg:#fbe7e3; --warn:#9a6a00; --warn-bg:#fbf0d4; color-scheme:light; } }
+:root[data-theme="light"] { --bg:#f4f1ea; --panel:#fbfaf6; --panel-2:#ffffff; --text:#121a26; --muted:#586474; --line:#d6d0c2; --accent:#1f5fa6; --warm:#b65f14;
+  --ok:#1d8350; --ok-bg:#e3f2e9; --bad:#c4321e; --bad-bg:#fbe7e3; --warn:#9a6a00; --warn-bg:#fbf0d4; color-scheme:light; }
 * { box-sizing:border-box; }
-body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
-main { max-width:960px; margin:0 auto; padding:32px 16px 64px; }
-h1 { font-size:24px; margin:0 0 4px; } h2 { font-size:17px; margin:0 0 12px; }
-p.lead { color:var(--muted); margin:0 0 24px; }
-section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:20px; }
-button { font:inherit; background:var(--accent); color:#fff; border:0; border-radius:7px; padding:8px 14px; cursor:pointer; }
-button:focus-visible, textarea:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-textarea { width:100%; min-height:160px; font:12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; background:var(--bg);
-  color:var(--text); border:1px solid var(--line); border-radius:7px; padding:10px; resize:vertical; }
-label { display:block; font-weight:600; margin:12px 0 6px; }
-.summary { margin:12px 0; font-weight:600; }
+body { margin:0; background:var(--bg); color:var(--text); font:15px/1.55 var(--body); }
+a { color:inherit; }
+header.site { border-bottom:1px solid var(--line); }
+header.site div { max-width:1040px; margin:0 auto; display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;
+  padding:14px max(16px, env(safe-area-inset-right, 0px)) 14px max(16px, env(safe-area-inset-left, 0px)); }
+header.site a.mark { text-decoration:none; font:900 22px/1 var(--display); letter-spacing:.06em; }
+header.site nav { display:flex; gap:18px; flex-wrap:wrap; font-size:14px; }
+header.site nav a { color:var(--muted); text-decoration:none; } header.site nav a:hover { color:var(--text); }
+main { max-width:1040px; margin:0 auto; padding:40px max(16px, env(safe-area-inset-right, 0px)) 72px max(16px, env(safe-area-inset-left, 0px)); }
+.kicker { font:500 11.5px/1 var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--muted); margin:0 0 10px; }
+h1 { font:900 clamp(40px, 7vw, 76px)/.9 var(--display); text-transform:uppercase; margin:0 0 14px; letter-spacing:-.005em; }
+h1 span { color:var(--accent); }
+h2 { font:800 26px/1 var(--display); text-transform:uppercase; letter-spacing:.02em; margin:0 0 8px; }
+p.lead { color:var(--muted); margin:0 0 32px; max-width:40em; font-size:16px; }
+section { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:24px; margin-bottom:20px; }
+button { font:700 17px/1 var(--display); text-transform:uppercase; letter-spacing:.05em; background:var(--accent); color:var(--bg); border:0; border-radius:3px; padding:12px 16px; cursor:pointer; }
+button.ghost { background:transparent; color:var(--accent); border:1px solid var(--line); }
+button:focus-visible, textarea:focus-visible, a:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+textarea { width:100%; min-height:170px; font:12.5px/1.5 var(--mono); background:var(--panel-2); color:var(--text); border:1px solid var(--line); border-radius:4px; padding:12px; resize:vertical; }
+label { display:block; font:500 11.5px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin:18px 0 8px; }
+.summary { margin:14px 0; font:600 14px/1.4 var(--mono); }
 .table-wrap { overflow-x:auto; }
-table { width:100%; border-collapse:collapse; font-size:13.5px; }
-th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
-th { color:var(--muted); font-weight:600; }
-code { font:12.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
-.pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12.5px; font-weight:600; white-space:nowrap; }
+table { width:100%; border-collapse:collapse; font:12.5px/1.45 var(--mono); font-variant-numeric:tabular-nums; }
+th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+th { color:var(--muted); font-weight:500; text-transform:uppercase; letter-spacing:.1em; font-size:10.5px; }
+code { font:12.5px var(--mono); }
+.pill { display:inline-block; padding:2px 8px; border-radius:3px; font:700 11px/1.5 var(--mono); text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; }
 .preserved { color:var(--ok); background:var(--ok-bg); } .violated { color:var(--bad); background:var(--bad-bg); }
 .unresolved { color:var(--warn); background:var(--warn-bg); }
 .note { color:var(--muted); font-size:13px; }
@@ -59,8 +74,13 @@ code { font:12.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
 </style>
 </head>
 <body>
+<header class="site"><div>
+<a class="mark" href="../">AMEP</a>
+<nav aria-label="Main"><a href="../#mandate">Mandate</a><a href="../#evidence">Evidence</a><a href="../#verdict">Verdict</a><a href="https://github.com/stafordtituss/amep">GitHub</a></nav>
+</div></header>
 <main>
-<h1>${htmlEsc(title)}</h1>
+<p class="kicker">Verifier · runs in this page</p>
+<h1>Check the <span>evidence.</span></h1>
 <p class="lead">Checks AMEP v0.2 evidence packets entirely in this page. Nothing is uploaded. Signatures are verified with your browser's WebCrypto Ed25519.</p>
 <p id="unsupported">This browser does not support Ed25519 in WebCrypto, so signatures cannot be checked here. Use a current Chrome, Edge, Safari or Firefox, or the command-line verifiers.</p>
 
@@ -78,7 +98,7 @@ code { font:12.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
 <textarea id="packet" spellcheck="false" placeholder='{ "mandates": [...], "invocations": [...], "effects": [...] }'></textarea>
 <label for="keys">Key set (JSON, as served at /.well-known/amep-keys.json)</label>
 <textarea id="keys" spellcheck="false"></textarea>
-<p><button id="run-packet">Verify packet</button> <button id="load-example" style="background:transparent;color:var(--accent);border:1px solid var(--line)">Load an example</button></p>
+<p><button id="run-packet">Verify packet</button> <button id="load-example" class="ghost">Load an example</button></p>
 <div class="summary" id="packet-summary" aria-live="polite"></div>
 <div class="table-wrap"><table id="packet-table" hidden><thead><tr><th>Object</th><th>Outcome</th><th>Invariant</th><th>Reason</th></tr></thead><tbody></tbody></table></div>
 </section>
@@ -153,4 +173,7 @@ ed25519Supported().then(ok => { if (!ok) document.getElementById("unsupported").
 </html>
 `;
 writeFileSync(outFile, html);
+// The same page is served by GitHub Pages from docs/verify/ (https://stafordtituss.github.io/amep/verify/), so anyone can try AMEP
+// in a browser without installing anything. Written only for the default build, so it never drifts from the checked page.
+if (!argOut) { mkdirSync(join(root, "docs/verify"), { recursive: true }); writeFileSync(join(root, "docs/verify/index.html"), html); writeFileSync(join(root, "docs/.nojekyll"), ""); }
 console.log(`wrote ${outFile} (${suite.length} vectors, ${Math.round(html.length / 1024)} KB)`);
