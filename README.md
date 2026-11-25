@@ -29,23 +29,42 @@
 
 ---
 
-## The question
+<a name="the-question"></a>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/h-question-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/h-question-light.svg">
+  <img alt="I. The question: did the agent stay inside?" src="docs/assets/readme/h-question-light.svg" width="100%">
+</picture>
 
 AI agents act for people through chains of delegation, tools and adapters. Identity tells you *who* acted, and authorization tells you what a token *allowed*. Neither shows that **what actually happened stayed within what a person authorized**.
 
 AMEP defines signed records for each link of that chain, from a person's mandate to an independently observed effect, and one deterministic answer:
 
-| Verdict | Meaning |
-|---|---|
-| **`preserved`** | What happened stayed inside what was allowed, at every step of the chain. |
-| **`violated`** | It went outside. The result names the broken invariant and the party that departed first. |
-| **`unresolved`** | A record is missing or can't be checked. The result names it. **A gap is never read as permission.** |
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/verdicts-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/verdicts-light.svg">
+  <img alt="Three verdicts. Preserved: everything stayed inside what was allowed. Violated: it crossed a boundary, and the result names the rule and the party. Unresolved: a record is missing, and a gap is never read as permission." src="docs/assets/readme/verdicts-light.svg" width="100%">
+</picture>
 
 Two verifiers given the same records and keys return the same verdict, byte for byte.
 
-## How it works
+<a name="how-it-works"></a>
 
-<p align="center"><b>Mandate</b> &nbsp;→&nbsp; <b>Delegation</b> &nbsp;→&nbsp; <b>Invocation</b> &nbsp;→&nbsp; <b>Effect receipt</b> &nbsp;→&nbsp; <b>Verdict</b><br><sub>each link signed by the party that made it · checked offline by anyone</sub></p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/h-how-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/h-how-light.svg">
+  <img alt="II. How it works: one signed chain" src="docs/assets/readme/h-how-light.svg" width="100%">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/chain-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/chain-light.svg">
+  <img alt="The chain: mandate, delegation, invocation and effect, each signed by the party that made it, then a verdict any verifier can reach offline." src="docs/assets/readme/chain-light.svg" width="100%">
+</picture>
+
+<details>
+<summary><b>What each record says</b></summary>
 
 | Record | Says | Signed by |
 |---|---|---|
@@ -55,9 +74,17 @@ Two verifiers given the same records and keys return the same verdict, byte for 
 | **Effect receipt** | What was actually executed | The executing party. For high-impact effects, not the agent's host (I10) |
 | **Verdict record** | The outcome of every call, naming the packet by digest | Any verifier, as an in-toto attestation |
 
+</details>
+
 Eleven invariants decide the verdict. They are listed, with every rule, in the [specification](spec/amep-v0.2.md#8-invariants).
 
-## Quick start
+<a name="quick-start"></a>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/h-start-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/h-start-light.svg">
+  <img alt="III. Quick start: check a packet" src="docs/assets/readme/h-start-light.svg" width="100%">
+</picture>
 
 **In your browser, nothing to install:** the [verifier](https://stafordtituss.github.io/amep/verify/) runs the full conformance suite and checks any packet you paste in, offline, in the page.
 
@@ -80,7 +107,13 @@ amep-protocol check-suite vectors/
 
 **Record an agent:** five runnable guides cover LangGraph, the OpenAI Agents SDK, saving and checking evidence, keeping the observer key away from the agent, and publishing a signed verdict. CI runs every one: [packages/agents/HOWTO.md](packages/agents/HOWTO.md).
 
-## Checked in the open
+<a name="checked-in-the-open"></a>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/h-open-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/h-open-light.svg">
+  <img alt="IV. Checked in the open: checked by others" src="docs/assets/readme/h-open-light.svg" width="100%">
+</picture>
 
 | Who | What | Record |
 |---|---|---|
@@ -90,24 +123,13 @@ amep-protocol check-suite vectors/
 | **Reviewers** | Reviews that found real bugs, from the IETF audit list, the OpenID AIIM list, Zealynx Security and others | [REVIEWS.md](REVIEWS.md) · [CONTRIBUTORS.md](CONTRIBUTORS.md) · [vectors/CREDITS.md](vectors/CREDITS.md) |
 | **A model of the hold rules** | Every reachable state at three calls, checked against the verifier | [`formal/`](formal/) |
 
-## In this repository
+<a name="standards-and-interop"></a>
 
-| Path | Contents |
-|---|---|
-| [`spec/`](spec/) | The core specification, bindings (AuthZEN, MCP, agent hosts) and profiles (Biscuit, Macaroon, PASETO, UCAN, Verifiable Credentials) |
-| [`vectors/`](vectors/) | The conformance suite: positive and must-reject packets. Also on Hugging Face: [stafordtituss/amep-conformance](https://huggingface.co/datasets/stafordtituss/amep-conformance) |
-| [`schemas/`](schemas/) | JSON Schemas, one per object, and CDDL |
-| [`packages/python/`](packages/python/) · [`packages/js/`](packages/js/) | The two reference verifiers, with SDK and command-line tool (written separately, by the same author) |
-| [`packages/mcp/`](packages/mcp/) | The verifier and suites as MCP tools |
-| [`packages/agents/`](packages/agents/) | Evidence for every tool call in OpenAI Agents SDK and LangGraph agents |
-| [`packages/conformance/`](packages/conformance/) | Runs the suites against any verifier, and imports other formats (AER-1, OpenID action receipts, Provared, Observed Effect) with a gap report |
-| [`verifier/browser/`](verifier/browser/) | The offline browser verifier |
-| [`interop/`](interop/) | Mappings and runs against other work. [COVERAGE.md](interop/COVERAGE.md) shows which parts of AMEP's question each format can settle |
-| [`proposals/`](proposals/) | Proposed changes: evaluation records, accountable owners, selective disclosure |
-| [`ietf/`](ietf/) | The Internet-Draft, in Markdown with rendered XML, text and HTML |
-| [`formal/`](formal/) | A TLA+ model of the hold and single-use rules, with an explorer that checks it against the verifier |
-
-## Standards and interop
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/h-standards-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/h-standards-light.svg">
+  <img alt="V. Standards: where AMEP fits" src="docs/assets/readme/h-standards-light.svg" width="100%">
+</picture>
 
 AMEP isn't an identity provider, a policy engine or a prompt-injection detector. It checks, afterwards, what those systems decided and what then happened, and composes with them:
 
@@ -136,14 +158,13 @@ AMEP evaluates evidence *after* authority has been granted and exercised. Relate
 
 </details>
 
-## Limits
+<a name="help-amep"></a>
 
-What AMEP can't show is written down, and each limit is pinned by a vector or a test: **[LIMITS.md](LIMITS.md)**. The main ones:
-- **A signer that lies consistently can't be caught;** contradictions between signed records can.
-- **An effect nobody recorded can't be seen,** except where an observer below the agent covers it (Observed Effect).
-- **Verifiers say what the evidence shows,** not whether the authority itself was wise.
-
-## Help AMEP
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/h-help-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/readme/h-help-light.svg">
+  <img alt="VI. Help AMEP: scrutiny wanted" src="docs/assets/readme/h-help-light.svg" width="100%">
+</picture>
 
 AMEP needs outside scrutiny more than anything else.
 
@@ -156,6 +177,34 @@ AMEP needs outside scrutiny more than anything else.
 4. **Cite it where relevant:** if your draft, paper or specification overlaps, an informative reference or a note on where the approaches differ is welcome.
 
 Every review, implementation and citation is logged as written, critical ones included, in [REVIEWS.md](REVIEWS.md).
+
+---
+
+<p align="center"><sub>REFERENCE</sub></p>
+
+## Limits
+
+What AMEP can't show is written down, and each limit is pinned by a vector or a test: **[LIMITS.md](LIMITS.md)**. The main ones:
+- **A signer that lies consistently can't be caught;** contradictions between signed records can.
+- **An effect nobody recorded can't be seen,** except where an observer below the agent covers it (Observed Effect).
+- **Verifiers say what the evidence shows,** not whether the authority itself was wise.
+
+## In this repository
+
+| Path | Contents |
+|---|---|
+| [`spec/`](spec/) | The core specification, bindings (AuthZEN, MCP, agent hosts) and profiles (Biscuit, Macaroon, PASETO, UCAN, Verifiable Credentials) |
+| [`vectors/`](vectors/) | The conformance suite: positive and must-reject packets. Also on Hugging Face: [stafordtituss/amep-conformance](https://huggingface.co/datasets/stafordtituss/amep-conformance) |
+| [`schemas/`](schemas/) | JSON Schemas, one per object, and CDDL |
+| [`packages/python/`](packages/python/) · [`packages/js/`](packages/js/) | The two reference verifiers, with SDK and command-line tool (written separately, by the same author) |
+| [`packages/mcp/`](packages/mcp/) | The verifier and suites as MCP tools |
+| [`packages/agents/`](packages/agents/) | Evidence for every tool call in OpenAI Agents SDK and LangGraph agents |
+| [`packages/conformance/`](packages/conformance/) | Runs the suites against any verifier, and imports other formats (AER-1, OpenID action receipts, Provared, Observed Effect) with a gap report |
+| [`verifier/browser/`](verifier/browser/) | The offline browser verifier |
+| [`interop/`](interop/) | Mappings and runs against other work. [COVERAGE.md](interop/COVERAGE.md) shows which parts of AMEP's question each format can settle |
+| [`proposals/`](proposals/) | Proposed changes: evaluation records, accountable owners, selective disclosure |
+| [`ietf/`](ietf/) | The Internet-Draft, in Markdown with rendered XML, text and HTML |
+| [`formal/`](formal/) | A TLA+ model of the hold and single-use rules, with an explorer that checks it against the verifier |
 
 ## Develop
 
