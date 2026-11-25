@@ -1,0 +1,157 @@
+[
+ {
+  "sent": {
+   "id": 1,
+   "method": "initialize",
+   "params": {
+    "protocolVersion": "2025-06-18",
+    "capabilities": {},
+    "clientInfo": {
+     "name": "amep-fixture",
+     "version": "1"
+    }
+   }
+  },
+  "got": {
+   "jsonrpc": "2.0",
+   "id": 1,
+   "result": {
+    "protocolVersion": "2025-06-18",
+    "capabilities": {
+     "tools": {}
+    },
+    "serverInfo": {
+     "name": "tickets",
+     "version": "1"
+    }
+   }
+  }
+ },
+ {
+  "sent": {
+   "id": 2,
+   "method": "tools/list",
+   "params": {}
+  },
+  "got": {
+   "jsonrpc": "2.0",
+   "id": 2,
+   "result": {
+    "tools": [
+     {
+      "name": "get_ticket",
+      "description": "Read a ticket.",
+      "inputSchema": {
+       "type": "object",
+       "properties": {
+        "ticket_id": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "ticket_id"
+       ]
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "sent": {
+   "id": 3,
+   "method": "tools/call",
+   "params": {
+    "name": "get_ticket",
+    "arguments": {
+     "ticket_id": "4821"
+    }
+   }
+  },
+  "got": {
+   "jsonrpc": "2.0",
+   "id": 3,
+   "result": {
+    "content": [
+     {
+      "type": "text",
+      "text": "{\"ticket\": \"4821\", \"status\": \"open\"}"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "sent": {
+   "id": 4,
+   "method": "tools/call",
+   "params": {
+    "name": "update_ticket",
+    "arguments": {
+     "ticket_id": "4821",
+     "status": "closed"
+    }
+   }
+  },
+  "got": {
+   "jsonrpc": "2.0",
+   "id": 4,
+   "error": {
+    "code": -32602,
+    "message": "RBAC is enforced by your Teleport roles. Contact your Teleport Admin for more details.",
+    "data": {
+     "error": {
+      "message": "access to resource denied. User does not have permissions."
+     }
+    }
+   }
+  }
+ },
+ {
+  "sent": {
+   "id": 5,
+   "method": "tools/call",
+   "params": {
+    "arguments": {
+     "ticket_id": "4821"
+    }
+   }
+  },
+  "got": {
+   "jsonrpc": "2.0",
+   "id": 5,
+   "error": {
+    "code": -32600,
+    "message": "Teleport did not forward an invalid Request object.",
+    "data": {
+     "message": "\"name\" parameter missing"
+    }
+   }
+  }
+ },
+ {
+  "sent": {
+   "id": 6,
+   "method": "tools/call",
+   "params": {
+    "name": "get_ticket",
+    "arguments": {
+     "ticket_id": "9999"
+    }
+   }
+  },
+  "got": {
+   "jsonrpc": "2.0",
+   "id": 6,
+   "result": {
+    "content": [
+     {
+      "type": "text",
+      "text": "no ticket 9999"
+     }
+    ],
+    "isError": true
+   }
+  }
+ }
+]

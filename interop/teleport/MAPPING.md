@@ -31,4 +31,10 @@ For a high-impact call, AMEP needs a record from a party other than the agent's 
 
 ## Status
 
-This is a mapping, not yet an import profile in `packages/conformance`. The next step is a profile with fixtures, a denied call and a forwarded call, generated from a real 18.11.10 deployment, with the per-event results published as for protect-mcp (`interop/protect-mcp/`).
+**Checked on a real cluster** (`fixtures-18.11.10/`): a pre-forward denial, an invalid request, an allowed call, and an allowed call whose tool failed, with the events Teleport 18.11.10 recorded for each. The two readings hold.
+
+Two findings for importers:
+- **A tool's own error is invisible.** A failing tool call and a working one record the same event (`TMCP003I`, `success: true`). This is gravitational/teleport#70015.
+- **An access denial and an invalid request share `TMCP003E`.** Only the error text distinguishes them.
+
+**Next:** an import profile in `packages/conformance` over these fixtures, with the per-event results published as for protect-mcp.
