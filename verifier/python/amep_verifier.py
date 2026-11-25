@@ -853,6 +853,22 @@ def vectors():
         by_operator(p, O2))
     add("high-impact effect observed by a key of another operator", ("preserved", "-"), lambda p, I, H, O, X:
         by_operator(p, O3))
+
+    # Admissions (spec 8, I10, v0.3.2): the actor's own record can't show it stayed within authority, but it can show it
+    # didn't. Found in the MasDrift analysis: an agent's own log of a forbidden external send stayed unresolved.
+    def admit(p, signer, observed_by, executed_res="repo:app/docs/launch.md", declared_res="repo:app/docs/launch.md"):
+        high_impact(p, observed_by=observed_by, assurance="L1")
+        inv = {**p["invocations"][0], "declared": {**p["invocations"][0]["declared"], "resource": declared_res}}
+        p["invocations"] = [(H2 if signer is O2 else H).sign(inv)]
+        p["effects"] = [signer.sign({**p["effects"][0], "executed": {**p["effects"][0]["executed"], "resource": executed_res}})]
+    add("high-impact effect outside authority, recorded only by the actor", ("violated", "I2"), lambda p, I, H, O, X:
+        admit(p, O, "agent:assistant-1"))
+    add("high-impact effect outside authority, recorded only by a key of the actor's own operator", ("violated", "I2"), lambda p, I, H, O, X:
+        admit(p, O2, "proxy:egress"))
+    add("the actor's own record says something else was executed", ("unresolved", "I10"), lambda p, I, H, O, X:
+        admit(p, O, "agent:assistant-1", executed_res="repo:app/src/other.ts", declared_res="repo:app/src/auth.ts"))
+    add("high-impact effect within authority, recorded only by the actor", ("unresolved", "I10"), lambda p, I, H, O, X:
+        admit(p, O, "agent:assistant-1", executed_res="repo:app/src/auth.ts", declared_res="repo:app/src/auth.ts"))
     add("high-impact call reported not executed only by a key of the host's own operator", ("unresolved", "I10"), lambda p, I, H, O, X: (
         high_impact(p), bound(p, I, H, O), p.update(effects=[]),
         p.update(invocations=[H2.sign(p["invocations"][0], v=2)]),
@@ -1107,6 +1123,31 @@ def vectors():
     operation("one operation executed twice", ("violated", "I2"), "twice")
     operation("retry after the first attempt is shown not executed", ("preserved", "-"), "released")
     operation("an independent operation proceeds while another is held", ("preserved", "-"), "independent")
+
+    # 12. Audience binding (spec 5.3, v0.3.2). From stafordtituss/amep#16 (delegation-control-bench, scenario VC-03): a
+    # presentation bound to one service, replayed to another, with action and resource in scope. Without audiences in
+    # the claims, the effect was preserved.
+    def aud_case(p, kind):
+        rs = lambda o: {x: v for x, v in o.items() if x != "proof"}
+        m, d = rs(p["mandates"][0]), rs(p["delegations"][0])
+        m["claims"] = {**m["claims"], "audiences": ["tool:reports-api"]}
+        d["claims"] = {**d["claims"], "audiences": ["tool:*"] if kind == "widened" else ["tool:reports-api"]}
+        p["mandates"], p["delegations"] = [I.sign(m, v=2)], [I.sign(d, v=2)]
+        p["interpretations"] = [H.sign(rs(p["interpretations"][0]), v=2)]
+        if kind != "unversioned":
+            p["amep_version"] = "0.3"
+        inv = H.sign(rs(p["invocations"][0]), v=2)
+        x = dict(p["effects"][0]["executed"])
+        if kind != "missing":
+            x["audience"] = "tool:analytics-api" if kind == "replayed" else "tool:reports-api"
+        p["invocations"] = [inv]
+        p["effects"] = [O.sign({**rs(p["effects"][0]), "executed": x, "invocation_digest": digest(inv)}, v=2)]
+
+    add("effect sent to the audience the claims name", ("preserved", "-"), lambda p, *a: aud_case(p, "match"))
+    add("presentation replayed to another audience", ("violated", "I2"), lambda p, *a: aud_case(p, "replayed"))
+    add("receipt does not record the audience the claims are bound to", ("unresolved", "I7"), lambda p, *a: aud_case(p, "missing"))
+    add("delegation widens its parent's audiences", ("violated", "I1"), lambda p, *a: aud_case(p, "widened"))
+    add("audiences in an unversioned packet", ("unresolved", "I7"), lambda p, *a: aud_case(p, "unversioned"))
     return keys, V
 
 
