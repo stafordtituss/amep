@@ -1728,7 +1728,7 @@ appear in all capitals, as shown here.<a href="#section-1.1-1" class="pilcrow">�
       </table>
 <p id="section-5-3">Without roles, a compromised host key could mint its own mandate or approve its own action.<a href="#section-5-3" class="pilcrow">¶</a></p>
 <p id="section-5-4">A key that is revoked, or used outside its validity interval, signs nothing: a record signed with it is treated as unsigned, and the cause is reported (missing, unknown key, role, key status, or invalid signature, in that order). A record is placed in the interval by its own time.<a href="#section-5-4" class="pilcrow">¶</a></p>
-<p id="section-5-5">For observer independence (I10), the actor is identified by the key that signed the invocation, not by the names in the records. A record signed by the invocation's own key is the actor's, whatever observer it names, and where the key set names operators, a record signed by a key of the host's operator is the host's.<a href="#section-5-5" class="pilcrow">¶</a></p>
+<p id="section-5-5">For observer independence (I10), the actor is identified by the key that signed the invocation, not by the names in the records. A record from the actor's side cannot establish that the actor stayed within its authority, but it can establish that it did not: where such a record shows the actor executing what it declared, outside its authority, the result is violated, charged to the actor, and the reason states that the effect was not independently observed. Such a record never convicts another party. A record signed by the invocation's own key is the actor's, whatever observer it names, and where the key set names operators, a record signed by a key of the host's operator is the host's.<a href="#section-5-5" class="pilcrow">¶</a></p>
 <p id="section-5-6">Ed25519 <span>[<a href="#RFC8032" class="cite xref">RFC8032</a>]</span> signatures are accepted under one exact rule in every verifier. A verifier <span class="bcp14">MUST</span> reject a signature whose scalar S is not less than the group order, and a public key or commitment R whose encoding is non-canonical or is a point of small order. Libraries otherwise differ on these edge cases (one accepts a signature by the identity key over every message), and two verifiers would then disagree on the same record.<a href="#section-5-6" class="pilcrow">¶</a></p>
 </section>
 </div>
@@ -1773,6 +1773,9 @@ appear in all capitals, as shown here.<a href="#section-1.1-1" class="pilcrow">�
 </li>
         <li id="section-7-2.3">
           <p id="section-7-2.3.1">A hold is released only by a showing that another party can check: for a call at or above <code>write_shared</code>, a "not executed" statement that meets I10. A statement signed only on the actor's side releases nothing.<a href="#section-7-2.3.1" class="pilcrow">¶</a></p>
+</li>
+        <li id="section-7-2.4">
+          <p id="section-7-2.4.1">Rejected evidence changes nothing. State carried in from earlier packets (<a href="#state" class="auto internal xref">Section 9.3</a>) changes only on evidence that passed its checks: a verified receipt from an observer that counts makes the operation done, and a verified, independent "not executed" statement releases the hold. A receipt or statement that fails its checks <span class="bcp14">MUST</span> leave the attempt's holds and completed operations as they were.<a href="#section-7-2.4.1" class="pilcrow">¶</a></p>
 </li>
       </ol>
 <p id="section-7-3">Checks that decide violated come before any check that can only hold, so that no hold hides a double use. A call that is violated is charged once, for its first violation; if a later packet resolves that violation, its use of an approval is counted again. The identifier is chosen by the party that retries, so it binds only what that party records.<a href="#section-7-3" class="pilcrow">¶</a></p>
@@ -1841,7 +1844,7 @@ appear in all capitals, as shown here.<a href="#section-1.1-1" class="pilcrow">�
           <tr>
             <td class="text-left" rowspan="1" colspan="1">I10</td>
             <td class="text-left" rowspan="1" colspan="1">An effect at or above <code>write_shared</code> names its actor and was observed by a party other than that actor</td>
-            <td class="text-left" rowspan="1" colspan="1">unresolved</td>
+            <td class="text-left" rowspan="1" colspan="1">unresolved (violated on the actor's own admission, <a href="#roles" class="auto internal xref">Section 5</a>)</td>
           </tr>
           <tr>
             <td class="text-left" rowspan="1" colspan="1">I11</td>
@@ -2017,7 +2020,7 @@ I11  violated    effect with no invocation
       <h2 id="name-test-vectors">
 <a href="#section-12" class="section-number selfRef">12. </a><a href="#name-test-vectors" class="section-name selfRef">Test Vectors</a>
       </h2>
-<p id="section-12-1"><span>[<a href="#AMEP" class="cite xref">AMEP</a>]</span> publishes three suites of signed packets, each with an expected outcome and invariant: 261 core vectors (69 positive and 192 must-reject), 16 approval-path vectors, and 20 delegation-continuity vectors, 297 in all. The must-reject vectors cover all eleven invariants, signer roles, the Ed25519 acceptance rule, malformed I-JSON, revocation at the time of each effect, call statements and binding, key status, operation identity, audience binding, operation approvals, grants, limits checked independently of their order, observer totals for the wrong window, held calls across packets, decision phase, deny lists, data lineage, and state across packets.<a href="#section-12-1" class="pilcrow">¶</a></p>
+<p id="section-12-1"><span>[<a href="#AMEP" class="cite xref">AMEP</a>]</span> publishes three suites of signed packets, each with an expected outcome and invariant: 277 core vectors (73 positive and 204 must-reject), 16 approval-path vectors, and 20 delegation-continuity vectors, 313 in all, plus six cross-packet sequences that check the verdict and the carried state after every step. The must-reject vectors cover all eleven invariants, signer roles, the Ed25519 acceptance rule, malformed I-JSON, revocation at the time of each effect, admissions, call statements and binding, key status, operation identity, audience binding, operation approvals, grants, limits checked independently of their order, observer totals for the wrong window, held calls across packets, decision phase, deny lists, data lineage, and state across packets.<a href="#section-12-1" class="pilcrow">¶</a></p>
 <p id="section-12-2">Two implementations written separately by the author (Python, and JavaScript run under Node.js and in a browser) agree on all 297, on the outcome, invariant, blame and gaps of every result, and produce byte-identical verdict records. An implementation by another party, zambo-amep-verify (Brennan Zambo), written from this document's source specification and the vectors alone, agrees on all 228 single-packet core vectors of an earlier suite. The hold and single-use rules have also been checked exhaustively against a model of them, over every reachable state with three calls. A conformance tool runs any verifier that can be invoked from a command line against all three suites.<a href="#section-12-2" class="pilcrow">¶</a></p>
 <p id="section-12-3">A conforming verifier <span class="bcp14">MUST</span> return the expected outcome and invariant for every vector.<a href="#section-12-3" class="pilcrow">¶</a></p>
 </section>
@@ -2048,7 +2051,7 @@ I11  violated    effect with no invocation
           <p id="section-13-4.1.1"><strong>zambo-amep-verify (Brennan Zambo).</strong> An independent verifier, written from the specification and the vectors alone, without reading either reference verifier. It agrees on all 228 single-packet core vectors of an earlier version of the core suite. His review of operation identity tightened what releases a hold.<a href="#section-13-4.1.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-13-4.2">
-          <p id="section-13-4.2.1"><strong>OpenID AIIM list review (Andrii, Radiolaria).</strong> Found that revoked keys were accepted, that a producer reported "not executed" after an exception with nothing recorded, and that a retry under fresh authorization started clean. These led to key status and operation identity.<a href="#section-13-4.2.1" class="pilcrow">¶</a></p>
+          <p id="section-13-4.2.1"><strong>OpenID AIIM list review (Andrii Akhtanin, Radiolaria).</strong> Found that revoked keys were accepted, that a producer reported "not executed" after an exception with nothing recorded, that a retry under fresh authorization started clean, and that rejected outcome evidence still changed the recorded state of an operation. These led to key status, operation identity and the rule that rejected evidence changes nothing.<a href="#section-13-4.2.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-13-4.3">
           <p id="section-13-4.3.1"><strong>Agent Payments Protocol.</strong> Two other verifiers, AER-1 and APAF-1, were run over the same pinned AP2 payment fixtures as this one, and the results were joined row by row. The comparison found that the fixtures lacked the payment-to-checkout reference, which led to checkout binding.<a href="#section-13-4.3.1" class="pilcrow">¶</a></p>
@@ -2060,7 +2063,7 @@ I11  violated    effect with no invocation
           <p id="section-13-4.5.1"><strong>Verifiable Agent Trust Envelope (Takao Sato).</strong> The maintainer verified the signatures of five published verdict records for a lost-response and recovery case, matched each to its packet by digest, and reviewed a reference example of the case. Evaluations of two further cases (interrupted work, and confirmed non-execution with a handoff) are published beside the project's own expected results; the second led to holding approvals while an outcome is unknown.<a href="#section-13-4.5.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-13-4.6">
-          <p id="section-13-4.6.1"><strong>Payments review (Carlos Vendrell Felici, Zealynx Security).</strong> Two rounds of review of the quantity limits, with signed test packets run through both verifiers. They led to the per-call and per-effect limits, per-observer counting of effects, the counting observer, integer amounts for on-chain assets, independent totals per limit, order-independent evaluation of limits, and observer totals that name their window.<a href="#section-13-4.6.1" class="pilcrow">¶</a></p>
+          <p id="section-13-4.6.1"><strong>Payments review and vectors (Carlos Vendrell Felici, Zealynx Security).</strong> Twelve vectors written by him, the first by an outside author, after two rounds of review of the quantity limits, with signed test packets run through both verifiers. They led to the per-call and per-effect limits, per-observer counting of effects, the counting observer, integer amounts for on-chain assets, independent totals per limit, order-independent evaluation of limits, and observer totals that name their window.<a href="#section-13-4.6.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-13-4.7">
           <p id="section-13-4.7.1"><strong>AUDIT mailing list review (Cliff Singletary).</strong> Led to evaluating revocation and status freshness at the time of each effect, not only at the invocation.<a href="#section-13-4.7.1" class="pilcrow">¶</a></p>
@@ -2278,7 +2281,13 @@ I11  violated    effect with no invocation
           <p id="appendix-A-1.6.1">Verdict records <span class="bcp14">MAY</span> name the admitted artifact as subject (<a href="#verdicts" class="auto internal xref">Section 10</a>).<a href="#appendix-A-1.6.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="appendix-A-1.7">
-          <p id="appendix-A-1.7.1">Test vectors: 297 in three suites; Implementation Status updated with an independent implementation and further reviews.<a href="#appendix-A-1.7.1" class="pilcrow">¶</a></p>
+          <p id="appendix-A-1.7.1">Rejected evidence changes nothing: carried state changes only on evidence that passed its checks (<a href="#operations" class="auto internal xref">Section 7</a>).<a href="#appendix-A-1.7.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="appendix-A-1.8">
+          <p id="appendix-A-1.8.1">Admissions: the actor's own record can establish a violation by the actor, never compliance and never another party's violation (<a href="#roles" class="auto internal xref">Section 5</a>).<a href="#appendix-A-1.8.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="appendix-A-1.9">
+          <p id="appendix-A-1.9.1">Test vectors: 313 in three suites, twelve of them written by an outside author, plus six cross-packet sequences; Implementation Status updated with an independent implementation and further reviews.<a href="#appendix-A-1.9.1" class="pilcrow">¶</a></p>
 </li>
       </ul>
 </section>
@@ -2325,7 +2334,7 @@ I11  violated    effect with no invocation
 <a href="#name-acknowledgments" class="section-name selfRef">Acknowledgments</a>
       </h2>
 <p id="appendix-C-1">This document is derived from the Agentic Mandate Evidence Protocol (AMEP), designed and written by the author.<a href="#appendix-C-1" class="pilcrow">¶</a></p>
-<p id="appendix-C-2">The author thanks Cliff Singletary for the review on the AUDIT mailing list that led to evaluating liveness at the time of each effect; Carlos Vendrell Felici for two rounds of review of the quantity limits; Brennan Zambo for the AER-1 runs, including the blind run; Takao Sato for verifying the verdict records of the lost-response case and the review behind operation approvals; the participants in the FINOS AI Governance Framework discussion of cross-institution authorization, whose requirement for unknown outcomes led to holds; Brennan Zambo, also, for the first independent implementation and for the review of operation identity; Andrii (Radiolaria) for the reports that led to key status and operation identity; Takao Sato, also, for the interrupted-work and handoff cases; nmatt1 for the APAF-1 column and the payment-reference finding; Tom Farley for the protect-mcp wire format; Sankalp Gilda for the subject of verdict records; yuzhou for what Teleport's audit events establish; and Tania Aizenman and David Luna for the EvaluationRecord proposal and the accountable-owner cases.<a href="#appendix-C-2" class="pilcrow">¶</a></p>
+<p id="appendix-C-2">The author thanks Cliff Singletary for the review on the AUDIT mailing list that led to evaluating liveness at the time of each effect; Carlos Vendrell Felici for two rounds of review of the quantity limits and for twelve vectors of his own; Brennan Zambo for the AER-1 runs, including the blind run; Takao Sato for verifying the verdict records of the lost-response case and the review behind operation approvals; the participants in the FINOS AI Governance Framework discussion of cross-institution authorization, whose requirement for unknown outcomes led to holds; Brennan Zambo, also, for the first independent implementation and for the review of operation identity; Andrii Akhtanin (Radiolaria) for the reports that led to key status, operation identity and the rule on rejected evidence; Takao Sato, also, for the interrupted-work and handoff cases; nmatt1 for the APAF-1 column and the payment-reference finding; Tom Farley for the protect-mcp wire format; Sankalp Gilda for the subject of verdict records; yuzhou for what Teleport's audit events establish; and Tania Aizenman and David Luna for the EvaluationRecord proposal and the accountable-owner cases.<a href="#appendix-C-2" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="authors-addresses">

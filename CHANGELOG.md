@@ -2,6 +2,22 @@
 
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
+
+## 0.3.0 (2026-11-25)
+
+The packages leave alpha: `amep-protocol` 0.3.0 on PyPI and `amep-protocol` 0.3.0 on npm. With them, Internet-Draft -02 and suite v0.3.2. The sections below, back to 0.3.0a4, are what this release contains. In brief:
+- **Operation identity:** a retry under fresh authorization can't take effect unnoticed. Rejected evidence changes nothing.
+- **Admissions:** the actor's own record can show a violation, never compliance.
+- **Audience binding.**
+- **Key status at the time of use.**
+- **The suite:** 313 vectors in three suites, plus six cross-packet sequences.
+
+**Outside contributors to this release:**
+- Carlos Vendrell Felici (Zealynx Security): twelve vectors of his own (#30), the first by an outside author;
+- Andrii Akhtanin (Radiolaria): key status, operation identity, and rejected evidence (#22, #24);
+- Brennan Zambo: an independent verifier, and the review of operation identity (#19, #24);
+- Takao Sato: the VATE cases, merged upstream;
+- the rest are recorded in `vectors/CREDITS.md` and `REVIEWS.md`.
 ## Audience binding (proposal, unreleased, 2026-11-25)
 
 - **The gap, stafordtituss/amep#16 (found with delegation-control-bench, scenario VC-03):** the core claims had no audience. A presentation bound to one service, replayed to another with an action and resource in scope, was `preserved`.
