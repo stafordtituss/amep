@@ -42,7 +42,17 @@ Offered by its authors on AP2#402. The family is pinned at DSHCorrectover/ccs-ap
 - **A2, unknown outcome held:** a pending payment stays a named unresolved, and is never promoted.
 - **A3, verdict naming:** violated carries what departed; unresolved carries what is missing.
 
-Each column's result on these vectors is *(to run)*. The family's authors confirm their own numbers.
+Each column's reading below is the one its owner posted on AP2#402, unedited in substance. Each owner read the bundle as data only, at `4271ac0`, and recomputed its SHA-256 to the manifest's lock (`a9f49107…09f8`). The objects carry no signed material, so the binding layer of every column stops first (AMEP: signature gap; AER-1: not checked; APAF-1: escalated). The readings are of each column's decision or record question, taking the objects as authentic.
+
+| Vector | CCS (family's own) | AMEP | AER-1 | APAF-1 |
+|---|---|---|---|---|
+| **A1**, budget total | violated (claimed 27999 against mandate 35999) | unresolved: the receipt carries no amount (gap `value`); the caller's figure is a claim, not a record of execution | not checked: no closed mandate bytes to recompute a reference against; "violated" is outside its vocabulary | approved: the executed payment equals the mandate; the caller's total is not an input |
+| **A2**, unknown outcome held | unresolved, never promoted | unresolved, held against reserves, approvals and operations | not checked, never promoted | escalated, never promoted; a later payment needing the budget escalates on `prior_outcome_unresolved` |
+| **A3**, verdict naming | v-good meets it; v-bad-name and u-bad-name don't | met by construction (core suite: every violated names invariant and blame, every unresolved a gap) | not applicable as a record evaluation; the naming discipline matches its own | met by construction (declined names the constraint, escalated what couldn't be verified) |
+
+**A1 is the family's most instructive divergence:** four answers to one artifact, each defensible from its layer's question. Three columns agree that the caller's figure doesn't convict the payment. They differ on what the record shows: an unknown amount (AMEP), nothing checkable (AER-1), or equality with the mandate (APAF-1). CCS answers a different question, whether the caller's context matches the mandate.
+
+*(to confirm: each owner's cell, before the text is agreed.)*
 
 ## 5. Findings that came out of the comparison
 1. **The fixtures lacked `payment.reference`.** Found by APAF-1 and fixed on AMEP's side with the second family; AMEP now checks checkout binding.
