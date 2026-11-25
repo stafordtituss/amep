@@ -17,6 +17,7 @@ EXPECTED_INVALID = {"must-reject/malformed-timestamp.json",
                     # v0.3: malformed amounts and limits, and an unknown claim member, are schema-invalid by design
                     "must-reject/amount-in-exponent-form.json", "must-reject/amount-with-a-leading-zero.json",
                     "must-reject/amount-written-as-a-json-number.json", "must-reject/reserve-with-a-numeric-amount.json",
+                    "must-reject/amount-with-40-integer-digits.json",
                     # a bare period_spent figure names no window (spec 5.9.2); verifiers accept it but never count it
                     "must-reject/observer-figure-that-names-no-window-does-not-count.json", "must-reject/negative-amount.json",
                     "must-reject/malformed-limit--period-without-per-period.json",

@@ -19,6 +19,20 @@ Specification drafts, conformance-suite versions and package versions are listed
 - **No hold hides a double use (found by the same model check).** Three orderings let an `unresolved` hold mask a violation that verified receipts had already proved, against spec 5.10's rule that checks deciding `violated` come first. First, an approval's single-use check ran after its hold check. Second, a call held on an approval didn't record its use, so a third use was held too. Third, "executed twice" (5.8.1) ran last, after the approval hold. Both cores now check single use and "executed twice" before any hold. No vector changes; the cases need three calls, and the model check (`formal/`) covers them.
 - **Status:** a proposal. Brennan Zambo agreed with all five expected answers (#24); Andrii's review is open.
 
+## Twelve payment-limit vectors, written by Carlos Vendrell Felici (unreleased, 2026-11-25)
+
+- **The first vectors written by someone outside the project** ([#30](https://github.com/stafordtituss/amep/pull/30)): 4 positive and 8 must-reject, on the readings invited in #10. They cover:
+  - a monthly figure that leaves a daily limit unresolved;
+  - a second payment service counted against one total;
+  - two identical payments in one second, which count twice;
+  - on-chain amounts up to uint128, where 40 digits is invalid;
+  - an approval of the pre-fee amount, which doesn't bind the debit;
+  - limits in the debit currency.
+- **Both reference verifiers agree on every one,** and regeneration is byte-identical.
+- **He also ran weakened copies of the core** against the suite. Three of four passed every earlier vector and fail only on the new ones, so these vectors close real gaps in what the suite could catch.
+- **His question about approvals that name a maximum** is open as [#31](https://github.com/stafordtituss/amep/issues/31).
+
+
 ## Verdict statements can name the admitted artifact as subject (unreleased, 2026-11-24)
 
 - **From Sankalp Gilda's review of in-toto/attestation#625:** when the evaluated actions produced an artifact a policy admits (a commit, a release, a payment), that artifact should be the statement's subject, with the evidence packet as an input.
