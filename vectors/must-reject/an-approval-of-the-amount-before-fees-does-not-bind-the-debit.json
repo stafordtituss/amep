@@ -1,0 +1,117 @@
+{
+ "name": "an approval of the amount before fees does not bind the debit",
+ "expect": {
+  "outcome": "violated",
+  "invariant": "I8"
+ },
+ "packet": {
+  "amep_version": "0.3",
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "payments.send"
+     ],
+     "resources": [
+      "payee:*"
+     ],
+     "ceiling": "financial",
+     "exp": 100,
+     "limits": [
+      {
+       "unit": "iso4217:EUR",
+       "per_call": "500.00"
+      }
+     ]
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "44d315a9b631becfb83383e56daeb1f026e0a03be2e8ab86ce50a9a545eb213391e82669c60b03f8fcb71e38ec99eb824381341604ccfa05efc08b64a2136509"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "bank_api",
+    "version": "v3",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "5ef3ab9b00c0c17c6be94a9e2b23ec77097f763f0846dbf0939e36bfc7725c93a6392b0ee8ecc9c67d090be777cbba8877cfc4cdba4ad45cf00edd7e8686390b"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "m-1",
+    "interpretation_ref": "a-1",
+    "actor": "agent:payments-assistant",
+    "t": 10,
+    "declared": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial"
+    },
+    "approval_ref": "ap-1",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "4cb8dccc278ae7635b828522a0057c243e7adef2737d88df0b76fee8f2e4f51c1c2782479b942fd05ca77b73e6d412f4509ea1de1940d4182ff46eff5469ce06"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "service:bank.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial",
+     "released": [],
+     "t": 11,
+     "value": {
+      "amount": "606.00",
+      "unit": "iso4217:EUR"
+     }
+    },
+    "proof": {
+     "kid": "bank-observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "5d4cb3df51083b8f4ab66c958e0527743bd863b8202b56d026596f947f64e10be539541ddf263a44a2cdf36d07dfe167afeb823d7712ae1bff831a9daceb060d"
+    }
+   }
+  ],
+  "approvals": [
+   {
+    "id": "ap-1",
+    "kind": "approval",
+    "effect_digest": "8e6c62c9fc900e4f0f4f3a5654d26921a72361a5cd1b390f5670b41cd11d44df",
+    "presence": "webauthn",
+    "expiry": 90,
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "704981e3b333dacf0947315a42fb6304baf9efe07af1dff236667cf6ac4b9ed496455fe88b8f6e7688fcb6b4b7a75305d3405faa5dae177ca4b729963e40ff06"
+    }
+   }
+  ]
+ }
+}

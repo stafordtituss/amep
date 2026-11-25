@@ -1,0 +1,101 @@
+{
+ "name": "caip19 amount of 25 digits, one unit over the limit",
+ "expect": {
+  "outcome": "violated",
+  "invariant": "I2"
+ },
+ "packet": {
+  "amep_version": "0.3",
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "payments.send"
+     ],
+     "resources": [
+      "payee:*"
+     ],
+     "ceiling": "financial",
+     "exp": 100,
+     "limits": [
+      {
+       "unit": "caip19:near:mainnet/slip44:397",
+       "per_call": "1000000000000000000000000"
+      }
+     ]
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "cbfa485c321bcce1cc9d7c409a9dec3b60cbf14bf2ee0ca3ae39e1b99a12d338b7e51e0b0d11b83af90aeb0a7c874eefdc806b0601416d601f1914f0c75cf808"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "bank_api",
+    "version": "v3",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "5ef3ab9b00c0c17c6be94a9e2b23ec77097f763f0846dbf0939e36bfc7725c93a6392b0ee8ecc9c67d090be777cbba8877cfc4cdba4ad45cf00edd7e8686390b"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "m-1",
+    "interpretation_ref": "a-1",
+    "actor": "agent:payments-assistant",
+    "t": 10,
+    "declared": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "8c9d3a9937a9442a420e06ecf2a372771f80ecc987bbb5636310b6355e6792c3e215d84d6a5e33283bd5abc0366c7eeb5dd3bd80a11d57bd8807e32481977404"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "service:bank.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial",
+     "released": [],
+     "t": 11,
+     "value": {
+      "amount": "1000000000000000000000001",
+      "unit": "caip19:near:mainnet/slip44:397"
+     }
+    },
+    "proof": {
+     "kid": "bank-observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "4dc7ed27cce98491ecfbf83b70bb653be320f42082607996a14cc868e3fb961bd365550dcaca30ae32140662b6a423b90b6dd960672646fa041ab50c2332b80f"
+    }
+   }
+  ]
+ }
+}

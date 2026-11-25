@@ -1,0 +1,105 @@
+{
+ "name": "converted payment over the limit in the debit currency",
+ "expect": {
+  "outcome": "violated",
+  "invariant": "I2"
+ },
+ "packet": {
+  "amep_version": "0.3",
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "payments.send"
+     ],
+     "resources": [
+      "payee:*"
+     ],
+     "ceiling": "financial",
+     "exp": 100,
+     "limits": [
+      {
+       "unit": "iso4217:USD",
+       "per_call": "1000.00"
+      },
+      {
+       "unit": "iso4217:EUR",
+       "per_call": "500.00"
+      }
+     ]
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "dc2ac466a35a9d8469cdb548a73120eaf84f3024957950ff47a51fd3c7e20f79604a27734e149c9d09d84fbf4fc6c45b41183dfa75fcc6641abd714b908c930b"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "bank_api",
+    "version": "v3",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "5ef3ab9b00c0c17c6be94a9e2b23ec77097f763f0846dbf0939e36bfc7725c93a6392b0ee8ecc9c67d090be777cbba8877cfc4cdba4ad45cf00edd7e8686390b"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "m-1",
+    "interpretation_ref": "a-1",
+    "actor": "agent:payments-assistant",
+    "t": 10,
+    "declared": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "8c9d3a9937a9442a420e06ecf2a372771f80ecc987bbb5636310b6355e6792c3e215d84d6a5e33283bd5abc0366c7eeb5dd3bd80a11d57bd8807e32481977404"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "service:bank.example",
+    "assurance": "L3",
+    "executed": {
+     "action": "payments.send",
+     "resource": "payee:city-utility",
+     "effect": "financial",
+     "released": [],
+     "t": 11,
+     "value": {
+      "amount": "560.00",
+      "unit": "iso4217:EUR"
+     }
+    },
+    "proof": {
+     "kid": "bank-observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "be6973a7ec2e7ee82fb1c7657d9c40949edb6e9e74d56906af55b8fc77cadc28195313c1b5e826ee30a2045e79f686ef8b3b7b6cce5f834ed1f4ec55de4e4b04"
+    }
+   }
+  ]
+ }
+}
