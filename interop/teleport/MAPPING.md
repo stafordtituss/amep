@@ -2,9 +2,9 @@
 
 **What this is:** a mapping of Teleport's MCP access audit events to AMEP evidence, written with what the events can and can't establish stated plainly. It's pinned to Teleport **18.11.10**, source commit `a2409e75364ef312099347782bd71e86dcaf8d10`.
 
-**Source:** the event behaviour below comes from a Teleport engineer's answers, including a check of this mapping's two readings against 18.11.10, in [gravitational/teleport#70011](https://github.com/gravitational/teleport/discussions/70011), with code references, and from the [MCP session audit reference](https://goteleport.com/docs/reference/audit-events/mcp-sessions/).
+**Source:** the event behaviour below comes from answers by yuzhou (ZYZ666-RGB), a community member who read the Teleport source, including a check of this mapping's two readings against 18.11.10, in [gravitational/teleport#70011](https://github.com/gravitational/teleport/discussions/70011), with code references, and from the [MCP session audit reference](https://goteleport.com/docs/reference/audit-events/mcp-sessions/).
 
-**No endorsement:** the Teleport engineer checked two readings against 18.11.10 (`a2409e7`), from the source, without running a deployment: a pre-forward denial, and a forwarded call whose outcome is unknown. Teleport has not reviewed or endorsed the rest of this mapping, and says its event fields may change between releases. Treat the mapping as tied to the pinned version.
+**No endorsement:** yuzhou isn't affiliated with Teleport; their answers are a community reading of the source, with code references. They checked two readings against 18.11.10 (`a2409e7`), without running a deployment: a pre-forward denial, and a forwarded call whose outcome is unknown. Teleport itself has not reviewed or endorsed this mapping, and its event fields may change between releases. Treat the mapping as tied to the pinned version.
 
 ## Why a proxy's record matters to AMEP
 
