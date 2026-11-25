@@ -548,6 +548,53 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       if (e instanceof Stop) out.push(result(id, e.outcome, e.invariant, e.reason, e.blame, e.gaps));
       else out.push(result(id, "unresolved", "I7", `malformed evidence: ${e.message}`, null, [{ need: "well_formed_evidence", ref: String(id) }]));
     }
+    settle(inv);
+  }
+
+  // spec 5.8.1 (v0.3.2): commit a change to carried outcome state only on evidence that passed its checks. A receipt that
+  // verifies, from an observer that counts for this call (I10), makes the operation done; a verified, independent
+  // not_executed statement settles the attempt. Anything else, a rejected receipt or statement included, leaves the state
+  // this attempt carried in as it was. From Andrii Akhtanin's review (Radiolaria) on the OpenID AIIM list, 25 Nov 2026.
+  function settle(inv) {
+    let d; try { d = digest(inv); } catch { return; }
+    const id = inv.id;
+    const op = typeof inv.operation === "string" && inv.operation ? inv.operation : undefined;
+    const effect = inv.declared && typeof inv.declared === "object" ? inv.declared.effect : undefined;
+    const hi = CEILING.includes(effect) && CEILING.indexOf(effect) >= CEILING.indexOf("write_shared");
+    const counts = o => !hi || (Boolean(inv.actor) && o.observed_by !== inv.actor && !sameOperator(o, inv));
+    const bound = o => !("invocation_digest" in o) || o.invocation_digest === d;
+    const recs = effects.filter(e => e && typeof e === "object" && e.invocation === id);
+    const executed = recs.some(e => verify(e) && typeof e.observed_by === "string" && bound(e) && !(hi && e.assurance === "L0") && counts(e));
+    const notRun = !recs.length && (pk.call_statements || []).some(c => c && typeof c === "object" && c.invocation === id && verify(c)
+      && c.disposition === "not_executed" && c.effect_count === 0 && bound(c) && counts(c));
+    if (executed && op !== undefined) {
+      if (!Object.hasOwn(opsDone, op)) opsDone[op] = { invocation: id, digest: d };
+      if (Object.hasOwn(opsHeld, op) && opsHeld[op].invocation === id) delete opsHeld[op];
+    }
+    if (executed || notRun || !present.has(d)) return;
+    for (const [o, h] of Object.entries(opsHeldIn)) if (h.digest === d && !Object.hasOwn(opsDone, o) && !Object.hasOwn(opsHeld, o)) opsHeld[o] = h;
+    for (const [o, h] of Object.entries(opsDoneIn)) if (h.digest === d && !Object.hasOwn(opsDone, o)) opsDone[o] = h;
+    for (const [a, h] of Object.entries(apprHeldIn)) if (h.digest === d && !Object.hasOwn(apprHeld, a)) apprHeld[a] = h;
+    if (Object.hasOwn(heldIn, d) && !Object.hasOwn(newHeld, d) && !Object.hasOwn(held, d)) held[d] = heldIn[d];
+  }
+
+  // spec 8, I10 (v0.3.2): the actor's own record cannot establish that it stayed within authority, but it can establish
+  // that it did not. A receipt from the actor, or from a key of its own operator, showing it executed what it declared
+  // outside its authority is an admission: violated, charged to the actor. It never convicts another party, so a record
+  // in which the executed effect differs from the declared one stays unresolved, as does every other self-report.
+  function admission(e, inv, claims) {
+    const x = e.executed;
+    let ok, why;
+    const note = " (on the actor's own record; not independently observed)";
+    try {
+      if (!x || typeof x !== "object" || x.action !== inv.declared.action || x.resource !== inv.declared.resource) return;
+      check(isGuardrail(x.resource, extraProtected), "violated", "I9", "executed effect targets guardrail/evidence store" + note, { blame: "agent" });
+      [ok, why] = effectOk(x, claims, v03);
+    } catch (err) {
+      if (err instanceof Stop) throw err;
+      return;
+    }
+    check(!ok, "violated", why.startsWith("released") ? "I5" : "I2", why + note, { blame: "agent" });
   }
 
   function evalInvocation(inv) {
@@ -687,10 +734,9 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     // an unknown amount) against every period limit on its chain that applies to it (spec 7.6 rule 6).
     if (!mine.length) holdUnknown();
     check(!mine.length, "unresolved", "I7", "no executed-effect receipt", { need: "receipt", ref: id });
-    // spec 5.8.1 (v0.3.2): this attempt took effect. The operation is done; a hold it had on the operation is released.
+    // spec 5.8.1 (v0.3.2): an earlier attempt at this operation that took effect. Recording this attempt as done is left
+    // to settle(), after this evaluation, and only on a receipt that passes its checks.
     const opPrev = op !== undefined && Object.hasOwn(opsDone, op) ? opsDone[op] : null;
-    if (op !== undefined && opPrev === null) opsDone[op] = { invocation: id, digest: invDigest };
-    if (op !== undefined && Object.hasOwn(opsHeld, op) && opsHeld[op].invocation === id) delete opsHeld[op];
     const highImpact = CEILING.indexOf(inv.declared.effect) >= CEILING.indexOf("write_shared");
     let claims = chain[0].claims; for (const c of chain.slice(1)) claims = meet(c.claims, claims, v03);
     if (intent) claims = meet(intent.claims, claims, v03);
@@ -702,6 +748,7 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       check("invocation_digest" in e && e.invocation_digest !== invDigest, "unresolved", "I7", `receipt ${e.id ?? "?"} is bound to a different invocation (invocation_digest mismatch)`, { need: "receipt_binding", ref: e.id ?? "?" });
       if (highImpact) {
         check(!inv.actor, "unresolved", "I10", "actor not recorded; observer independence cannot be shown", { need: "actor", ref: id });
+        if (e.observed_by === inv.actor || sameOperator(e, inv)) admission(e, inv, claims);
         check(e.observed_by === inv.actor || e.assurance === "L0", "unresolved", "I10", "high-impact effect only self-reported", { need: "independent_observer", ref: e.id ?? "?" });
         check(sameOperator(e, inv), "unresolved", "I10", "high-impact effect observed only by a key of the host's own operator", { need: "independent_observer", ref: e.id ?? "?" });
       }

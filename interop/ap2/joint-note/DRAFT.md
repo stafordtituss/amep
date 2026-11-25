@@ -54,7 +54,7 @@ Each column's reading below is the one its owner posted on AP2#402, unedited in 
 
 *(to confirm: each owner's cell, before the text is agreed.)*
 
-**Fourth column (CCS, `ccs-ap2-column` at `fa62bba`):** APAF-1 re-ran the row join on (bundle, chain, transaction_id): 38 of 38 rows join. One row, `s3-wrong-payee`, is marked for correction by the column's authors (verified, where the fixture carries the payee constraint). The other divergences carry layer explanations. *(to confirm, by CCS.)*
+**Fourth column (CCS, `ccs-ap2-column`; corrected at `9307b07`):** APAF-1 re-ran the row join on (bundle, chain, transaction_id): 38 of 38 rows join. One row, `s3-wrong-payee`, was a miss in the column, and its authors confirmed and corrected it on AP2#402. Their checker read the allowed payees only from separate disclosures. In the synthetic family the list is inline, and when no list was resolvable the check was skipped, so an unknown was treated as no constraint. In rev2 the list is read from either place, and a list that can't be resolved is held unresolved. `s3-wrong-payee` moves from verified to violated, and the column's counts are 15 verified, 15 violated and 8 unresolved. The column's self-check suite grew from 11 to 13, adding two assertions across rows: the same semantics must judge the same in every family, and a fixture named for a failure must never score verified. The other divergences carry layer explanations, which CCS adopted as stated.
 
 ## 5. Findings that came out of the comparison
 1. **The fixtures lacked `payment.reference`.** Found by APAF-1 and fixed on AMEP's side with the second family; AMEP now checks checkout binding.

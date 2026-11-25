@@ -853,6 +853,22 @@ def vectors():
         by_operator(p, O2))
     add("high-impact effect observed by a key of another operator", ("preserved", "-"), lambda p, I, H, O, X:
         by_operator(p, O3))
+
+    # Admissions (spec 8, I10, v0.3.2): the actor's own record can't show it stayed within authority, but it can show it
+    # didn't. Found in the MasDrift analysis: an agent's own log of a forbidden external send stayed unresolved.
+    def admit(p, signer, observed_by, executed_res="repo:app/docs/launch.md", declared_res="repo:app/docs/launch.md"):
+        high_impact(p, observed_by=observed_by, assurance="L1")
+        inv = {**p["invocations"][0], "declared": {**p["invocations"][0]["declared"], "resource": declared_res}}
+        p["invocations"] = [(H2 if signer is O2 else H).sign(inv)]
+        p["effects"] = [signer.sign({**p["effects"][0], "executed": {**p["effects"][0]["executed"], "resource": executed_res}})]
+    add("high-impact effect outside authority, recorded only by the actor", ("violated", "I2"), lambda p, I, H, O, X:
+        admit(p, O, "agent:assistant-1"))
+    add("high-impact effect outside authority, recorded only by a key of the actor's own operator", ("violated", "I2"), lambda p, I, H, O, X:
+        admit(p, O2, "proxy:egress"))
+    add("the actor's own record says something else was executed", ("unresolved", "I10"), lambda p, I, H, O, X:
+        admit(p, O, "agent:assistant-1", executed_res="repo:app/src/other.ts", declared_res="repo:app/src/auth.ts"))
+    add("high-impact effect within authority, recorded only by the actor", ("unresolved", "I10"), lambda p, I, H, O, X:
+        admit(p, O, "agent:assistant-1", executed_res="repo:app/src/auth.ts", declared_res="repo:app/src/auth.ts"))
     add("high-impact call reported not executed only by a key of the host's own operator", ("unresolved", "I10"), lambda p, I, H, O, X: (
         high_impact(p), bound(p, I, H, O), p.update(effects=[]),
         p.update(invocations=[H2.sign(p["invocations"][0], v=2)]),
@@ -1156,6 +1172,120 @@ def check_dir(d: str) -> int:
     return 0 if ok == n else 1
 
 
+def sequences():
+    """Cross-packet sequences (spec 5.8.1, 10.7): verifier state is carried from one packet to the next, and each step
+    states both its verdict and the operation state it leaves. From Andrii Akhtanin's review (Radiolaria) on the OpenID
+    AIIM list, 25 Nov 2026: evidence that is rejected must neither release a hold nor record an operation as done."""
+    from amep_protocol.core import digest
+    I, H, O, X = Signer("issuer-1", ["issuer", "approver"]), Signer("host-1", ["host"]), Signer("observer-1", ["observer"]), Signer("attacker")
+    decl = {"action": "fs.write", "resource": "repo:app/src/auth.ts", "effect": "write_local"}
+
+    def chain():
+        p = base(I, H, O)
+        for k in ("mandates", "delegations"):
+            p[k] = [I.sign({x: v for x, v in o.items() if x != "proof"}, v=2) for o in p[k]]
+        p["interpretations"] = [H.sign({x: v for x, v in o.items() if x != "proof"}, v=2) for o in p["interpretations"]]
+        p["amep_version"] = "0.3"
+        p["effects"] = []
+        return p
+    i0 = H.sign({"id": "i-0", "kind": "invocation", "authority_ref": "d-1", "interpretation_ref": "a-1", "t": 5,
+                 "declared": decl, "operation": "op-7f3a"}, v=2)
+
+    def first():
+        p = chain()
+        p["invocations"] = [i0]
+        return p
+
+    def again(evidence):
+        p = chain()
+        p["invocations"] = [i0]
+        if evidence == "statement":
+            p["call_statements"] = [O.sign({"id": "c-0", "kind": "call_statement", "invocation": "i-0", "observed_by": "hook:host",
+                                            "disposition": "not_executed", "effect_count": 0, "t": 8, "invocation_digest": digest(i0)}, v=2)]
+        elif evidence == "bad_statement":   # signed by a key the verifier doesn't know
+            p["call_statements"] = [X.sign({"id": "c-0", "kind": "call_statement", "invocation": "i-0", "observed_by": "hook:host",
+                                            "disposition": "not_executed", "effect_count": 0, "t": 8, "invocation_digest": digest(i0)}, v=2)]
+        else:
+            signer = O if evidence == "receipt" else X
+            p["effects"] = [signer.sign({"id": "e-0", "kind": "effect", "invocation": "i-0", "observed_by": "hook:host", "assurance": "L1",
+                                         "invocation_digest": digest(i0), "executed": {**decl, "released": [], "t": 6}}, v=2)]
+        return p
+
+    def retry(operation="op-7f3a", fresh=True):
+        p = chain()
+        auth = "d-1"
+        if fresh:   # the retry runs under a fresh grant from the same issuer
+            m2 = {x: v for x, v in p["mandates"][0].items() if x != "proof"}
+            p["mandates"].append(I.sign({**m2, "id": "m-2"}, v=2))
+            auth = "m-2"
+        i1 = H.sign({"id": "i-1", "kind": "invocation", "authority_ref": auth, "interpretation_ref": "a-1", "t": 10,
+                     "declared": decl, "operation": operation}, v=2)
+        p["invocations"] = [i1]
+        p["effects"] = [O.sign({"id": "e-1", "kind": "effect", "invocation": "i-1", "observed_by": "hook:host", "assurance": "L1",
+                                "invocation_digest": digest(i1), "executed": {**decl, "released": [], "t": 11}}, v=2)]
+        return p
+
+    held = {"op-7f3a": "i-0"}
+    S = [
+        ("an unverifiable not_executed statement does not release the hold", [
+            (first(), ("unresolved", "I7"), held, {}),
+            (again("bad_statement"), ("unresolved", "I7"), held, {}),
+            # the retry is still held; its own verified receipt shows it took effect, so that fact is kept
+            (retry(), ("unresolved", "I7"), held, {"op-7f3a": "i-1"})]),
+        ("an unverifiable receipt does not record the operation as done", [
+            (first(), ("unresolved", "I7"), held, {}),
+            (again("bad_receipt"), ("unresolved", "I7"), held, {}),
+            (retry(), ("unresolved", "I7"), held, {"op-7f3a": "i-1"}),
+            # a verified receipt for the first attempt now arrives: both attempts took effect
+            (again("receipt"), ("violated", "I2"), {}, {"op-7f3a": "i-1"})]),
+        ("control: a verified not_executed statement releases the hold", [
+            (first(), ("unresolved", "I7"), held, {}),
+            (again("statement"), ("preserved", "-"), {}, {}),
+            (retry(), ("preserved", "-"), {}, {"op-7f3a": "i-1"})]),
+        ("control: a verified receipt records the operation as done", [
+            (first(), ("unresolved", "I7"), held, {}),
+            (again("receipt"), ("preserved", "-"), {}, {"op-7f3a": "i-0"}),
+            (retry(), ("violated", "I2"), {}, {"op-7f3a": "i-0"})]),
+        ("control: an independent operation proceeds while another is held", [
+            (first(), ("unresolved", "I7"), held, {}),
+            (retry("op-9c21", fresh=False), ("preserved", "-"), held, {"op-9c21": "i-1"})]),
+    ]
+    # carried approval use (spec 5.10): an approval used in one packet stays used in the next. From Andrii Akhtanin's
+    # review: the approval-use accounting needs a carried-state test, not only single-packet vectors.
+    def approved(inv_id, t):
+        p = base(I, H, O)
+        body = {**p["effects"][0]["executed"], "t": t + 1}
+        ap = I.sign({"id": "ap-1", "kind": "approval", "effect_digest": approval_digest(body), "presence": "webauthn"})
+        inv = H.sign({**{k: v for k, v in p["invocations"][0].items() if k != "proof"}, "id": inv_id, "t": t, "approval_ref": "ap-1"})
+        eff = O.sign({**{k: v for k, v in p["effects"][0].items() if k != "proof"}, "id": f"e-{inv_id}", "invocation": inv_id, "executed": body})
+        p.update(invocations=[inv], effects=[eff], approvals=[ap])
+        return p
+    S.append(("a single-use approval used in one packet is still used in the next", [
+        (approved("i-1", 10), ("preserved", "-"), {}, {}, {"ap-1": "i-1"}),
+        (approved("i-2", 20), ("violated", "I8"), {}, {}, {"ap-1": "i-1"})]))
+    keys = {s.kid: s.public() for s in (I, H, O)}
+    out = []
+    for name, steps in S:
+        out.append({"name": name, "steps": [
+            {"packet": p, "expect": {"outcome": o, "invariant": inv},
+             "state_after": {"operations_held": st[0], "operations_done": st[1], **({"approvals_used": st[2]} if len(st) > 2 else {})}}
+            for p, (o, inv), *st in steps]})
+    return keys, out
+
+
+def run_sequence(seq, keys):
+    """Replays one sequence, carrying state; returns a list of failures (empty when every step matches)."""
+    state, fails = {}, []
+    for n, step in enumerate(seq["steps"]):
+        r = verdict(evaluate(step["packet"], keys, state=state))
+        got = {k: {o: h["invocation"] for o, h in state.get(k, {}).items()} for k in ("operations_held", "operations_done")}
+        if "approvals_used" in step["state_after"]:
+            got["approvals_used"] = {a: u[0] for a, u in state.get("approvals_used", {}).items()}
+        if (r.outcome, r.invariant) != (step["expect"]["outcome"], step["expect"]["invariant"]) or got != step["state_after"]:
+            fails.append(f"{seq['name']}, step {n + 1}: got {r.outcome}/{r.invariant} {got} ({r.reason})")
+    return fails
+
+
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "--check":
         sys.exit(check_dir(sys.argv[2]))
@@ -1185,5 +1315,14 @@ if __name__ == "__main__":
         passed += ok
         if not ok:
             print(f"FAIL  {name:45} -> {r.outcome:10} {r.invariant:3} {r.reason}   (expected {exp_out}/{exp_inv})")
-    print(f"{passed}/{len(V)} vectors pass (in memory)")
+    skeys, seqs = sequences()
+    os.makedirs(f"{out_dir}/sequences", exist_ok=True)
+    doc = {"note": "Cross-packet sequences: replay the steps in order, carrying verifier state; each step gives its verdict "
+                   "and the operations held and done after it (operation -> invocation id).", "keys": skeys, "sequences": seqs}
+    json.dump(doc, open(f"{out_dir}/sequences/operation-state.json", "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+    sfails = [f for q in seqs for f in run_sequence(q, skeys)]
+    for f in sfails:
+        print("FAIL  " + f)
+    print(f"{passed}/{len(V)} vectors pass (in memory); {len(seqs) - len({f.split(', step')[0] for f in sfails})}/{len(seqs)} sequences")
+    passed -= len(sfails)
     sys.exit(0 if passed == len(V) else 1)

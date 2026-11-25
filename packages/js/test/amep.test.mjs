@@ -245,3 +245,21 @@ test("the actor's own key is the actor, whatever observed_by says (I10; found by
   const e0 = H.sign(sdk.effect("e-0", "i-0", "server:tickets", "L1", sdk.effectBody("tickets.update", "tickets:issue/1", "write_shared", 6)), { v: 2 });
   assert.deepEqual(run(e0)["i-0"], ["unresolved", "I10"]);
 });
+
+// vectors/sequences: verifier state carried across packets; each step's verdict and the operation state it leaves
+// (spec 5.8.1). From Andrii Akhtanin's review: rejected evidence must not release a hold or record an operation done.
+test("operation-state sequences: verdict and carried state at every step", () => {
+  const doc = JSON.parse(readFileSync(join(VECTORS, "sequences", "operation-state.json"), "utf8"));
+  assert.equal(doc.sequences.length, 6);
+  for (const seq of doc.sequences) {
+    const state = {};
+    seq.steps.forEach((step, n) => {
+      const v = verdict(evaluate(step.packet, doc.keys, sigOk, [], state));
+      const got = Object.fromEntries(["operations_held", "operations_done"].map(k =>
+        [k, Object.fromEntries(Object.entries(state[k] || {}).map(([o, h]) => [o, h.invocation]))]));
+      if ("approvals_used" in step.state_after) got.approvals_used = Object.fromEntries(Object.entries(state.approvals_used || {}).map(([a, u]) => [a, u[0]]));
+      assert.deepEqual([v.outcome, v.invariant], [step.expect.outcome, step.expect.invariant], `${seq.name}, step ${n + 1}`);
+      assert.deepEqual(got, step.state_after, `${seq.name}, step ${n + 1}`);
+    });
+  }
+});
