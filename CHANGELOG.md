@@ -5,6 +5,13 @@ Specification drafts, conformance-suite versions and package versions are listed
 
 ## protect-mcp import profile (unreleased, 2026-11-24)
 
+- **Revised after Tom Farley's review (#20, 26 November):**
+  - binding needs the signed `payload_digest.canonical: "jcs"` marker, a tool that maps to the invocation's action, and a single candidate;
+  - two calls with the same arguments stay unbound unless `correlation.tool_use_ref` equals the receipt's `request_id`;
+  - a pre-execution decision is derived only where the reason establishes the phase, so `post_execution_receipt` yields none.
+
+  Five constructed fixtures and six tests pin these rules.
+
 - **`amep-conformance import --profile protect-mcp`** reads protect-mcp decision receipts (`protectmcp:decision` ACTA envelopes). It:
   - authenticates them against an issuer key given separately (`--issuer-key`);
   - binds them to an AMEP invocation when `payload_digest.input_hash` equals `args_digest`;

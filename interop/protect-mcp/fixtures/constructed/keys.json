@@ -1,0 +1,18 @@
+{
+ "principal-1": {
+  "kid": "principal-1",
+  "alg": "Ed25519",
+  "x": "f38b6d13a669f341e8c79992afc7d5d1b3fa0dd7c39639c23ae777b4b3df1c40",
+  "roles": [
+   "issuer"
+  ]
+ },
+ "agent-host-1": {
+  "kid": "agent-host-1",
+  "alg": "Ed25519",
+  "x": "0ef826c2d838ac0001c870cfe45a04c505f0090889e133eca19f598eb137b03f",
+  "roles": [
+   "host"
+  ]
+ }
+}

@@ -1,0 +1,28 @@
+{
+ "payload": {
+  "type": "protectmcp:decision",
+  "tool_name": "Read",
+  "decision": "allow",
+  "reason": "cedar_allow",
+  "policy_digest": "sha256:94428dedc59ccc1dc58578871f5b81893cb4bc376dbf97922cbda494083b2d1f",
+  "scope": "tu-1795534979661-f1ea",
+  "mode": "enforce",
+  "request_id": "tu-1795534979661-f1ea",
+  "spec": "draft-farley-acta-signed-receipts-03",
+  "issuer_certification": "self-signed",
+  "public_key": "58b3eb605906990f23cd72907b994c75e1e6151a554730bcad3969ec4063defa",
+  "issuer_name": "protect-mcp",
+  "payload_digest": {
+   "input_hash": "7d6441497d2a000b8143602a7817c90abe7db88e139f89c062a1c36cfe0ad9d6",
+   "input_size": 20,
+   "canonical": "jcs"
+  },
+  "issued_at": "2026-11-24T15:42:59.661Z",
+  "issuer_id": "amep-constructed"
+ },
+ "signature": {
+  "alg": "EdDSA",
+  "kid": "amep-constructed",
+  "sig": "c96364521511fccbf1f5acdc6487dc0fb81652f7ca645d37bdc6799603f649dda373c528b736ed962a44a6a1bafb3c201fb22df1f81ca58a33d4c5724b6d7e0e"
+ }
+}

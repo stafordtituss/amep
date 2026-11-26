@@ -50,6 +50,30 @@ AMEP packet: [`packet.json`](packet.json), with deterministic test keys from [`m
 
 These are the results Tom Farley predicted in #31: the first two decisions authenticate, downstream execution stays unresolved for both, and the altered copy fails signature verification.
 
+### Binding and phase (revised after Tom Farley's review of #20)
+
+The digest establishes the **arguments**, not the invocation. So the profile now binds a receipt only under three conditions:
+- **The signed marker `payload_digest.canonical` is `"jcs"`.** The pinned `protect-mcp@0.32.5` `sign --input` path signs it; other gateway paths can omit the digest or use another serialization.
+- **The receipt's tool maps to the invocation's declared action.**
+- **Exactly one candidate matches.** When two calls have the same arguments, only a trusted identifier tells them apart: the invocation's signed `correlation.tool_use_ref` equal to the receipt's signed `request_id`. Otherwise the receipt stays authenticated but unbound.
+
+A pre-execution decision is derived only where the **phase is established**. The payload type `protectmcp:decision` also carries receipts signed after execution (`reason: "post_execution_receipt"`), so the type alone can't establish phase:
+- the `cedar_allow` and `cedar_deny` reasons of the `sign --cedar` path count as pre-execution;
+- `post_execution_receipt` counts as post-execution;
+- any other reason leaves the phase not established.
+
+The constructed fixtures below are **not ScopeBlind output**. Each is a copy of fixture 1 with one field changed, re-signed in the same wire format with a deterministic test key ([`make-constructed.mjs`](make-constructed.mjs)), so that only the rule under test differs.
+
+| Fixture | Against | Binding | AMEP decision |
+|---|---|---|---|
+| [`4-missing-canonical-marker.json`](fixtures/constructed/4-missing-canonical-marker.json) | `packet.json` | missing: no `canonical: "jcs"` | none |
+| [`5-post-execution-receipt.json`](fixtures/constructed/5-post-execution-receipt.json) | `packet.json` | digest, to `i-1` | none: phase is post-execution |
+| [`6-allow-resigned.json`](fixtures/constructed/6-allow-resigned.json) (control) | `packet.json` | digest, to `i-1` | allow, pre-execution, as fixture 1 |
+| `1-allow.json` | [`packet-repeated.json`](fixtures/constructed/packet-repeated.json): two reads of `README.md` | **ambiguous**, `i-1` or `i-1b` | none: authenticated, unbound |
+| `1-allow.json` | [`packet-repeated-correlated.json`](fixtures/constructed/packet-repeated-correlated.json): the same, with `correlation.tool_use_ref` | digest and `request_id`, to `i-1` | allow, pre-execution |
+
+All of these, with fixtures 1 to 3: `sh interop/protect-mcp/run-all.sh`.
+
 To reproduce:
 
 ```bash

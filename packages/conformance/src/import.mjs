@@ -83,11 +83,16 @@ export function importRecord(record, { profile: pid, map = { tools: {} }, expect
   let decision = null;
   if (profile.decisionOnly) {
     mapping.authenticated = integrity.verdict === "pass";
-    const hex = (info.input_hash ?? "").replace(/^sha256:/, "");
-    const inv = hex ? invocations.find(i => i.args_digest && i.args_digest === hex) : null;
-    if (inv) mapping.binding = "digest";
-    if (inv && integrity.verdict === "pass")
-      decision = profile.toDecision(info, inv.id, `${profile.id}:${info.record_id}`);
+    // An unauthenticated receipt is not bound to anything: what it says is not the gateway's statement.
+    const b = integrity.verdict === "pass" ? profile.bind(info, entry, invocations)
+      : { binding: "not used", why: "the receipt failed its own checks, so it is not bound to any invocation" };
+    mapping.binding = b.binding;
+    if (b.why) mapping.unbound = b.why;
+    mapping.phase = info.phase ?? "not established";
+    if (b.inv && integrity.verdict === "pass") {
+      if (info.phase === "pre_execution") decision = profile.toDecision(info, b.inv.id, `${profile.id}:${info.record_id}`);
+      else mapping.no_decision = `bound to ${b.inv.id}, but the receipt's phase is ${info.phase ?? "not established"}, so it is not re-expressed as a pre-execution decision`;
+    }
   }
   return { profile: profile.id, integrity: { verdict: integrity.verdict, id_verdict: integrity.id_verdict, checks: integrity.checks },
     mapping, effect, ...(profile.decisionOnly ? { decision } : {}), not_imported: why, gaps: profile.gaps(info, mapping) };

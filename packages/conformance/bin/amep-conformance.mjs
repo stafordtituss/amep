@@ -67,6 +67,8 @@ async function main(argv) {
       if (out.effect) console.log(`mapped to AMEP: ${out.effect.executed.action} ${out.effect.executed.resource} (${out.effect.executed.effect}), assurance ${out.effect.assurance}, binding ${out.mapping.binding}`);
       else console.log(`not imported: ${out.not_imported}`);
       if (out.decision) console.log(`AMEP decision: ${out.decision.mode} (${out.decision.phase}) for invocation ${out.decision.invocation}, binding ${out.mapping.binding}`);
+      else if (out.mapping.no_decision) console.log(`no AMEP decision: ${out.mapping.no_decision}`);
+      else if (out.mapping.unbound && out.integrity.verdict === "pass") console.log(`no AMEP decision: not bound (${out.mapping.binding}): ${out.mapping.unbound}`);
       if (out.mapping.conflict) console.log(`warning: ${out.mapping.conflict}`);
       console.log("what AMEP needs that this record does not carry:");
       for (const g of out.gaps) console.log(`  [${g.status}] ${g.need}: ${g.detail}`);
