@@ -75,7 +75,11 @@ schemas["common"] = {
                                   "audiences": {"description": "Services the authority may be exercised at; absent means any (spec 5.3, v0.3.2).",
                                                 "type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}}},
         "declared": {"type": "object", "required": ["action", "resource", "effect"], "additionalProperties": False,
-                     "properties": {"action": {"type": "string"}, "resource": {"type": "string"}, "effect": {"$ref": "#/$defs/effect_class"}}},
+                     "properties": {"action": {"type": "string"}, "resource": {"type": "string"}, "effect": {"$ref": "#/$defs/effect_class"},
+                                    "scope": {"description": "For a call whose effects are not known in advance: the actions and resources its effects may have (spec 5.8, v0.3.3).",
+                                              "type": "object", "required": ["actions", "resources"], "additionalProperties": False,
+                                              "properties": {"actions": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+                                                             "resources": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}}}}},
         "executed_body": {"type": "object", "required": ["action", "resource", "effect", "t"], "additionalProperties": False,
                           "patternProperties": EXT,
                           "properties": {"action": {"type": "string"}, "resource": {"type": "string"},
@@ -142,6 +146,8 @@ schemas["approval"] = obj("approval", "ApprovalBinding (spec 5.10). Signed by ro
     "effect_digests": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
     "presence": {"enum": ["webauthn", "chat_user", "host_ui", "none"]}, "approver": {"type": "string"},
     "resource_version": {"type": "string"}, "nbf": ref("time"), "expiry": ref("time"), "consumed": {"type": "boolean"},
+    "findings": {"description": "For a principal's confirmation: the ids of the findings the principal was shown (spec 5.11, v0.3.3).",
+                 "type": "array", "minItems": 1, "items": ref("ref")},
     "proof": ref("proof")}, "approval")
 schemas["approval"]["oneOf"] = [{"required": ["effect_digest"]}, {"required": ["effect_digests"]}]
 schemas["finding"] = obj("finding", "ContentFinding (spec 5.11). Counts as trusted only when signed (role host or observer).",

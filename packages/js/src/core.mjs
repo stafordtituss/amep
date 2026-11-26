@@ -277,6 +277,18 @@ function meet(a, b, v03 = false) {
     if (key in a || key in b) m[key] = [...new Set([...(a[key] || []), ...(b[key] || [])])].sort();
   return m;
 }
+// spec 5.8 (v0.3.3): an executed effect matches its call's declaration. A call whose effects are not known in advance,
+// such as a shell command, may declare a scope {actions, resources} instead of naming one effect: an effect then matches
+// when its action and resource fall within the scope and its class is at most the declared class.
+export function withinDeclared(x, inv, v03 = false) {
+  const d = inv.declared, sc = v03 ? d.scope : undefined;
+  if (sc === undefined) return x.action === d.action && x.resource === d.resource;
+  return sc.actions.some(p => patMatch(x.action, p)) && sc.resources.some(p => patMatch(x.resource, p))
+    && CEILING.indexOf(x.effect) <= CEILING.indexOf(d.effect);
+}
+const scopeWellFormed = sc => !!sc && typeof sc === "object" && !Array.isArray(sc)
+  && Object.keys(sc).length === 2 && ["actions", "resources"].every(k => Array.isArray(sc[k]) && sc[k].length > 0
+  && sc[k].every(v => typeof v === "string" && v.length > 0));
 function effectOk(x, c, v03 = false) {
   const act = grantsOf(c, v03).filter(g => g.actions.some(p => patMatch(x.action, p)));
   if (!act.length) return [false, "action outside claims"];
@@ -414,9 +426,11 @@ function limitsNarrower(c, p) {
   }
   return null;
 }
+export const MAX_REVOCATION_WINDOW = 3600;   // spec 5.12.1 (v0.3.3): a window may not outlast an hour
 function revocationWindow(node) {
   const w = (node.revocation || {}).window ?? 0;
   if (typeof w !== "number" || !Number.isFinite(w) || w < 0) throw new Malformed("revocation window must be a non-negative number of seconds");
+  if (w > MAX_REVOCATION_WINDOW) throw new Malformed(`revocation window of ${fmt(w)}s exceeds the ${MAX_REVOCATION_WINDOW}s maximum (spec 5.12.1)`);
   return w;
 }
 const fmt = n => String(n); // Python's :g for the integer and short decimal times used in reasons
@@ -499,6 +513,15 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   };
   const firstCause = os => { const o = os.find(x => !verify(x)); return os.some(x => !verify(x)) ? sigCause(o) : undefined; };
   const objs = {};
+  const notes = new Map();   // per invocation: a note for a preserved result (spec 5.12.1)
+  // spec 5.11 (v0.3.3), from stafordtituss/amep#34: a principal's confirmation of a call shaped by untrusted or
+  // quarantined content is an approval (spec 5.10) signed by an approver key that lists, in `findings`, every finding the
+  // principal was shown. Like any approval it is bound to the executed effect and used once. The host's own
+  // principal_confirmed: true is the party being judged vouching for itself, so it never confirms on its own.
+  const principalConfirms = (inv, needed) => {
+    const ap = "approval_ref" in inv ? objs[inv.approval_ref] : undefined;
+    return !!ap && ap.kind === "approval" && verify(ap) && Array.isArray(ap.findings) && needed.every(f => ap.findings.includes(f));
+  };
   for (const kind of ["mandates", "delegations", "intents", "interpretations", "invocations", "effects", "approvals", "findings"])
     for (const o of pk[kind] || []) if (o && typeof o === "object" && "id" in o) objs[o.id] = o;
   const revocations = pk.revocations || [], statuses = pk.statuses || [], effects = pk.effects || [];
@@ -541,9 +564,13 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     const id = inv.id ?? "?";
     try {
       const leaked = (inv.influenced_by || []).filter(f => quarantined.has(f) && n > quarantined.get(f));
-      check(leaked.length > 0 && !inv.principal_confirmed, "violated", "I4", `quarantined content reached the agent (${leaked.join(", ")})`, { blame: "host" });
+      if (leaked.length > 0 && !principalConfirms(inv, leaked)) {
+        check(!!inv.principal_confirmed, "unresolved", "I4", `quarantined content reached the agent (${leaked.join(", ")}); only the host says the principal confirmed it`,
+          { need: "principal_confirmation", ref: id });
+        check(true, "violated", "I4", `quarantined content reached the agent (${leaked.join(", ")})`, { blame: "host" });
+      }
       const why = evalInvocation(inv);
-      out.push(result(id, "preserved", "-", why || "continuity preserved"));
+      out.push(result(id, "preserved", "-", why || notes.get(id) || "continuity preserved"));
     } catch (e) {
       if (e instanceof Stop) out.push(result(id, e.outcome, e.invariant, e.reason, e.blame, e.gaps));
       else out.push(result(id, "unresolved", "I7", `malformed evidence: ${e.message}`, null, [{ need: "well_formed_evidence", ref: String(id) }]));
@@ -587,7 +614,7 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     let ok, why;
     const note = " (on the actor's own record; not independently observed)";
     try {
-      if (!x || typeof x !== "object" || x.action !== inv.declared.action || x.resource !== inv.declared.resource) return;
+      if (!x || typeof x !== "object" || !withinDeclared(x, inv, v03)) return;
       check(isGuardrail(x.resource, extraProtected), "violated", "I9", "executed effect targets guardrail/evidence store" + note, { blame: "agent" });
       [ok, why] = effectOk(x, claims, v03);
     } catch (err) {
@@ -626,6 +653,12 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       check("grants" in x.claims, "unresolved", "I7", `${x.id}: grants require amep_version 0.3`, { need: "well_formed_evidence", ref: x.id });
     if (!v03) for (const x of nodes)
       check("audiences" in x.claims, "unresolved", "I7", `${x.id}: audiences require amep_version 0.3`, { need: "well_formed_evidence", ref: x.id });
+    if (inv.declared && typeof inv.declared === "object" && "scope" in inv.declared) {
+      // declared.scope is an AMEP 0.3 member: ignored, it would turn a departure into a match.
+      check(!v03, "unresolved", "I7", `${id}: declared.scope requires amep_version 0.3`, { need: "well_formed_evidence", ref: id });
+      check(!scopeWellFormed(inv.declared.scope), "unresolved", "I7",
+        `${id}: declared.scope must be exactly {actions, resources}, each a non-empty list of patterns`, { need: "well_formed_evidence", ref: id });
+    }
     if (v03 && "reserve" in inv) {
       try { checkReserve(inv.reserve); }
       catch (e) { if (!(e instanceof Malformed)) throw e; check(true, "unresolved", "I7", `${id}: ${e.message}`, { need: "reserve", ref: id }); }
@@ -669,7 +702,13 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     const liveness = (t, what) => {
       for (const [rT, target, why] of revokedAt) if (rT <= t) {
         const w = revocationWindow(byId.get(target));
-        check(t < rT + w, "unresolved", "I6", `${why} ${fmt(t - rT)}s before ${what}, inside its ${fmt(w)}s propagation window`, { blame: "agent", need: "revocation_settled", ref: target });
+        // spec 5.12.1 (v0.3.3), from stafordtituss/amep#35: the window is part of the signed grant, so an action inside it
+        // is within the authority as granted. Nothing is missing, so the result isn't unresolved; the revocation is
+        // noted in the reason instead.
+        if (t < rT + w) {
+          if (!notes.has(id)) notes.set(id, `preserved inside the ${fmt(w)}s propagation window: ${why} ${fmt(t - rT)}s before ${what}`);
+          continue;
+        }
         check(true, "violated", "I6", `${why} before ${what}`, { blame: "agent" });
       }
     };
@@ -684,7 +723,11 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     // influence (spec 5.11): trusted only if the finding exists, is signed and is labelled trusted
     const mine = effects.filter(e => e.invocation === id);
     const untrusted = (inv.influenced_by || []).filter(f => !(objs[f] && verify(objs[f]) && objs[f].integrity_label === "trusted"));
-    check(untrusted.length > 0 && inv.declared.effect !== "read" && !inv.principal_confirmed, mine.length ? "violated" : "unresolved", "I4", "mutation shaped by untrusted content", { blame: "agent", need: "principal_confirmation", ref: id });
+    if (untrusted.length > 0 && inv.declared.effect !== "read" && !principalConfirms(inv, untrusted)) {
+      check(!!inv.principal_confirmed, "unresolved", "I4", "mutation shaped by untrusted content; only the host says the principal confirmed it",
+        { need: "principal_confirmation", ref: id });
+      check(true, mine.length ? "violated" : "unresolved", "I4", "mutation shaped by untrusted content", { blame: "agent", need: "principal_confirmation", ref: id });
+    }
     // call statements (spec 5.14, v0.3): the observer's signed account of the whole call. It binds the call to this
     // exact signed invocation and to the arguments the server received, says whether anything was executed, and how
     // many receipts to expect, so that "no receipt" is no longer ambiguous.
@@ -758,7 +801,8 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       liveness(toTime(x.t), `effect ${e.id ?? "?"}`);
       freshStatus(toTime(x.t), `effect ${e.id ?? "?"}`);
       if ("mediated" in inv) check(canon(x) !== canon(inv.mediated), "violated", "I2", "executed differs from mediated effect", { blame: "server" });
-      else check(x.action !== inv.declared.action || x.resource !== inv.declared.resource, "violated", "I2", "declared != executed", { blame: "server" });
+      else check(!withinDeclared(x, inv, v03), "violated", "I2",
+        v03 && "scope" in inv.declared ? "executed outside the call's declared scope" : "declared != executed", { blame: "server" });
       check(isGuardrail(x.resource, extraProtected), "violated", "I9", "executed effect targets guardrail/evidence store", { blame: "agent" });
       const [ok, why] = effectOk(x, claims, v03);
       check(!ok, "violated", why.startsWith("released") ? "I5" : "I2", why, { blame: "agent" });
@@ -948,7 +992,12 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   }
   // spec 10.4 orphan effects
   const invIds = new Set((pk.invocations || []).map(i => i.id));
-  for (const e of effects) if (!invIds.has(e.invocation)) out.push(result(e.id ?? "?", "violated", "I11", "effect without any authorized invocation (bypass)", "host"));
+  // spec 10.4 (v0.3.3), from stafordtituss/amep#36: an invocation missing from this packet may have been left out by
+  // whoever assembled it. AMEP can't assume the packet is complete (LIMITS.md, section A), so absence is a missing
+  // record, not proof of a bypass, and no party is blamed for it.
+  for (const e of effects) if (!invIds.has(e.invocation))
+    out.push(result(e.id ?? "?", "unresolved", "I11", `effect names invocation ${e.invocation}, which is not in this packet: a bypass, or a packet that left it out`,
+      null, [{ need: "invocation", ref: e.invocation != null ? String(e.invocation) : "-" }]));
   state.spent = spent;
   state.approvals_used = approvalUse;
   if (totals.size) state.period_totals = Object.fromEntries([...totals].map(([k, v]) => [k, unitsStr(v)]));

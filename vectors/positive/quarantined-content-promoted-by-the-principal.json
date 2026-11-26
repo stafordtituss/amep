@@ -106,10 +106,11 @@
      "f-1"
     ],
     "principal_confirmed": true,
+    "approval_ref": "ap-q",
     "proof": {
      "kid": "host-1",
      "alg": "Ed25519",
-     "sig": "1cd656065bbbceddda5bccd5dc417eee4f5d4990bb8e551219879c98c071484590d9c1c0b6fd7c4af3280a04b5bb82960c92201e2bb8c2950a26874b1de43f04"
+     "sig": "baaf6196df7659c85bc4f5ea40013ff14c77bae207646af5cb44f28d076bddca6afdb8741c7ddce8805600e7b2fafbb91a258eeea9c9f0873a254e378c5e9405"
     }
    }
   ],
@@ -150,6 +151,22 @@
      "kid": "observer-1",
      "alg": "Ed25519",
      "sig": "834d8f2855ec386a2ac775bfb89476a6ec44e9a43265be7ae5b45bc5a083cd9d346596f6a73abb10d4d8b1e7a69b60acd79a7c7e86801d7cbb693cba20a5300e"
+    }
+   }
+  ],
+  "approvals": [
+   {
+    "id": "ap-q",
+    "kind": "approval",
+    "presence": "webauthn",
+    "findings": [
+     "f-1"
+    ],
+    "effect_digest": "b9b145ab3da8d6cee94feed2c4be15600c61ad5341583296aac0db054e008d45",
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "721bd54c084928b5d87157380d4284abf8b7284419336f28c6747c8a9a91cf13c10a777786c465d7ec0d4ba548037816b5a82a8a2afd79d1fc0ad263e1bcea05"
     }
    }
   ],

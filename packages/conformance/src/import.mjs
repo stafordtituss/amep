@@ -15,8 +15,9 @@ import { sigOk } from "@stafordtituss/amep";
 import { aer1 } from "./profiles/aer1.mjs";
 import { oidfActionReceipt } from "./profiles/oidf-action-receipt.mjs";
 import { protectMcp } from "./profiles/protect-mcp.mjs";
+import { agentReceipts } from "./profiles/agent-receipts.mjs";
 
-export const PROFILES = { aer1, "oidf-action-receipt": oidfActionReceipt, "protect-mcp": protectMcp };
+export const PROFILES = { aer1, "oidf-action-receipt": oidfActionReceipt, "protect-mcp": protectMcp, "agent-receipts": agentReceipts };
 
 function lookup(obj, path) {
   return path.split(".").reduce((o, k) => (o && typeof o === "object" ? o[k] : undefined), obj);
@@ -38,10 +39,10 @@ function fill(template, fields) {
  * A decision-only profile (protect-mcp) never yields an effect; for a bound record it yields `decision`, an unsigned
  * AMEP pre-execution decision.
  */
-export function importRecord(record, { profile: pid, map = { tools: {} }, expectedId, invocations = [], invocationId, issuerKey } = {}) {
+export function importRecord(record, { profile: pid, map = { tools: {} }, expectedId, publicKey, invocations = [], invocationId, issuerKey } = {}) {
   const profile = pid ? PROFILES[pid] : Object.values(PROFILES).find(p => p.detect(record));
   if (!profile) throw new Error(pid ? `unknown profile ${pid}` : "no profile recognizes this record");
-  const integrity = profile.check(record, { expectedId, issuerKey });
+  const integrity = profile.check(record, { expectedId, publicKey, issuerKey });
   const info = profile.extract(record, integrity.committed);
   const entry = map.tools?.[info.tool.name];
   const mapping = { mappedFrom: entry ? "map" : "missing", binding: "missing", released: entry?.released ?? null };

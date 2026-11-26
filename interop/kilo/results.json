@@ -1,0 +1,181 @@
+{
+ "claims": {
+  "grants": [
+   {
+    "actions": [
+     "fs.read"
+    ],
+    "resources": [
+     "file:*"
+    ]
+   },
+   {
+    "actions": [
+     "fs.write"
+    ],
+    "resources": [
+     "file:src/*"
+    ]
+   },
+   {
+    "actions": [
+     "process.exec"
+    ],
+    "resources": [
+     "cmd:npm *"
+    ]
+   },
+   {
+    "actions": [
+     "fs.write"
+    ],
+    "resources": [
+     "file:node_modules/*"
+    ]
+   },
+   {
+    "actions": [
+     "fs.write"
+    ],
+    "resources": [
+     "file:package-lock.json"
+    ]
+   }
+  ],
+  "ceiling": "write_local",
+  "exp": "2026-12-31T00:00:00Z",
+  "deny_resources": [
+   "file:config/prod/*",
+   "cmd:npm run deploy*"
+  ]
+ },
+ "differences": [
+  "edit \"*\": ask grants nothing in AMEP; a call allowed by the user's answer needs that answer as a signed approval",
+  "bash \"*\": ask grants nothing in AMEP; a call allowed by the user's answer needs that answer as a signed approval"
+ ],
+ "gaps": [],
+ "rows": [
+  {
+   "call": "call_01",
+   "tool": "read",
+   "input": "/work/app/README.md",
+   "kilo": "completed",
+   "amep": {
+    "id": "call_01",
+    "outcome": "preserved",
+    "invariant": "-",
+    "reason": "continuity preserved",
+    "blame": null,
+    "gaps": []
+   },
+   "amep_without_deploy_target": {
+    "id": "call_01",
+    "outcome": "preserved",
+    "invariant": "-",
+    "reason": "continuity preserved",
+    "blame": null,
+    "gaps": []
+   },
+   "outside_grant": []
+  },
+  {
+   "call": "call_02",
+   "tool": "edit",
+   "input": "/work/app/src/auth.ts",
+   "kilo": "completed",
+   "amep": {
+    "id": "call_02",
+    "outcome": "preserved",
+    "invariant": "-",
+    "reason": "continuity preserved",
+    "blame": null,
+    "gaps": []
+   },
+   "amep_without_deploy_target": {
+    "id": "call_02",
+    "outcome": "preserved",
+    "invariant": "-",
+    "reason": "continuity preserved",
+    "blame": null,
+    "gaps": []
+   },
+   "outside_grant": []
+  },
+  {
+   "call": "call_03",
+   "tool": "bash",
+   "input": "npm install",
+   "kilo": "completed",
+   "amep": {
+    "id": "call_03",
+    "outcome": "violated",
+    "invariant": "I2",
+    "reason": "resource outside claims",
+    "blame": "agent",
+    "gaps": []
+   },
+   "amep_without_deploy_target": {
+    "id": "call_03",
+    "outcome": "violated",
+    "invariant": "I2",
+    "reason": "resource outside claims",
+    "blame": "agent",
+    "gaps": []
+   },
+   "outside_grant": [
+    "file:Makefile"
+   ]
+  },
+  {
+   "call": "call_04",
+   "tool": "bash",
+   "input": "npm run deploy",
+   "kilo": "denied by a rule",
+   "amep": {
+    "id": "call_04",
+    "outcome": "preserved",
+    "invariant": "-",
+    "reason": "nothing executed: deploy-target signed a not_executed call statement",
+    "blame": null,
+    "gaps": []
+   },
+   "amep_without_deploy_target": {
+    "id": "call_04",
+    "outcome": "unresolved",
+    "invariant": "I10",
+    "reason": "denied, but only the host says it held; a high-impact call needs an independent not_executed statement",
+    "blame": null,
+    "gaps": [
+     {
+      "need": "independent_observer",
+      "ref": "call_04"
+     }
+    ]
+   },
+   "outside_grant": []
+  },
+  {
+   "call": "call_05",
+   "tool": "edit",
+   "input": "/work/app/config/prod/settings.json",
+   "kilo": "denied by a rule",
+   "amep": {
+    "id": "call_05",
+    "outcome": "preserved",
+    "invariant": "-",
+    "reason": "nothing executed: workspace-observer signed a not_executed call statement",
+    "blame": null,
+    "gaps": []
+   },
+   "amep_without_deploy_target": {
+    "id": "call_05",
+    "outcome": "preserved",
+    "invariant": "-",
+    "reason": "nothing executed: workspace-observer signed a not_executed call statement",
+    "blame": null,
+    "gaps": []
+   },
+   "outside_grant": []
+  }
+ ]
+}

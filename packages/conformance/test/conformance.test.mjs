@@ -608,3 +608,97 @@ describe("protect-mcp binding and phase", () => {
     assert.match(x.mapping.unbound, /another action/);
   });
 });
+
+// ---- Agent Receipts (agent-receipts/obsigna#1204) ----
+import { agentReceipts, checkChain } from "../src/profiles/agent-receipts.mjs";
+import { digest as coreDigest } from "@stafordtituss/amep/core";
+describe("agent-receipts profile", () => {
+  const fx = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "fixtures", "agent-receipts", "v040.json"), "utf8"));
+  const map = { tools: { "system.command.execute": { action: "command.execute", resource: "host:commands", effect: "write_shared" },
+    "data.api.read": { action: "api.read", resource: "api:data", effect: "read" } } };
+  test("a published receipt verifies under the issuer key; a changed one does not", () => {
+    assert.equal(agentReceipts.check(fx.idempotencyKeyReceipt, { publicKey: fx.publicKey }).verdict, "pass");
+    const t = structuredClone(fx.idempotencyKeyReceipt); t.credentialSubject.action.type = "data.api.read";
+    assert.equal(agentReceipts.check(t, { publicKey: fx.publicKey }).verdict, "verification failed");
+    assert.equal(agentReceipts.check(fx.idempotencyKeyReceipt, {}).verdict, "verification failed");
+  });
+  test("the retry chain is valid and reports its duplicate idempotency_key", () => {
+    const c = checkChain(fx.duplicateIdempotencyChain);
+    assert.equal(c.valid, true);
+    assert.deepEqual(c.duplicate_idempotency_keys, ["jsonrpc-req-retry-001"]);
+    const swapped = [fx.duplicateIdempotencyChain[1], fx.duplicateIdempotencyChain[0]];
+    assert.equal(checkChain(swapped).valid, false);
+  });
+  test("a success imports with the receipt's issuer as observer; a failure does not import", () => {
+    const ok = importRecord(fx.idempotencyKeyReceipt, { profile: "agent-receipts", map, publicKey: fx.publicKey });
+    assert.equal(ok.effect.executed.action, "command.execute");
+    assert.equal(ok.effect.observed_by, "did:agent:test");
+    assert.equal(ok.effect.assurance, "L1");
+    const fail = importRecord(fx.duplicateIdempotencyChain[0], { profile: "agent-receipts", map, publicKey: fx.publicKey });
+    assert.equal(fail.effect, null);
+    assert.match(fail.not_imported, /does not establish what was executed/);
+  });
+  test("worked verdicts: client-side mode is unresolved (I10); a timeout holds its retry (I7)", () => {
+    const issuer = Key.generate("iss", ["issuer"]), host = Key.generate("host", ["host"]), obs = Key.generate("obs", ["observer"]);
+    const keys = { ...keyset(issuer, obs), host: { ...host.publicEntry(), operator: "agent-op" } };
+    const m = issuer.sign({ id: "m-1", kind: "mandate", principal: "did:user:test", claims: { actions: ["command.execute", "api.read"],
+      resources: ["host:commands", "api:data"], ceiling: "write_shared", exp: "2026-12-31T00:00:00Z" } }, { v: 2 });
+    const a = host.sign({ id: "a-1", kind: "interpretation", source: "curated", adapter: "toolmap", version: "1" }, { v: 2 });
+    const run = (receipts, actor) => {
+      const invs = [], effects = [];
+      receipts.forEach((r, i) => {
+        const t = map.tools[r.credentialSubject.action.type];
+        const inv = host.sign({ id: `i-${i}`, kind: "invocation", authority_ref: "m-1", interpretation_ref: "a-1", t: r.credentialSubject.action.timestamp,
+          actor, declared: { action: t.action, resource: t.resource, effect: t.effect }, operation: r.credentialSubject.action.idempotency_key }, { v: 2 });
+        invs.push(inv);
+        const imp = importRecord(r, { profile: "agent-receipts", map, publicKey: fx.publicKey });
+        if (imp.effect) effects.push(obs.sign({ ...imp.effect, invocation: inv.id, invocation_digest: coreDigest(inv) }, { v: 2 }));
+      });
+      return amepEvaluate({ amep_version: "0.3", mandates: [m], interpretations: [a], invocations: invs, effects }, keys, sigOk);
+    };
+    const client = run([fx.idempotencyKeyReceipt], "did:agent:test");
+    assert.deepEqual([client[0].outcome, client[0].invariant], ["unresolved", "I10"]);
+    const retry = run(fx.duplicateIdempotencyChain, "agent:runtime");
+    assert.deepEqual([retry[1].outcome, retry[1].invariant], ["unresolved", "I7"]);
+  });
+});
+
+// ---- Kilo Code sessions (interop/kilo) ----
+import { claimsFromConfig, importSession } from "../src/profiles/kilo.mjs";
+describe("kilo profile", () => {
+  const R = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "interop", "kilo");
+  const J = p => JSON.parse(readFileSync(join(R, p), "utf8"));
+  test("allow rules become grants, deny rules a deny list, and ask grants nothing", () => {
+    const { claims, differences } = claimsFromConfig(J("kilo.json").permission, { commandScopes: { "npm *": ["node_modules/*"] } });
+    assert.deepEqual(claims.deny_resources, ["file:config/prod/*", "cmd:npm run deploy*"]);
+    assert.ok(claims.grants.some(g => g.actions[0] === "fs.write" && g.resources[0] === "file:src/*"));
+    assert.ok(claims.grants.some(g => g.resources[0] === "file:node_modules/*"));
+    assert.ok(!claims.grants.some(g => g.actions[0] !== "fs.read" && ["file:*", "cmd:*"].includes(g.resources[0])), "an ask rule must not become a grant");
+    assert.equal(differences.filter(d => /ask grants nothing/.test(d)).length, 2);
+  });
+  test("a wildcard inside a pattern grants nothing", () => {
+    const { claims, differences } = claimsFromConfig({ edit: { "src/*/test.ts": "allow" } });
+    assert.equal(claims.grants.length, 0);
+    assert.match(differences[0], /wildcard inside the pattern/);
+  });
+  test("a deny followed by an overlapping allow is reported as stricter than Kilo", () => {
+    const { differences } = claimsFromConfig({ bash: { "git *": "deny", "git status": "allow" } });
+    assert.ok(differences.some(d => /AMEP's deny always wins/.test(d)));
+  });
+  test("tool parts become invocations; a shell command declares the workspace as its scope; permission errors become denies", () => {
+    const { calls } = importSession(J("session.json"), { commandEffects: { "npm run deploy*": "external_send" } });
+    assert.equal(calls.length, 5);
+    assert.equal(calls[1].invocation.declared.resource, "file:src/auth.ts");
+    assert.deepEqual(calls[2].invocation.declared.scope, { actions: ["fs.*"], resources: ["file:*"] });
+    assert.equal(calls[3].invocation.declared.effect, "external_send");
+    assert.deepEqual(calls.filter(c => c.decision).map(c => c.callID), ["call_04", "call_05"]);
+  });
+  test("the demo's verdicts", () => {
+    const out = execFileSync(process.execPath, [join(R, "run.mjs")], { encoding: "utf8" });
+    assert.match(out, /call_03 .*violated I2 - resource outside claims \(blame agent\): file:Makefile/);
+    assert.match(out, /call_04 .*preserved/);
+    assert.match(out, /without the deploy target's record: unresolved I10/);
+    assert.match(out, /call_05 .*preserved/);
+    assert.match(out, /session verdict: violated/);
+  });
+});

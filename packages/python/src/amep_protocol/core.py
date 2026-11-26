@@ -420,6 +420,24 @@ def meet(a: dict, b: dict, v03: bool = False) -> dict:
     return m
 
 
+def within_declared(x: dict, inv: dict, v03: bool = False) -> bool:
+    """spec 5.8 (v0.3.3): an executed effect matches its call's declaration. A call whose effects are not known in
+    advance, such as a shell command, may declare a `scope` {actions, resources} instead of naming one effect: an
+    effect then matches when its action and resource fall within the scope and its class is at most the declared
+    class. Found while importing Kilo Code sessions, where an allowed command writes files the call did not name."""
+    d = inv["declared"]
+    sc = d.get("scope") if v03 else None
+    if sc is None:
+        return (x["action"], x["resource"]) == (d["action"], d["resource"])
+    return (any(pat_match(x["action"], p) for p in sc["actions"]) and any(pat_match(x["resource"], p) for p in sc["resources"])
+            and CEILING.index(x["effect"]) <= CEILING.index(d["effect"]))
+
+
+def scope_well_formed(sc) -> bool:
+    return (isinstance(sc, dict) and set(sc) == {"actions", "resources"}
+            and all(isinstance(sc[k], list) and sc[k] and all(isinstance(v, str) and v for v in sc[k]) for k in ("actions", "resources")))
+
+
 def effect_ok(x: dict, c: dict, v03: bool = False) -> tuple[bool, str]:
     gs = grants_of(c, v03)
     act = [g for g in gs if any(pat_match(x["action"], p) for p in g["actions"])]
@@ -728,7 +746,7 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
         x = operator_of(a)
         return x is not None and x == operator_of(b)
 
-    ctx = {"v03": v03, "totals": totals, "prior_windows": prior_windows, "same_operator": same_operator,
+    ctx = {"v03": v03, "totals": totals, "prior_windows": prior_windows, "same_operator": same_operator, "notes": {},
            "held": {d: h for d, h in held_in.items() if d not in present}, "new_held": {}, "first_cause": first_cause,
            # spec 5.10, held approvals (v0.3): approvals held for earlier invocations whose outcome is unknown; one held by an
            # invocation in this packet is set aside, since this packet decides that invocation afresh
@@ -784,9 +802,13 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
         rid = inv.get("id", "?")
         try:
             leaked = [f for f in inv.get("influenced_by", []) if f in quarantined and n > quarantined[f]]
-            _check(bool(leaked) and not inv.get("principal_confirmed"), "violated", "I4", f"quarantined content reached the agent ({', '.join(leaked)})", blame="host")
+            if leaked and not principal_confirms(inv, objs, vsig, leaked):
+                _check(bool(inv.get("principal_confirmed")), "unresolved", "I4",
+                       f"quarantined content reached the agent ({', '.join(leaked)}); only the host says the principal confirmed it",
+                       need="principal_confirmation", ref=rid)
+                _check(True, "violated", "I4", f"quarantined content reached the agent ({', '.join(leaked)})", blame="host")
             why = _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects, spent, approval_use, extra_protected, order, taint, ctx)
-            out.append(Result(rid, "preserved", "-", why or "continuity preserved"))
+            out.append(Result(rid, "preserved", "-", why or ctx["notes"].get(rid) or "continuity preserved"))
         except Stop as s:
             out.append(Result(rid, *s.r))
         except (Malformed, KeyError, TypeError, ValueError, AttributeError) as e:
@@ -820,7 +842,13 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
     inv_ids = {i.get("id") for i in packet.get("invocations", [])}
     for e in effects:
         if e.get("invocation") not in inv_ids:
-            out.append(Result(e.get("id", "?"), "violated", "I11", "effect without any authorized invocation (bypass)", blame="host"))
+            # spec 10.4 (v0.3.3), from stafordtituss/amep#36: an invocation missing from this packet may have been left out
+            # by whoever assembled it. AMEP can't assume the packet is complete (LIMITS.md, section A), so absence is a
+            # missing record, not proof of a bypass, and no party is blamed for it.
+            ref = e.get("invocation")
+            out.append(Result(e.get("id", "?"), "unresolved", "I11",
+                              f"effect names invocation {ref}, which is not in this packet: a bypass, or a packet that left it out",
+                              gaps=[{"need": "invocation", "ref": str(ref) if ref is not None else "-"}]))
     state["spent"] = spent
     state["approvals_used"] = {k: list(v) for k, v in approval_use.items()}
     if totals:
@@ -853,11 +881,26 @@ def _units_str(u: int) -> str:
     return f"{ip}.{fp_s}" if fp_s else str(ip)
 
 
+MAX_REVOCATION_WINDOW = 3600   # spec 5.12.1 (v0.3.3): a window may not outlast an hour
+
+
 def _revocation_window(node) -> float:
     w = (node.get("revocation") or {}).get("window", 0)
     if isinstance(w, bool) or not isinstance(w, (int, float)) or w < 0:
         raise Malformed("revocation window must be a non-negative number of seconds")
+    if w > MAX_REVOCATION_WINDOW:
+        raise Malformed(f"revocation window of {w:g}s exceeds the {MAX_REVOCATION_WINDOW}s maximum (spec 5.12.1)")
     return w
+
+
+def principal_confirms(inv: dict, objs: dict, vsig, needed: list) -> bool:
+    """spec 5.11 (v0.3.3), from stafordtituss/amep#34: a principal's confirmation of a call shaped by untrusted or
+    quarantined content is an approval (spec 5.10) signed by an approver key that lists, in `findings`, every finding
+    the principal was shown. Like any approval it is bound to the executed effect and used once. The host's own
+    `principal_confirmed: true` is the party being judged vouching for itself, so it never confirms on its own."""
+    ap = objs.get(inv.get("approval_ref")) if "approval_ref" in inv else None
+    return (isinstance(ap, dict) and ap.get("kind") == "approval" and vsig(ap)
+            and isinstance(ap.get("findings"), list) and all(f in ap["findings"] for f in needed))
 
 
 def _admission(e, inv, eff_claims, extra_protected, ctx):
@@ -868,7 +911,7 @@ def _admission(e, inv, eff_claims, extra_protected, ctx):
     differs from the declared one would charge the server, so it stays unresolved, as does every other self-report."""
     x = e.get("executed")
     try:
-        if not isinstance(x, dict) or (x["action"], x["resource"]) != (inv["declared"]["action"], inv["declared"]["resource"]):
+        if not isinstance(x, dict) or not within_declared(x, inv, ctx["v03"]):
             return
         note = " (on the actor's own record; not independently observed)"
         _check(is_guardrail(x["resource"], extra_protected), "violated", "I9", "executed effect targets guardrail/evidence store" + note, blame="agent")
@@ -955,6 +998,11 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
                    need="well_formed_evidence", ref=n['id'])
             _check("audiences" in n["claims"], "unresolved", "I7", f"{n['id']}: audiences require amep_version 0.3",
                    need="well_formed_evidence", ref=n['id'])
+    if "scope" in (inv.get("declared") or {}):
+        # declared.scope is an AMEP 0.3 member: ignored, it would turn a departure into a match.
+        _check(not ctx["v03"], "unresolved", "I7", f"{rid}: declared.scope requires amep_version 0.3", need="well_formed_evidence", ref=rid)
+        _check(not scope_well_formed(inv["declared"]["scope"]), "unresolved", "I7",
+               f"{rid}: declared.scope must be exactly {{actions, resources}}, each a non-empty list of patterns", need="well_formed_evidence", ref=rid)
     if ctx["v03"] and "reserve" in inv:
         try:
             check_reserve(inv["reserve"])
@@ -1002,7 +1050,12 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         for r_t, target, why in sorted(revoked_at):
             if r_t <= t:
                 w = _revocation_window(by_id[target])
-                _check(t < r_t + w, "unresolved", "I6", f"{why} {t - r_t:g}s before {what}, inside its {w:g}s propagation window", blame="agent", need="revocation_settled", ref=target)
+                # spec 5.12.1 (v0.3.3), from stafordtituss/amep#35: the window is part of the signed grant, so an action
+                # inside it is within the authority as granted. Nothing is missing, so the result isn't unresolved; the
+                # revocation is noted in the reason instead.
+                if t < r_t + w:
+                    ctx["notes"].setdefault(rid, f"preserved inside the {w:g}s propagation window: {why} {t - r_t:g}s before {what}")
+                    continue
                 _check(True, "violated", "I6", f"{why} before {what}", blame="agent")
 
     def fresh_status(t, what):
@@ -1021,8 +1074,10 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
     mine = [e for e in effects if e.get("invocation") == rid]
     untrusted = [f for f in inv.get("influenced_by", [])
                  if not (objs.get(f) and vsig(objs[f]) and objs[f].get("integrity_label") == "trusted")]
-    _check(bool(untrusted) and inv["declared"]["effect"] != "read" and not inv.get("principal_confirmed"),
-           "violated" if mine else "unresolved", "I4", "mutation shaped by untrusted content", blame="agent", need="principal_confirmation", ref=rid)
+    if untrusted and inv["declared"]["effect"] != "read" and not principal_confirms(inv, objs, vsig, untrusted):
+        _check(bool(inv.get("principal_confirmed")), "unresolved", "I4",
+               "mutation shaped by untrusted content; only the host says the principal confirmed it", need="principal_confirmation", ref=rid)
+        _check(True, "violated" if mine else "unresolved", "I4", "mutation shaped by untrusted content", blame="agent", need="principal_confirmation", ref=rid)
     # 10. call statements (spec 5.14, v0.3): the observer's signed account of the whole call. It binds the call to
     # this exact signed invocation and to the arguments the server received, says whether anything was executed,
     # and how many receipts to expect, so that "no receipt" is no longer ambiguous.
@@ -1118,7 +1173,8 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         if "mediated" in inv:
             _check(canon(x) != canon(inv["mediated"]), "violated", "I2", "executed differs from mediated effect", blame="server")
         else:
-            _check((x["action"], x["resource"]) != (inv["declared"]["action"], inv["declared"]["resource"]), "violated", "I2", "declared != executed", blame="server")
+            _check(not within_declared(x, inv, ctx["v03"]), "violated", "I2",
+                   "executed outside the call's declared scope" if ctx["v03"] and "scope" in inv["declared"] else "declared != executed", blame="server")
         _check(is_guardrail(x["resource"], extra_protected), "violated", "I9", "executed effect targets guardrail/evidence store", blame="agent")
         ok, why = effect_ok(x, eff_claims, ctx["v03"])
         _check(not ok, "violated", "I5" if why.startswith("released") else "I2", why, blame="agent")
