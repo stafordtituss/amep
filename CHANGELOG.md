@@ -3,6 +3,24 @@
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
 
+## Calls whose effects aren't known in advance, and a Kilo Code demo (unreleased, 2026-11-26)
+
+- **The gap, found while importing Kilo Code sessions (`interop/kilo/`):** every effect of a call had to match the call's declared effect exactly. A shell command can't name its writes in advance. So every write by an allowed `npm install` read as a departure charged to the server, the harmless ones included.
+- **Now (spec 5.8.2):** `declared.scope`, `{actions, resources}` in the shape of a grant, lets such a call declare where its effects may land.
+  - An effect within the scope, at most the declared class, is judged against the claims like any other. One outside the grant is `violated` (I2), charged to the agent.
+  - An effect outside the scope is `violated` (I2), charged to the server, as before.
+  - A scope permits nothing the claims don't.
+  - It's an AMEP 0.3 member: in an unversioned packet, or when malformed, the result is `unresolved` (I7).
+- **Suite v0.3.3:** 6 more core vectors (1 positive, 5 must-reject). The core suite now has 283 (74 positive, 209 must-reject). No existing vector changes. Both reference verifiers and the browser page agree on all 283.
+- **Schemas:** `scope` in `declared`, in the JSON Schemas and the CDDL.
+- **`packages/conformance/src/profiles/kilo.mjs`** maps a Kilo permission config to AMEP claims and `kilo export` tool parts to invocations:
+  - `allow` rules become grants, `deny` rules a deny list, and `ask` grants nothing;
+  - where the two differ, AMEP is stricter, and the profile says where.
+- **`interop/kilo/`:** a five-call session, constructed in the shape of `kilo export`, with a workspace observer's record.
+  - Kilo allowed `npm install`, and its install script rewrote the `Makefile`: `violated`, naming that one write.
+  - A denied deploy is `unresolved` until the deployment target signs that nothing arrived.
+- **Fix to a stale test:** Provared line 8 has been `violated` (I2) since the admissions rule, matching Provared's own finding.
+
 ## 0.3.0 (2026-11-25)
 
 The packages leave alpha: `amep-protocol` 0.3.0 on PyPI and `amep-protocol` 0.3.0 on npm. With them, Internet-Draft -02 and suite v0.3.2. The sections below, back to 0.3.0a4, are what this release contains. In brief:

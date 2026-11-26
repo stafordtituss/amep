@@ -277,6 +277,18 @@ function meet(a, b, v03 = false) {
     if (key in a || key in b) m[key] = [...new Set([...(a[key] || []), ...(b[key] || [])])].sort();
   return m;
 }
+// spec 5.8 (v0.3.3): an executed effect matches its call's declaration. A call whose effects are not known in advance,
+// such as a shell command, may declare a scope {actions, resources} instead of naming one effect: an effect then matches
+// when its action and resource fall within the scope and its class is at most the declared class.
+export function withinDeclared(x, inv, v03 = false) {
+  const d = inv.declared, sc = v03 ? d.scope : undefined;
+  if (sc === undefined) return x.action === d.action && x.resource === d.resource;
+  return sc.actions.some(p => patMatch(x.action, p)) && sc.resources.some(p => patMatch(x.resource, p))
+    && CEILING.indexOf(x.effect) <= CEILING.indexOf(d.effect);
+}
+const scopeWellFormed = sc => !!sc && typeof sc === "object" && !Array.isArray(sc)
+  && Object.keys(sc).length === 2 && ["actions", "resources"].every(k => Array.isArray(sc[k]) && sc[k].length > 0
+  && sc[k].every(v => typeof v === "string" && v.length > 0));
 function effectOk(x, c, v03 = false) {
   const act = grantsOf(c, v03).filter(g => g.actions.some(p => patMatch(x.action, p)));
   if (!act.length) return [false, "action outside claims"];
@@ -587,7 +599,7 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     let ok, why;
     const note = " (on the actor's own record; not independently observed)";
     try {
-      if (!x || typeof x !== "object" || x.action !== inv.declared.action || x.resource !== inv.declared.resource) return;
+      if (!x || typeof x !== "object" || !withinDeclared(x, inv, v03)) return;
       check(isGuardrail(x.resource, extraProtected), "violated", "I9", "executed effect targets guardrail/evidence store" + note, { blame: "agent" });
       [ok, why] = effectOk(x, claims, v03);
     } catch (err) {
@@ -626,6 +638,12 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       check("grants" in x.claims, "unresolved", "I7", `${x.id}: grants require amep_version 0.3`, { need: "well_formed_evidence", ref: x.id });
     if (!v03) for (const x of nodes)
       check("audiences" in x.claims, "unresolved", "I7", `${x.id}: audiences require amep_version 0.3`, { need: "well_formed_evidence", ref: x.id });
+    if (inv.declared && typeof inv.declared === "object" && "scope" in inv.declared) {
+      // declared.scope is an AMEP 0.3 member: ignored, it would turn a departure into a match.
+      check(!v03, "unresolved", "I7", `${id}: declared.scope requires amep_version 0.3`, { need: "well_formed_evidence", ref: id });
+      check(!scopeWellFormed(inv.declared.scope), "unresolved", "I7",
+        `${id}: declared.scope must be exactly {actions, resources}, each a non-empty list of patterns`, { need: "well_formed_evidence", ref: id });
+    }
     if (v03 && "reserve" in inv) {
       try { checkReserve(inv.reserve); }
       catch (e) { if (!(e instanceof Malformed)) throw e; check(true, "unresolved", "I7", `${id}: ${e.message}`, { need: "reserve", ref: id }); }
@@ -758,7 +776,8 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       liveness(toTime(x.t), `effect ${e.id ?? "?"}`);
       freshStatus(toTime(x.t), `effect ${e.id ?? "?"}`);
       if ("mediated" in inv) check(canon(x) !== canon(inv.mediated), "violated", "I2", "executed differs from mediated effect", { blame: "server" });
-      else check(x.action !== inv.declared.action || x.resource !== inv.declared.resource, "violated", "I2", "declared != executed", { blame: "server" });
+      else check(!withinDeclared(x, inv, v03), "violated", "I2",
+        v03 && "scope" in inv.declared ? "executed outside the call's declared scope" : "declared != executed", { blame: "server" });
       check(isGuardrail(x.resource, extraProtected), "violated", "I9", "executed effect targets guardrail/evidence store", { blame: "agent" });
       const [ok, why] = effectOk(x, claims, v03);
       check(!ok, "violated", why.startsWith("released") ? "I5" : "I2", why, { blame: "agent" });

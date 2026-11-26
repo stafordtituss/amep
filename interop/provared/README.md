@@ -19,7 +19,7 @@ The AMEP import profile (`packages/conformance/src/profiles/provared.mjs`) works
 | Agree | 2 and 4 are `preserved` and Provared finds no breach. 6 is `violated` (I2, blame `agent`), where Provared finds `over-limit` and `approval-missing` |
 | Both flag it, in different terms | 5: an order with no countersignature. Provared reports `countersignature-missing`; AMEP is `unresolved`, gap `independent_observer` (I10) |
 | AMEP is stricter | 3: a message the agent sent, recorded only by the agent. Provared requires nothing more. AMEP requires an independent observer for any effect of class `external_send` or above, so it is `unresolved` |
-| **AMEP gap** | 8: the agent deleted files, an action its slip does not allow, and only the agent recorded it. Provared reports `action-not-allowed`; AMEP stops at observer independence and is `unresolved` |
+| Both flag it (closed in 0.3.0) | 8: the agent deleted files, an action its slip does not allow, and only the agent recorded it. Provared reports `action-not-allowed`. AMEP was `unresolved` here before 0.3.0; it now treats the agent's own record of the breach as an admission: `violated` (I2), marked "on the actor's own record; not independently observed" |
 
 The tamper checks (in the profile's tests) all fail closed: a changed amount, a removed or flipped signature (Ed25519, ML-DSA-87 or passkey), a moved countersignature or approval, a deleted stub, and non-canonical content.
 
@@ -46,7 +46,7 @@ AMEP can't yet verify passkey or ML-DSA signatures itself, which is why its obje
 
 ## Open questions for AMEP, raised by this run
 
-1. **The agent's own record of an action outside its permission (line 8).** Should a self-reported effect that falls outside the effective claims be `violated`, as the actor's admission, rather than `unresolved` for lack of an independent observer? An admission against interest is strong evidence. The risk to weigh is a host framing an agent with records it signed itself.
+1. **Answered in 0.3.0 (stafordtituss/amep#32).** The agent's own record of an action outside its permission (line 8). Should a self-reported effect that falls outside the effective claims be `violated`, as the actor's admission, rather than `unresolved` for lack of an independent observer? An admission against interest is strong evidence. The risk to weigh is a host framing an agent with records it signed itself.
 2. **Caps an approval cannot lift.** Every AMEP limit can be exceeded with an approval that passed I8. Provared's `each` cap cannot be. A limit member such as `"approvable": false` would express it.
 3. **Spending that stays unresolved.** At line 6, AMEP's period total is 205 GBP, not Provared's 230: line 5's 25 GBP isn't counted, because that invocation's evaluation stopped at I10 before the limits. The packet verdict can't come out `preserved` because of this (an unresolved invocation keeps the packet from being preserved), but per-invocation results after an unresolved payment are computed from a smaller total than may have been spent.
 4. **Passkey (WebAuthn) and ML-DSA signatures in AMEP itself**, so that a slip could stand as an AMEP mandate without re-expression. That's planned as the optional post-quantum capability.

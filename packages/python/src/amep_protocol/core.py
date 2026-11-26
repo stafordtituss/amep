@@ -420,6 +420,24 @@ def meet(a: dict, b: dict, v03: bool = False) -> dict:
     return m
 
 
+def within_declared(x: dict, inv: dict, v03: bool = False) -> bool:
+    """spec 5.8 (v0.3.3): an executed effect matches its call's declaration. A call whose effects are not known in
+    advance, such as a shell command, may declare a `scope` {actions, resources} instead of naming one effect: an
+    effect then matches when its action and resource fall within the scope and its class is at most the declared
+    class. Found while importing Kilo Code sessions, where an allowed command writes files the call did not name."""
+    d = inv["declared"]
+    sc = d.get("scope") if v03 else None
+    if sc is None:
+        return (x["action"], x["resource"]) == (d["action"], d["resource"])
+    return (any(pat_match(x["action"], p) for p in sc["actions"]) and any(pat_match(x["resource"], p) for p in sc["resources"])
+            and CEILING.index(x["effect"]) <= CEILING.index(d["effect"]))
+
+
+def scope_well_formed(sc) -> bool:
+    return (isinstance(sc, dict) and set(sc) == {"actions", "resources"}
+            and all(isinstance(sc[k], list) and sc[k] and all(isinstance(v, str) and v for v in sc[k]) for k in ("actions", "resources")))
+
+
 def effect_ok(x: dict, c: dict, v03: bool = False) -> tuple[bool, str]:
     gs = grants_of(c, v03)
     act = [g for g in gs if any(pat_match(x["action"], p) for p in g["actions"])]
@@ -868,7 +886,7 @@ def _admission(e, inv, eff_claims, extra_protected, ctx):
     differs from the declared one would charge the server, so it stays unresolved, as does every other self-report."""
     x = e.get("executed")
     try:
-        if not isinstance(x, dict) or (x["action"], x["resource"]) != (inv["declared"]["action"], inv["declared"]["resource"]):
+        if not isinstance(x, dict) or not within_declared(x, inv, ctx["v03"]):
             return
         note = " (on the actor's own record; not independently observed)"
         _check(is_guardrail(x["resource"], extra_protected), "violated", "I9", "executed effect targets guardrail/evidence store" + note, blame="agent")
@@ -955,6 +973,11 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
                    need="well_formed_evidence", ref=n['id'])
             _check("audiences" in n["claims"], "unresolved", "I7", f"{n['id']}: audiences require amep_version 0.3",
                    need="well_formed_evidence", ref=n['id'])
+    if "scope" in (inv.get("declared") or {}):
+        # declared.scope is an AMEP 0.3 member: ignored, it would turn a departure into a match.
+        _check(not ctx["v03"], "unresolved", "I7", f"{rid}: declared.scope requires amep_version 0.3", need="well_formed_evidence", ref=rid)
+        _check(not scope_well_formed(inv["declared"]["scope"]), "unresolved", "I7",
+               f"{rid}: declared.scope must be exactly {{actions, resources}}, each a non-empty list of patterns", need="well_formed_evidence", ref=rid)
     if ctx["v03"] and "reserve" in inv:
         try:
             check_reserve(inv["reserve"])
@@ -1118,7 +1141,8 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         if "mediated" in inv:
             _check(canon(x) != canon(inv["mediated"]), "violated", "I2", "executed differs from mediated effect", blame="server")
         else:
-            _check((x["action"], x["resource"]) != (inv["declared"]["action"], inv["declared"]["resource"]), "violated", "I2", "declared != executed", blame="server")
+            _check(not within_declared(x, inv, ctx["v03"]), "violated", "I2",
+                   "executed outside the call's declared scope" if ctx["v03"] and "scope" in inv["declared"] else "declared != executed", blame="server")
         _check(is_guardrail(x["resource"], extra_protected), "violated", "I9", "executed effect targets guardrail/evidence store", blame="agent")
         ok, why = effect_ok(x, eff_claims, ctx["v03"])
         _check(not ok, "violated", "I5" if why.startswith("released") else "I2", why, blame="agent")

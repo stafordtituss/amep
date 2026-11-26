@@ -1,0 +1,126 @@
+{
+ "$comment": "Constructed for the AMEP demo in the shape of `kilo export`; not a recorded Kilo session. See make-session.py.",
+ "info": {
+  "id": "ses_demo",
+  "directory": "/work/app",
+  "title": "Fix token expiry check"
+ },
+ "messages": [
+  {
+   "info": {
+    "id": "msg_2",
+    "sessionID": "ses_demo",
+    "role": "assistant"
+   },
+   "parts": [
+    {
+     "id": "prt_call_01",
+     "sessionID": "ses_demo",
+     "messageID": "msg_2",
+     "type": "tool",
+     "callID": "call_01",
+     "tool": "read",
+     "state": {
+      "status": "completed",
+      "input": {
+       "filePath": "/work/app/README.md"
+      },
+      "time": {
+       "start": 1795651201000,
+       "end": 1795651201800
+      },
+      "output": "...",
+      "title": "README.md",
+      "metadata": {}
+     }
+    },
+    {
+     "id": "prt_call_02",
+     "sessionID": "ses_demo",
+     "messageID": "msg_2",
+     "type": "tool",
+     "callID": "call_02",
+     "tool": "edit",
+     "state": {
+      "status": "completed",
+      "input": {
+       "filePath": "/work/app/src/auth.ts",
+       "oldString": "if (token)",
+       "newString": "if (token && !expired(token))"
+      },
+      "time": {
+       "start": 1795651205000,
+       "end": 1795651205800
+      },
+      "output": "Edit applied",
+      "title": "src/auth.ts",
+      "metadata": {}
+     }
+    },
+    {
+     "id": "prt_call_03",
+     "sessionID": "ses_demo",
+     "messageID": "msg_2",
+     "type": "tool",
+     "callID": "call_03",
+     "tool": "bash",
+     "state": {
+      "status": "completed",
+      "input": {
+       "command": "npm install",
+       "description": "Install dependencies"
+      },
+      "time": {
+       "start": 1795651209000,
+       "end": 1795651209800
+      },
+      "output": "added 214 packages",
+      "title": "npm install",
+      "metadata": {}
+     }
+    },
+    {
+     "id": "prt_call_04",
+     "sessionID": "ses_demo",
+     "messageID": "msg_2",
+     "type": "tool",
+     "callID": "call_04",
+     "tool": "bash",
+     "state": {
+      "status": "error",
+      "input": {
+       "command": "npm run deploy",
+       "description": "Deploy the fix"
+      },
+      "time": {
+       "start": 1795651214000,
+       "end": 1795651214800
+      },
+      "error": "The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {\"permission\":\"bash\",\"pattern\":\"npm run deploy*\",\"action\":\"deny\"}"
+     }
+    },
+    {
+     "id": "prt_call_05",
+     "sessionID": "ses_demo",
+     "messageID": "msg_2",
+     "type": "tool",
+     "callID": "call_05",
+     "tool": "edit",
+     "state": {
+      "status": "error",
+      "input": {
+       "filePath": "/work/app/config/prod/settings.json",
+       "oldString": "\"debug\": false",
+       "newString": "\"debug\": true"
+      },
+      "time": {
+       "start": 1795651218000,
+       "end": 1795651218800
+      },
+      "error": "The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {\"permission\":\"edit\",\"pattern\":\"config/prod/*\",\"action\":\"deny\"}"
+     }
+    }
+   ]
+  }
+ ]
+}

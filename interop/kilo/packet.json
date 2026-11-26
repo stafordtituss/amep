@@ -1,0 +1,375 @@
+{
+ "amep_version": "0.3",
+ "mandates": [
+  {
+   "id": "m-1",
+   "kind": "mandate",
+   "principal": "user:developer",
+   "claims": {
+    "grants": [
+     {
+      "actions": [
+       "fs.read"
+      ],
+      "resources": [
+       "file:*"
+      ]
+     },
+     {
+      "actions": [
+       "fs.write"
+      ],
+      "resources": [
+       "file:src/*"
+      ]
+     },
+     {
+      "actions": [
+       "process.exec"
+      ],
+      "resources": [
+       "cmd:npm *"
+      ]
+     },
+     {
+      "actions": [
+       "fs.write"
+      ],
+      "resources": [
+       "file:node_modules/*"
+      ]
+     },
+     {
+      "actions": [
+       "fs.write"
+      ],
+      "resources": [
+       "file:package-lock.json"
+      ]
+     }
+    ],
+    "ceiling": "write_local",
+    "exp": "2026-12-31T00:00:00Z",
+    "deny_resources": [
+     "file:config/prod/*",
+     "cmd:npm run deploy*"
+    ]
+   },
+   "proof": {
+    "kid": "user",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "883dd6c32069b3377632c5a97bccbcc35cde354847d7524b394ec4d56a92e8e514b91522cae25372525383b70a554ecb87bc5bbf9868dc67754c6ca8b98c8605"
+   }
+  }
+ ],
+ "interpretations": [
+  {
+   "id": "a-1",
+   "kind": "interpretation",
+   "source": "curated",
+   "adapter": "kilo-code",
+   "version": "b12e612",
+   "proof": {
+    "kid": "kilo-host",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "20e6112b0c56fe49886ac4009fd72fe2e77055951eadc8d61806696a4ae9032afec5f9e1f6d59079be7e6a70c4b86e746822e4c8bf8e8e28849a88c27c4a650e"
+   }
+  }
+ ],
+ "invocations": [
+  {
+   "id": "call_01",
+   "kind": "invocation",
+   "authority_ref": "m-1",
+   "interpretation_ref": "a-1",
+   "t": "2026-11-26T00:00:01Z",
+   "actor": "agent:kilo",
+   "declared": {
+    "action": "fs.read",
+    "resource": "file:README.md",
+    "effect": "read"
+   },
+   "proof": {
+    "kid": "kilo-host",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "89e4ab78c15a5ce6073ea368a3836048a6cda3db29eb1962115872f16ff3f95460b46b3205df7ef6c2391825e748a74002a203394b14bf34b6835ed8da67d80b"
+   }
+  },
+  {
+   "id": "call_02",
+   "kind": "invocation",
+   "authority_ref": "m-1",
+   "interpretation_ref": "a-1",
+   "t": "2026-11-26T00:00:05Z",
+   "actor": "agent:kilo",
+   "declared": {
+    "action": "fs.write",
+    "resource": "file:src/auth.ts",
+    "effect": "write_local"
+   },
+   "proof": {
+    "kid": "kilo-host",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "5f8c9f2f3c3ba117606e68e045de50b7eff8ac33f0757a897e0340f9f36cfaaa0a0ad99d3d203f9dd8ebcdcc21ea2fa8c341e5e09d3388be5c13ab040b22e800"
+   }
+  },
+  {
+   "id": "call_03",
+   "kind": "invocation",
+   "authority_ref": "m-1",
+   "interpretation_ref": "a-1",
+   "t": "2026-11-26T00:00:09Z",
+   "actor": "agent:kilo",
+   "declared": {
+    "action": "process.exec",
+    "resource": "cmd:npm install",
+    "effect": "write_local",
+    "scope": {
+     "actions": [
+      "fs.*"
+     ],
+     "resources": [
+      "file:*"
+     ]
+    }
+   },
+   "proof": {
+    "kid": "kilo-host",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "296b875407e9c07004819ca221fd6d5ffa7674586e01b3080844c177c02eecb4728019acb60ef187ffb82ff61181ba1906529e05891ec483190b62f152d27604"
+   }
+  },
+  {
+   "id": "call_04",
+   "kind": "invocation",
+   "authority_ref": "m-1",
+   "interpretation_ref": "a-1",
+   "t": "2026-11-26T00:00:14Z",
+   "actor": "agent:kilo",
+   "declared": {
+    "action": "process.exec",
+    "resource": "cmd:npm run deploy",
+    "effect": "external_send",
+    "scope": {
+     "actions": [
+      "fs.*"
+     ],
+     "resources": [
+      "file:*"
+     ]
+    }
+   },
+   "proof": {
+    "kid": "kilo-host",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "d75a477eddaf4d29079e117902ffe3f7905a0db3f42e2f813118d692d06dcf55877b1f8534271921e2f78b435ea887b77781f38a5bccd03304e40c240426960d"
+   }
+  },
+  {
+   "id": "call_05",
+   "kind": "invocation",
+   "authority_ref": "m-1",
+   "interpretation_ref": "a-1",
+   "t": "2026-11-26T00:00:18Z",
+   "actor": "agent:kilo",
+   "declared": {
+    "action": "fs.write",
+    "resource": "file:config/prod/settings.json",
+    "effect": "write_local"
+   },
+   "proof": {
+    "kid": "kilo-host",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "8bdf786b80568667778bdf131998753703587905cb0fb51057736200fcc9705d78e53283e2786f7cd402319e6cdb2130ce58a5b5b8392029a551af792f69710f"
+   }
+  }
+ ],
+ "effects": [
+  {
+   "id": "e-call_01",
+   "kind": "effect",
+   "invocation": "call_01",
+   "observed_by": "kilo",
+   "assurance": "L1",
+   "invocation_digest": "de0e56a3768e0abb37cd16149eb80002e81d585b544d89174f040cc2919648e9",
+   "executed": {
+    "action": "fs.read",
+    "resource": "file:README.md",
+    "effect": "read",
+    "released": [],
+    "t": "2026-11-26T00:00:01Z"
+   },
+   "proof": {
+    "kid": "kilo-reader",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "9e031d8a5a61ece7943a9e2ba8f55c1b798059acb43bbb791357a49651ef81a664da2ecb2a2e24f9ad2bd5eda507b2a02193d0b71c1003230cc7d693377dc10c"
+   }
+  },
+  {
+   "id": "e-call_02-0",
+   "kind": "effect",
+   "invocation": "call_02",
+   "observed_by": "workspace-observer",
+   "assurance": "L2",
+   "invocation_digest": "20beb8b78e07b24655ff7be4b7fb398d3ffa8c9a63b7c61d09fc61f7fb18c831",
+   "executed": {
+    "action": "fs.write",
+    "resource": "file:src/auth.ts",
+    "effect": "write_local",
+    "released": [],
+    "t": "2026-11-26T00:00:05Z"
+   },
+   "proof": {
+    "kid": "workspace-observer",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "bed1cf1dc5787602cd32023ee25938c0f5d232aa5a3b3ac253ad37ca4c5a3aaa40101c8bf014245f67fced871d9255673907040e8b9c428c3bea1068ee13910e"
+   }
+  },
+  {
+   "id": "e-call_03-0",
+   "kind": "effect",
+   "invocation": "call_03",
+   "observed_by": "workspace-observer",
+   "assurance": "L2",
+   "invocation_digest": "95108227710ff6e1243d77a807af18398c793443fa9f00288cf9954e3a937ffc",
+   "executed": {
+    "action": "fs.write",
+    "resource": "file:node_modules/.package-lock.json",
+    "effect": "write_local",
+    "released": [],
+    "t": "2026-11-26T00:00:09Z"
+   },
+   "proof": {
+    "kid": "workspace-observer",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "794303eebe0e661afe188cda6d9b4edceb4cfc587a94985d48a34527b29eb0da25935877a0abe23d2cef5bee071965d20985a10d28f37f1a806848f95d3a4f07"
+   }
+  },
+  {
+   "id": "e-call_03-1",
+   "kind": "effect",
+   "invocation": "call_03",
+   "observed_by": "workspace-observer",
+   "assurance": "L2",
+   "invocation_digest": "95108227710ff6e1243d77a807af18398c793443fa9f00288cf9954e3a937ffc",
+   "executed": {
+    "action": "fs.write",
+    "resource": "file:package-lock.json",
+    "effect": "write_local",
+    "released": [],
+    "t": "2026-11-26T00:00:09Z"
+   },
+   "proof": {
+    "kid": "workspace-observer",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "48ac410b2980d72397833cf911af2377ffeb6cfcbf37b8d1a4ccfbadba72caa80016695e62c52e3db2f6204bdcb23c92511a980a33d7194d86ede2e9e5ded90b"
+   }
+  },
+  {
+   "id": "e-call_03-2",
+   "kind": "effect",
+   "invocation": "call_03",
+   "observed_by": "workspace-observer",
+   "assurance": "L2",
+   "invocation_digest": "95108227710ff6e1243d77a807af18398c793443fa9f00288cf9954e3a937ffc",
+   "executed": {
+    "action": "fs.write",
+    "resource": "file:Makefile",
+    "effect": "write_local",
+    "released": [],
+    "t": "2026-11-26T00:00:09Z"
+   },
+   "proof": {
+    "kid": "workspace-observer",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "2df97a612433296d968f9264a3fa0942e904e0b0c7ccc8f9b446c2980828b9e5e44f5233e4265cbda46229237dc6c0cc5f6cb52b2da4f133333ef26f1acc320e"
+   }
+  }
+ ],
+ "decisions": [
+  {
+   "kind": "decision",
+   "invocation": "call_04",
+   "outcome": "violated",
+   "mode": "deny",
+   "phase": "pre_execution",
+   "reason": "Kilo PermissionDeniedError",
+   "enforcement": {
+    "pep": "kilo-permission",
+    "fail_mode": "closed",
+    "applied": "confirmed"
+   },
+   "proof": {
+    "kid": "kilo-host",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "3667d1846c3ce07426c4f12503973612cb3a0ffee33c34e531a2253ff92d0b011d580159eda1b292189f4c10fdf1e5ac900d8e745fd578c7da1a88618b383301"
+   }
+  },
+  {
+   "kind": "decision",
+   "invocation": "call_05",
+   "outcome": "violated",
+   "mode": "deny",
+   "phase": "pre_execution",
+   "reason": "Kilo PermissionDeniedError",
+   "enforcement": {
+    "pep": "kilo-permission",
+    "fail_mode": "closed",
+    "applied": "confirmed"
+   },
+   "proof": {
+    "kid": "kilo-host",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "c1547fea7916cd0c34484270db76c046555b271ed9990cd814e112728b082357975d1492f90c544273ef9e4948778acaaf7465870fa8bd52000866668fd8430f"
+   }
+  }
+ ],
+ "call_statements": [
+  {
+   "id": "c-call_05",
+   "kind": "call_statement",
+   "invocation": "call_05",
+   "observed_by": "workspace-observer",
+   "disposition": "not_executed",
+   "effect_count": 0,
+   "t": "2026-11-26T00:00:18Z",
+   "invocation_digest": "84c609c151c8bccdaaff3cd384c5e48081e3f02c47e8411be2eb73214d92009a",
+   "proof": {
+    "kid": "workspace-observer",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "bc435a0c3c9ad5981ab8b6112beac609fa1a7588b9a4acc657bcc829c00902d55b8ce60b24fc0f337f43d3bb23df59625405483fcebc8acf7dab2ed80798a60b"
+   }
+  },
+  {
+   "id": "c-call_04",
+   "kind": "call_statement",
+   "invocation": "call_04",
+   "observed_by": "deploy-target",
+   "disposition": "not_executed",
+   "effect_count": 0,
+   "t": "2026-11-26T00:00:14Z",
+   "invocation_digest": "3c40406f1adb95629ace18351bd316cfa3c125bfb17e80d90e2914bb8bbaab14",
+   "proof": {
+    "kid": "deploy-target",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "65716526a7d043bf6e3ca349614ea174c901dad60d3e4b0db7468284e737fcbca1674bd4cd86643cace24322c658e8c0a063af9a6d783f3eb3e6edcfd52df000"
+   }
+  }
+ ]
+}

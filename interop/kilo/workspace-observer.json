@@ -1,0 +1,33 @@
+{
+ "$comment": "The workspace observer's record, constructed for the demo: a process outside the agent, under its own key and operator (for example the sandbox or build host that owns the workspace), listing every file written during each tool call, and the deployment target's statement of what it received.",
+ "calls": {
+  "call_01": {
+   "writes": []
+  },
+  "call_02": {
+   "writes": [
+    "src/auth.ts"
+   ]
+  },
+  "call_03": {
+   "writes": [
+    "node_modules/.package-lock.json",
+    "package-lock.json",
+    "Makefile"
+   ],
+   "note": "a dependency's install script rewrote the Makefile"
+  },
+  "call_04": {
+   "writes": []
+  },
+  "call_05": {
+   "writes": []
+  }
+ },
+ "registry_statements": {
+  "call_04": {
+   "disposition": "not_executed",
+   "detail": "no deployment received in the interval"
+  }
+ }
+}
