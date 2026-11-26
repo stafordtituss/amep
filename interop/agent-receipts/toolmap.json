@@ -1,0 +1,11 @@
+{
+  "$comment": "Example deployment tool map for the Agent Receipts cross-SDK vectors. action.type names a class of action, not a resource or an effect class, so these entries are the verifier's reading, not the Agent Receipts spec. Where a receipt carries action.target.resource, the resource comes from it; data.api.read and system.command.execute receipts in the vectors carry no target, so their resource is fixed per action type for the worked cases.",
+  "tools": {
+    "filesystem.file.read":   { "action": "fs.read",   "resource": "file:{target.resource}", "effect": "read" },
+    "filesystem.file.write":  { "action": "fs.write",  "resource": "file:{target.resource}", "effect": "write_local" },
+    "filesystem.file.delete": { "action": "fs.delete", "resource": "file:{target.resource}", "effect": "destructive", "released": [] },
+    "http.request":           { "action": "http.request", "resource": "url:{target.resource}", "effect": "external_send", "released": [] },
+    "data.api.read":          { "action": "api.read", "resource": "api:data", "effect": "read" },
+    "system.command.execute": { "action": "command.execute", "resource": "host:commands", "effect": "write_shared" }
+  }
+}

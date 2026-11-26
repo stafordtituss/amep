@@ -302,7 +302,7 @@ describe("import-book: Provared", () => {
       4: ["preserved", "-", null],         // approved, countersigned
       5: ["unresolved", "I10", null],      // Provared: countersignature-missing
       6: ["violated", "I2", "agent"],      // Provared: over-limit, approval-missing
-      8: ["unresolved", "I10", null],      // Provared: action-not-allowed (an AMEP gap: see interop/provared/README.md)
+      8: ["violated", "I2", "agent"],      // Provared: action-not-allowed. The agent's own record admits it (spec I10, admissions)
     });
     assert.deepEqual(expected.breaches[6], ["over-limit", "approval-missing"]);
   });
@@ -559,5 +559,59 @@ describe("profile: AP2 checkout binding (payment.reference), on SDK bundles with
       "sdk-redeemed-twice": "violated I2",
       "sdk-ref-other-checkout": "violated I2", "sdk-ref-checkout-absent": "unresolved I7",
     });
+  });
+});
+
+// ---- Agent Receipts (agent-receipts/obsigna#1204) ----
+import { agentReceipts, checkChain } from "../src/profiles/agent-receipts.mjs";
+import { digest as coreDigest } from "@stafordtituss/amep/core";
+describe("agent-receipts profile", () => {
+  const fx = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "fixtures", "agent-receipts", "v040.json"), "utf8"));
+  const map = { tools: { "system.command.execute": { action: "command.execute", resource: "host:commands", effect: "write_shared" },
+    "data.api.read": { action: "api.read", resource: "api:data", effect: "read" } } };
+  test("a published receipt verifies under the issuer key; a changed one does not", () => {
+    assert.equal(agentReceipts.check(fx.idempotencyKeyReceipt, { publicKey: fx.publicKey }).verdict, "pass");
+    const t = structuredClone(fx.idempotencyKeyReceipt); t.credentialSubject.action.type = "data.api.read";
+    assert.equal(agentReceipts.check(t, { publicKey: fx.publicKey }).verdict, "verification failed");
+    assert.equal(agentReceipts.check(fx.idempotencyKeyReceipt, {}).verdict, "verification failed");
+  });
+  test("the retry chain is valid and reports its duplicate idempotency_key", () => {
+    const c = checkChain(fx.duplicateIdempotencyChain);
+    assert.equal(c.valid, true);
+    assert.deepEqual(c.duplicate_idempotency_keys, ["jsonrpc-req-retry-001"]);
+    const swapped = [fx.duplicateIdempotencyChain[1], fx.duplicateIdempotencyChain[0]];
+    assert.equal(checkChain(swapped).valid, false);
+  });
+  test("a success imports with the receipt's issuer as observer; a failure does not import", () => {
+    const ok = importRecord(fx.idempotencyKeyReceipt, { profile: "agent-receipts", map, publicKey: fx.publicKey });
+    assert.equal(ok.effect.executed.action, "command.execute");
+    assert.equal(ok.effect.observed_by, "did:agent:test");
+    assert.equal(ok.effect.assurance, "L1");
+    const fail = importRecord(fx.duplicateIdempotencyChain[0], { profile: "agent-receipts", map, publicKey: fx.publicKey });
+    assert.equal(fail.effect, null);
+    assert.match(fail.not_imported, /does not establish what was executed/);
+  });
+  test("worked verdicts: client-side mode is unresolved (I10); a timeout holds its retry (I7)", () => {
+    const issuer = Key.generate("iss", ["issuer"]), host = Key.generate("host", ["host"]), obs = Key.generate("obs", ["observer"]);
+    const keys = { ...keyset(issuer, obs), host: { ...host.publicEntry(), operator: "agent-op" } };
+    const m = issuer.sign({ id: "m-1", kind: "mandate", principal: "did:user:test", claims: { actions: ["command.execute", "api.read"],
+      resources: ["host:commands", "api:data"], ceiling: "write_shared", exp: "2026-12-31T00:00:00Z" } }, { v: 2 });
+    const a = host.sign({ id: "a-1", kind: "interpretation", source: "curated", adapter: "toolmap", version: "1" }, { v: 2 });
+    const run = (receipts, actor) => {
+      const invs = [], effects = [];
+      receipts.forEach((r, i) => {
+        const t = map.tools[r.credentialSubject.action.type];
+        const inv = host.sign({ id: `i-${i}`, kind: "invocation", authority_ref: "m-1", interpretation_ref: "a-1", t: r.credentialSubject.action.timestamp,
+          actor, declared: { action: t.action, resource: t.resource, effect: t.effect }, operation: r.credentialSubject.action.idempotency_key }, { v: 2 });
+        invs.push(inv);
+        const imp = importRecord(r, { profile: "agent-receipts", map, publicKey: fx.publicKey });
+        if (imp.effect) effects.push(obs.sign({ ...imp.effect, invocation: inv.id, invocation_digest: coreDigest(inv) }, { v: 2 }));
+      });
+      return amepEvaluate({ amep_version: "0.3", mandates: [m], interpretations: [a], invocations: invs, effects }, keys, sigOk);
+    };
+    const client = run([fx.idempotencyKeyReceipt], "did:agent:test");
+    assert.deepEqual([client[0].outcome, client[0].invariant], ["unresolved", "I10"]);
+    const retry = run(fx.duplicateIdempotencyChain, "agent:runtime");
+    assert.deepEqual([retry[1].outcome, retry[1].invariant], ["unresolved", "I7"]);
   });
 });

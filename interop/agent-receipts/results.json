@@ -1,0 +1,503 @@
+{
+ "commit": "7c5a02ccabfb4092bb4c2ec7bbcfcd677565c22f",
+ "A": {
+  "canonicalization": {
+   "agree": 30,
+   "of": 33,
+   "misses": [
+    {
+     "name": "number_large_exp_boundary_fixed",
+     "got": "error: number 100000000000000000000 is outside the I-JSON range (|n| > 2^53-1)",
+     "want": "100000000000000000000"
+    },
+    {
+     "name": "number_large_exp_boundary_exp",
+     "got": "error: number 1e+21 is outside the I-JSON range (|n| > 2^53-1)",
+     "want": "1e+21"
+    },
+    {
+     "name": "number_2_to_53",
+     "got": "error: number 9007199254740992 is outside the I-JSON range (|n| > 2^53-1)",
+     "want": "9007199254740992"
+    }
+   ]
+  },
+  "receipt_hashes": {
+   "agree": 10,
+   "of": 10,
+   "misses": [],
+   "swept": [
+    "receipt_optional_null_becomes_absent",
+    "receipt_parameters_disclosure_null_becomes_absent"
+   ]
+  },
+  "signed": {
+   "pass": 15,
+   "of": 15,
+   "fail": []
+  },
+  "malformed": {
+   "receipts_rejected": 7,
+   "of": 7,
+   "receipts": [
+    {
+     "name": "wrong_proof_type",
+     "verdict": "rejected: wrong proof type"
+    },
+    {
+     "name": "mutated_action_type",
+     "verdict": "verification failed"
+    },
+    {
+     "name": "mutated_principal_id",
+     "verdict": "verification failed"
+    },
+    {
+     "name": "truncated_proof_value",
+     "verdict": "rejected: proofValue malformed"
+    },
+    {
+     "name": "wrong_multibase_prefix",
+     "verdict": "rejected: proofValue malformed"
+    },
+    {
+     "name": "flipped_proof_byte",
+     "verdict": "verification failed"
+    },
+    {
+     "name": "schema_missing_required_field",
+     "verdict": "rejected: chain block incomplete"
+    }
+   ],
+   "chains_rejected": 4,
+   "chains": [
+    {
+     "name": "missing_previous_receipt_hash_mid_chain",
+     "signatures_valid": 2,
+     "of": 3,
+     "chain_valid": false,
+     "broken": [
+      "link 1 hash"
+     ]
+    },
+    {
+     "name": "chain_wrong_previous_receipt_hash",
+     "signatures_valid": 3,
+     "of": 3,
+     "chain_valid": false,
+     "broken": [
+      "link 2 hash"
+     ]
+    },
+    {
+     "name": "chain_duplicate_sequence",
+     "signatures_valid": 3,
+     "of": 3,
+     "chain_valid": false,
+     "broken": [
+      "link 2 sequence"
+     ]
+    },
+    {
+     "name": "chain_sequence_gap",
+     "signatures_valid": 3,
+     "of": 3,
+     "chain_valid": false,
+     "broken": [
+      "link 2 sequence"
+     ]
+    }
+   ],
+   "set_rejected": true
+  },
+  "chains": {
+   "v020.terminalChain": {
+    "valid": true,
+    "duplicate_idempotency_keys": []
+   },
+   "v040.duplicateIdempotencyChain": {
+    "valid": true,
+    "duplicate_idempotency_keys": [
+     "jsonrpc-req-retry-001"
+    ]
+   }
+  }
+ },
+ "B": [
+  {
+   "name": "go_vectors.signing.signed",
+   "type": "filesystem.file.read",
+   "risk": "low",
+   "outcome": "success",
+   "imported": false,
+   "mapped": null,
+   "not_imported": "resource template needs target.resource, which the record does not carry",
+   "gaps": [
+    "who signed: the acting agent, or a party apart from it: deployment, not receipt",
+    "the grant the action is judged against: missing",
+    "the resource acted on: missing",
+    "binding to the authorizing call: missing",
+    "the logical operation (retries): missing"
+   ]
+  },
+  {
+   "name": "py_vectors.signing.signed",
+   "type": "filesystem.file.read",
+   "risk": "low",
+   "outcome": "success",
+   "imported": false,
+   "mapped": null,
+   "not_imported": "resource template needs target.resource, which the record does not carry",
+   "gaps": [
+    "who signed: the acting agent, or a party apart from it: deployment, not receipt",
+    "the grant the action is judged against: missing",
+    "the resource acted on: missing",
+    "binding to the authorizing call: missing",
+    "the logical operation (retries): missing"
+   ]
+  },
+  {
+   "name": "v020.terminalChain[0]",
+   "type": "filesystem.file.read",
+   "risk": "low",
+   "outcome": "success",
+   "imported": false,
+   "mapped": null,
+   "not_imported": "resource template needs target.resource, which the record does not carry",
+   "gaps": [
+    "who signed: the acting agent, or a party apart from it: deployment, not receipt",
+    "the grant the action is judged against: missing",
+    "the resource acted on: missing",
+    "binding to the authorizing call: missing",
+    "the logical operation (retries): missing"
+   ]
+  },
+  {
+   "name": "v020.terminalChain[1]",
+   "type": "filesystem.file.read",
+   "risk": "low",
+   "outcome": "success",
+   "imported": false,
+   "mapped": null,
+   "not_imported": "resource template needs target.resource, which the record does not carry",
+   "gaps": [
+    "who signed: the acting agent, or a party apart from it: deployment, not receipt",
+    "the grant the action is judged against: missing",
+    "the resource acted on: missing",
+    "binding to the authorizing call: missing",
+    "the logical operation (retries): missing"
+   ]
+  },
+  {
+   "name": "v020.terminalChain[2]",
+   "type": "filesystem.file.read",
+   "risk": "low",
+   "outcome": "success",
+   "imported": false,
+   "mapped": null,
+   "not_imported": "resource template needs target.resource, which the record does not carry",
+   "gaps": [
+    "who signed: the acting agent, or a party apart from it: deployment, not receipt",
+    "the grant the action is judged against: missing",
+    "the resource acted on: missing",
+    "binding to the authorizing call: missing",
+    "the logical operation (retries): missing"
+   ]
+  },
+  {
+   "name": "v020.parametersDisclosureReceipt",
+   "type": "filesystem.file.read",
+   "risk": "low",
+   "outcome": "success",
+   "imported": false,
+   "mapped": null,
+   "not_imported": "resource template needs target.resource, which the record does not carry",
+   "gaps": [
+    "who signed: the acting agent, or a party apart from it: deployment, not receipt",
+    "the grant the action is judged against: missing",
+    "the resource acted on: missing",
+    "binding to the authorizing call: missing",
+    "the logical operation (retries): missing"
+   ]
+  },
+  {
+   "name": "v030.parametersDisclosureEnvelopeReceipt",
+   "type": "system.command.execute",
+   "risk": "high",
+   "outcome": "success",
+   "imported": true,
+   "mapped": "command.execute host:commands (write_shared)",
+   "not_imported": null,
+   "gaps": [
+    "who signed: the acting agent, or a party apart from it: deployment, not receipt",
+    "the grant the action is judged against: missing",
+    "the resource acted on: missing",
+    "binding to the authorizing call: missing",
+    "the logical operation (retries): missing"
+   ]
+  },
+  {
+   "name": "v030.peerCredentialEmitterMetadataReceipt",
+   "type": "system.events_dropped",
+   "risk": "low",
+   "outcome": "success",
+   "imported": false,
+   "mapped": null,
+   "not_imported": "tool \"system.events_dropped\" is not in the tool map",
+   "gaps": [
+    "who signed: the acting agent, or a party apart from it: deployment, not receipt",
+    "the grant the action is judged against: missing",
+    "the resource acted on: missing",
+    "canonical action and effect class: missing",
+    "binding to the authorizing call: missing",
+    "the logical operation (retries): missing"
+   ]
+  },
+  {
+   "name": "v030.peerCredentialRootReceipt",
+   "type": "system.command.execute",
+   "risk": "high",
+   "outcome": "success",
+   "imported": true,
+   "mapped": "command.execute host:commands (write_shared)",
+   "not_imported": null,
+   "gaps": [
+    "who signed: the acting agent, or a party apart from it: deployment, not receipt",
+    "the grant the action is judged against: missing",
+    "the resource acted on: missing",
+    "binding to the authorizing call: missing",
+    "the logical operation (retries): missing"
+   ]
+  },
+  {
+   "name": "v040.idempotencyKeyReceipt",
+   "type": "system.command.execute",
+   "risk": "high",
+   "outcome": "success",
+   "imported": true,
+   "mapped": "command.execute host:commands (write_shared)",
+   "not_imported": null,
+   "gaps": [
+    "who signed: the acting agent, or a party apart from it: deployment, not receipt",
+    "the grant the action is judged against: missing",
+    "the resource acted on: missing",
+    "binding to the authorizing call: missing"
+   ]
+  },
+  {
+   "name": "v040.duplicateIdempotencyChain[0]",
+   "type": "data.api.read",
+   "risk": "low",
+   "outcome": "failure",
+   "imported": false,
+   "mapped": null,
+   "not_imported": "outcome \"failure\" does not establish what was executed; the call stays unresolved",
+   "gaps": [
+    "who signed: the acting agent, or a party apart from it: deployment, not receipt",
+    "the grant the action is judged against: missing",
+    "the resource acted on: missing",
+    "binding to the authorizing call: missing"
+   ]
+  },
+  {
+   "name": "v040.duplicateIdempotencyChain[1]",
+   "type": "data.api.read",
+   "risk": "low",
+   "outcome": "success",
+   "imported": true,
+   "mapped": "api.read api:data (read)",
+   "not_imported": null,
+   "gaps": [
+    "who signed: the acting agent, or a party apart from it: deployment, not receipt",
+    "the grant the action is judged against: missing",
+    "the resource acted on: missing",
+    "binding to the authorizing call: missing"
+   ]
+  },
+  {
+   "name": "v050.runtimeReceipt",
+   "type": "filesystem.file.read",
+   "risk": "low",
+   "outcome": "success",
+   "imported": false,
+   "mapped": null,
+   "not_imported": "resource template needs target.resource, which the record does not carry",
+   "gaps": [
+    "who signed: the acting agent, or a party apart from it: deployment, not receipt",
+    "the grant the action is judged against: missing",
+    "the resource acted on: missing",
+    "binding to the authorizing call: missing",
+    "the logical operation (retries): missing"
+   ]
+  },
+  {
+   "name": "v050.extendedRuntimeReceipt",
+   "type": "filesystem.file.read",
+   "risk": "low",
+   "outcome": "success",
+   "imported": false,
+   "mapped": null,
+   "not_imported": "resource template needs target.resource, which the record does not carry",
+   "gaps": [
+    "who signed: the acting agent, or a party apart from it: deployment, not receipt",
+    "the grant the action is judged against: missing",
+    "the resource acted on: missing",
+    "binding to the authorizing call: missing",
+    "the logical operation (retries): missing"
+   ]
+  },
+  {
+   "name": "v050.rootAgentReceipt",
+   "type": "filesystem.file.read",
+   "risk": "low",
+   "outcome": "success",
+   "imported": false,
+   "mapped": null,
+   "not_imported": "resource template needs target.resource, which the record does not carry",
+   "gaps": [
+    "who signed: the acting agent, or a party apart from it: deployment, not receipt",
+    "the grant the action is judged against: missing",
+    "the resource acted on: missing",
+    "binding to the authorizing call: missing",
+    "the logical operation (retries): missing"
+   ]
+  }
+ ],
+ "C": [
+  {
+   "case": "one high-risk command (v040.idempotencyKeyReceipt)",
+   "mode": "client-side mode (ADR-0020): the agent signs its own receipt",
+   "verdict": {
+    "id": "i-0",
+    "outcome": "unresolved",
+    "invariant": "I10",
+    "reason": "high-impact effect only self-reported",
+    "blame": null,
+    "gaps": [
+     {
+      "need": "independent_observer",
+      "ref": "agent-receipts:urn:receipt:040e0040-0000-4040-a040-000000000001"
+     }
+    ]
+   },
+   "results": [
+    {
+     "invocation": "i-0",
+     "outcome": "unresolved",
+     "invariant": "I10",
+     "reason": "high-impact effect only self-reported",
+     "blame": null
+    }
+   ]
+  },
+  {
+   "case": "one high-risk command (v040.idempotencyKeyReceipt)",
+   "mode": "daemon mode (ADR-0010), daemon run by the agent's own operator",
+   "verdict": {
+    "id": "i-0",
+    "outcome": "unresolved",
+    "invariant": "I10",
+    "reason": "high-impact effect observed only by a key of the host's own operator",
+    "blame": null,
+    "gaps": [
+     {
+      "need": "independent_observer",
+      "ref": "agent-receipts:urn:receipt:040e0040-0000-4040-a040-000000000001"
+     }
+    ]
+   },
+   "results": [
+    {
+     "invocation": "i-0",
+     "outcome": "unresolved",
+     "invariant": "I10",
+     "reason": "high-impact effect observed only by a key of the host's own operator",
+     "blame": null
+    }
+   ]
+  },
+  {
+   "case": "one high-risk command (v040.idempotencyKeyReceipt)",
+   "mode": "daemon mode, daemon run by an operator other than the agent's",
+   "verdict": {
+    "id": "i-0",
+    "outcome": "preserved",
+    "invariant": "-",
+    "reason": "continuity preserved",
+    "blame": null,
+    "gaps": []
+   },
+   "results": [
+    {
+     "invocation": "i-0",
+     "outcome": "preserved",
+     "invariant": "-",
+     "reason": "continuity preserved",
+     "blame": null
+    }
+   ]
+  },
+  {
+   "case": "timeout, then a retry under the same idempotency_key (v040.duplicateIdempotencyChain)",
+   "mode": "any: the first receipt says failure, which does not show the call was not executed",
+   "verdict": {
+    "id": "i-0",
+    "outcome": "unresolved",
+    "invariant": "I7",
+    "reason": "no executed-effect receipt",
+    "blame": null,
+    "gaps": [
+     {
+      "need": "receipt",
+      "ref": "i-0"
+     }
+    ]
+   },
+   "results": [
+    {
+     "invocation": "i-0",
+     "outcome": "unresolved",
+     "invariant": "I7",
+     "reason": "no executed-effect receipt",
+     "blame": null
+    },
+    {
+     "invocation": "i-1",
+     "outcome": "unresolved",
+     "invariant": "I7",
+     "reason": "operation jsonrpc-req-retry-001 is held for i-0, whose outcome is unknown",
+     "blame": null
+    }
+   ]
+  },
+  {
+   "case": "two successes under one idempotency_key (constructed: the chain above plus a second success)",
+   "mode": "daemon run by another operator",
+   "chain_valid": true,
+   "verdict": {
+    "id": "i-1",
+    "outcome": "violated",
+    "invariant": "I2",
+    "reason": "operation jsonrpc-req-retry-001 already took effect under i-0: executed twice",
+    "blame": "agent",
+    "gaps": []
+   },
+   "results": [
+    {
+     "invocation": "i-0",
+     "outcome": "preserved",
+     "invariant": "-",
+     "reason": "continuity preserved",
+     "blame": null
+    },
+    {
+     "invocation": "i-1",
+     "outcome": "violated",
+     "invariant": "I2",
+     "reason": "operation jsonrpc-req-retry-001 already took effect under i-0: executed twice",
+     "blame": "agent"
+    }
+   ]
+  }
+ ]
+}

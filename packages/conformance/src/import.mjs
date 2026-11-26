@@ -14,8 +14,9 @@ import { CEILING, digest, evaluate, verdict } from "@stafordtituss/amep/core";
 import { sigOk } from "@stafordtituss/amep";
 import { aer1 } from "./profiles/aer1.mjs";
 import { oidfActionReceipt } from "./profiles/oidf-action-receipt.mjs";
+import { agentReceipts } from "./profiles/agent-receipts.mjs";
 
-export const PROFILES = { aer1, "oidf-action-receipt": oidfActionReceipt };
+export const PROFILES = { aer1, "oidf-action-receipt": oidfActionReceipt, "agent-receipts": agentReceipts };
 
 function lookup(obj, path) {
   return path.split(".").reduce((o, k) => (o && typeof o === "object" ? o[k] : undefined), obj);
@@ -34,10 +35,10 @@ function fill(template, fields) {
  * Import one record. Returns { profile, integrity, mapping, effect (unsigned AMEP effect or null), gaps }.
  * `invocations` (optional): AMEP invocations the record may belong to; binding is made only by a matching digest.
  */
-export function importRecord(record, { profile: pid, map = { tools: {} }, expectedId, invocations = [], invocationId } = {}) {
+export function importRecord(record, { profile: pid, map = { tools: {} }, expectedId, publicKey, invocations = [], invocationId } = {}) {
   const profile = pid ? PROFILES[pid] : Object.values(PROFILES).find(p => p.detect(record));
   if (!profile) throw new Error(pid ? `unknown profile ${pid}` : "no profile recognizes this record");
-  const integrity = profile.check(record, { expectedId });
+  const integrity = profile.check(record, { expectedId, publicKey });
   const info = profile.extract(record, integrity.committed);
   const entry = map.tools?.[info.tool.name];
   const mapping = { mappedFrom: entry ? "map" : "missing", binding: "missing", released: entry?.released ?? null };
