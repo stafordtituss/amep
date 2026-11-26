@@ -3,7 +3,15 @@
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
 
-## A corroborated receipt is not a self-report (I10), clocks of different operators (I6), and the OWASP Agentic Evidence scenarios (unreleased, 2026-11-26)
+## 0.3.2 (2026-11-26)
+
+`amep-protocol` 0.3.2 on PyPI and `@stafordtituss/amep` 0.3.2 on npm, with suite v0.3.4: 297 core vectors (78 positive, 219 must-reject), 16 approval-path vectors and 20 delegation-continuity vectors, 333 in all, plus seven cross-packet sequences. Two fixes, both found by mapping the OWASP Agentic Evidence authorization-to-outcome scenarios (OWASP/Agentic-Evidence#2, #21; research note OWASP/Agentic-Evidence#22):
+- **A corroborated receipt is not a self-report (I10).** The actor's own receipt beside an independent receipt of the same effect no longer leaves a high-impact call `unresolved`.
+- **Clocks of different operators (I6, spec 5.12.2, #43).** A key may declare `clock_skew`. A revocation and an action from different operators within their combined skew of the deciding boundary are `unresolved`, gap `ordering`.
+
+No existing vector's outcome changes. `keys.json` gains three keys.
+
+## A corroborated receipt is not a self-report (I10), clocks of different operators (I6), and the OWASP Agentic Evidence scenarios (shipped in 0.3.2; 2026-11-26)
 
 - **The gap, found while mapping the OWASP Agentic Evidence authorization-to-outcome scenarios** (OWASP/Agentic-Evidence#2, #21). For a high-impact call, an asserted `tool.result` from the executing side, beside an independent observation of the same write, came out `unresolved` (I10). Each receipt was judged on its own, so adding corroborating evidence weakened the verdict. That contradicts spec 10.2, under which the same effect recorded by several observers is one effect.
 - **Now (I10):** a receipt from the actor's side is corroborated when observers independent of the actor recorded the same executed body, ignoring `t`, at least as many times. A self-report of more executions than were independently observed stays `unresolved`.
