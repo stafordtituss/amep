@@ -1,0 +1,135 @@
+{
+ "amep": "0.3.2",
+ "source": "arXiv:2610.07459, Section 4",
+ "cases": [
+  {
+   "state": "A",
+   "paper": "March claim UNDECIDABLE",
+   "records": "the tool manifest and approval configuration; no send recorded",
+   "amep": {
+    "outcome": "unresolved",
+    "invariant": "I7",
+    "reason": "empty packet",
+    "blame": null,
+    "gaps": [
+     {
+      "need": "invocation",
+      "ref": "-"
+     }
+    ]
+   },
+   "per_call": [],
+   "packet_sha256": "1503c53e4d094542635b16ac165d890c1d3a10d5e7780702ff3362a0b803e109"
+  },
+  {
+   "state": "B, tx-19",
+   "paper": "this email meets P-7",
+   "records": "agent log names g-5531; grant log; gateway delivery with matching recipient and hash",
+   "amep": {
+    "outcome": "preserved",
+    "invariant": "-",
+    "reason": "continuity preserved",
+    "blame": null,
+    "gaps": []
+   },
+   "per_call": [
+    {
+     "id": "tx-19",
+     "outcome": "preserved",
+     "invariant": "-"
+    }
+   ],
+   "packet_sha256": "03d0476f60c4036467e6f43a2b3ffe1dd31e163947850f676d0a0dd791d0bdf2"
+  },
+  {
+   "state": "C, tx-23",
+   "paper": "violates P-7; March claim CONTRADICTED",
+   "records": "interface confirmation only; no grant; gateway delivery",
+   "amep": {
+    "outcome": "violated",
+    "invariant": "I2",
+    "reason": "action outside claims",
+    "blame": "agent",
+    "gaps": []
+   },
+   "per_call": [
+    {
+     "id": "tx-23",
+     "outcome": "violated",
+     "invariant": "I2"
+    }
+   ],
+   "packet_sha256": "e7942fdef0404b532fa480770f23a2156c887104e62942e36559f0777d7e4291"
+  },
+  {
+   "state": "D, tx-31",
+   "paper": "UNDECIDABLE for this email",
+   "records": "agent entry with no grant and no correlation id; server log lost; gateway delivery",
+   "amep": {
+    "outcome": "unresolved",
+    "invariant": "I7",
+    "reason": "no root mandate",
+    "blame": null,
+    "gaps": [
+     {
+      "need": "root_mandate",
+      "ref": "g-lost"
+     }
+    ]
+   },
+   "per_call": [
+    {
+     "id": "tx-31",
+     "outcome": "unresolved",
+     "invariant": "I7"
+    },
+    {
+     "id": "e-gw-0312",
+     "outcome": "unresolved",
+     "invariant": "I11"
+    }
+   ],
+   "packet_sha256": "00d9d42daa94ddc4f724ce460d663c8c45fb3ac69732e7a2b59a30a594711a47"
+  },
+  {
+   "state": "E, 4th email",
+   "paper": "UNDECIDABLE for this email",
+   "records": "signed agent log verifies for three emails; gateway shows a fourth with no log entry and no grant",
+   "amep": {
+    "outcome": "unresolved",
+    "invariant": "I11",
+    "reason": "effect names invocation unlogged-gw-fourth, which is not in this packet: a bypass, or a packet that left it out",
+    "blame": null,
+    "gaps": [
+     {
+      "need": "invocation",
+      "ref": "unlogged-gw-fourth"
+     }
+    ]
+   },
+   "per_call": [
+    {
+     "id": "tx-e1",
+     "outcome": "preserved",
+     "invariant": "-"
+    },
+    {
+     "id": "tx-e2",
+     "outcome": "preserved",
+     "invariant": "-"
+    },
+    {
+     "id": "tx-e3",
+     "outcome": "preserved",
+     "invariant": "-"
+    },
+    {
+     "id": "e-gw-fourth",
+     "outcome": "unresolved",
+     "invariant": "I11"
+    }
+   ],
+   "packet_sha256": "b1b09560bdfe1df21ce15302d5205bafea86941a2958058d31be6f499d0e0b84"
+  }
+ ]
+}
