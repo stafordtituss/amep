@@ -983,6 +983,32 @@ def vectors():
     add("unversioned packet with grants", ("unresolved", "I7"), lambda p, I, H, O, X:
         grants(p, I, H, O, mandate={"grants": [{"actions": ["fs.read"], "resources": ["repo:app/docs/*"]}], "keep": True}, versioned=False))
 
+    # 8b. A call whose effects aren't known in advance (spec 5.8, declared.scope, v0.3.3). Found while importing Kilo Code
+    # sessions (interop/kilo): an allowed `npm install` writes files the call never named, so with an exact declaration
+    # every write read as a departure blamed on the server, whether or not it was within the grant.
+    def command(p, I, H, O, writes, scope=None, versioned=True, effect="write_local"):
+        inv = {**p["invocations"][0], "declared": {"action": "process.exec", "resource": "cmd:npm install", "effect": "write_local",
+               "scope": scope if scope is not None else {"actions": ["fs.write"], "resources": ["repo:app/*"]}}}
+        effs = [{**p["effects"][0], "id": f"e-{n + 1}", "executed": {"action": "fs.write", "resource": r, "effect": effect, "released": [], "t": 11 + n}}
+                for n, r in enumerate(writes)]
+        if versioned:
+            p["invocations"], p["effects"] = [inv], effs
+            v03(p, I, H, O)
+        else:
+            p["invocations"], p["effects"] = [H.sign(inv)], [O.sign(e) for e in effs]
+    add("command writes within its declared scope and the grant", ("preserved", "-"), lambda p, I, H, O, X:
+        command(p, I, H, O, ["repo:app/src/a.ts", "repo:app/src/b.ts"]))
+    add("command write within its declared scope but outside the grant", ("violated", "I2"), lambda p, I, H, O, X:
+        command(p, I, H, O, ["repo:app/src/a.ts", "repo:app/Makefile"]))
+    add("command write outside its declared scope", ("violated", "I2"), lambda p, I, H, O, X:
+        command(p, I, H, O, ["repo:app/src/a.ts", "repo:app/Makefile"], scope={"actions": ["fs.write"], "resources": ["repo:app/src/*"]}))
+    add("command effect above its declared class", ("violated", "I2"), lambda p, I, H, O, X:
+        command(p, I, H, O, ["repo:app/src/a.ts"], effect="write_shared"))
+    add("declared scope in an unversioned packet", ("unresolved", "I7"), lambda p, I, H, O, X:
+        command(p, I, H, O, ["repo:app/src/a.ts"], versioned=False))
+    add("declared scope with an empty list", ("unresolved", "I7"), lambda p, I, H, O, X:
+        command(p, I, H, O, ["repo:app/src/a.ts"], scope={"actions": ["fs.write"], "resources": []}))
+
     # 9. Holds for unknown outcomes (spec 7.6 rule 6, v0.3). From the cross-institution example of
     # finos/ai-governance-framework#421: "a slice with an unknown outcome stays counted until reconciliation shows it was
     # booked or not booked". An earlier call (i-0, reserve 250.00 EUR) had no outcome; verifier state holds it.

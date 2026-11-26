@@ -1,0 +1,46 @@
+{
+ "user": {
+  "kid": "user",
+  "alg": "Ed25519",
+  "x": "c02593c3bd6f60f70f9d13652e564438ff139d570e02934e4c421bd1f3220000",
+  "roles": [
+   "issuer"
+  ]
+ },
+ "kilo-host": {
+  "kid": "kilo-host",
+  "alg": "Ed25519",
+  "x": "1b7f97e7bb9a4c95dd51ca47c213e7e4f6bc3b56d1f1b6d4cd2853ba3c0c0065",
+  "roles": [
+   "host"
+  ],
+  "operator": "kilo-user-machine"
+ },
+ "kilo-reader": {
+  "kid": "kilo-reader",
+  "alg": "Ed25519",
+  "x": "f9ddb3b52e15b59b37ec346bc97e6c9d88bcc851d4f6c532a78e40a857e913af",
+  "roles": [
+   "observer"
+  ],
+  "operator": "kilo-user-machine"
+ },
+ "workspace-observer": {
+  "kid": "workspace-observer",
+  "alg": "Ed25519",
+  "x": "5c1e11c0d5d82ac418069c5c66519a31bc212a47128c6c46d0f2c67e27143cd4",
+  "roles": [
+   "observer"
+  ],
+  "operator": "workspace-host"
+ },
+ "deploy-target": {
+  "kid": "deploy-target",
+  "alg": "Ed25519",
+  "x": "0e816b31e8d2a984654a85c939bbcd57a22ee6a2f1865c92b3dc9504e6dca2bb",
+  "roles": [
+   "observer"
+  ],
+  "operator": "deploy-target"
+ }
+}

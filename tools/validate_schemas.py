@@ -28,6 +28,7 @@ EXPECTED_INVALID = {"must-reject/malformed-timestamp.json",
                     "must-reject/call-statement-with-an-unknown-disposition.json",
                     "must-reject/call-statement-with-a-negative-effect-count.json",
                     "must-reject/receipt-that-names-no-observer.json",
+                    "must-reject/declared-scope-with-an-empty-list.json",
                     # v0.3: an operation approval must carry exactly one non-empty effect_digests list
                     "must-reject/operation-approval-that-also-has-effect-digest.json",
                     "must-reject/operation-approval-with-an-empty-list.json",
