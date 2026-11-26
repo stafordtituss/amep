@@ -177,7 +177,7 @@ AMEP needs outside scrutiny more than anything else.
 3. **Review it in public:** an [independent technical review](https://github.com/stafordtituss/amep/issues/new?template=independent-review.yml), or a comment on an IETF, W3C, DIF or OpenID Foundation list.
 4. **Cite it where relevant:** if your draft, paper or specification overlaps, an informative reference or a note on where the approaches differ is welcome.
 
-Every review, implementation and citation is logged as written, critical ones included, in [REVIEWS.md](REVIEWS.md).
+Every review, implementation and citation is logged as written, critical ones included, in [REVIEWS.md](REVIEWS.md). [EVALUATION.md](EVALUATION.md) says, for the current release, who checked what and against which version, and what hasn't been checked yet.
 
 ---
 

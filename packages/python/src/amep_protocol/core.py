@@ -899,8 +899,21 @@ def principal_confirms(inv: dict, objs: dict, vsig, needed: list) -> bool:
     the principal was shown. Like any approval it is bound to the executed effect and used once. The host's own
     `principal_confirmed: true` is the party being judged vouching for itself, so it never confirms on its own."""
     ap = objs.get(inv.get("approval_ref")) if "approval_ref" in inv else None
+    # From tclancy's follow-up on #39: the confirmation must be the principal's own, with the principal present. It names
+    # the chain's root principal as `approver`, and its presence is webauthn or chat_user; host_ui and none are the host
+    # vouching for itself again. (Binding the approver key itself to the principal needs a key-to-principal record,
+    # which AMEP does not define yet.)
     return (isinstance(ap, dict) and ap.get("kind") == "approval" and vsig(ap)
+            and ap.get("presence") in ("webauthn", "chat_user") and ap.get("approver") == root_principal(inv, objs)
             and isinstance(ap.get("findings"), list) and all(f in ap["findings"] for f in needed))
+
+
+def root_principal(inv: dict, objs: dict):
+    """The principal of the mandate at the root of the invocation's chain, or None."""
+    node, seen = objs.get(inv.get("authority_ref")), set()
+    while isinstance(node, dict) and node.get("kind") == "delegation" and node.get("id") not in seen:
+        seen.add(node.get("id")); node = objs.get(node.get("parent"))
+    return node.get("principal") if isinstance(node, dict) and node.get("kind") == "mandate" else None
 
 
 def _admission(e, inv, eff_claims, extra_protected, ctx):

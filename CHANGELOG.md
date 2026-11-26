@@ -3,7 +3,27 @@
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
 
-## A seventh cross-packet sequence: restoring a violated call's approval use (unreleased, 2026-11-26)
+## 0.3.1 (2026-11-26)
+
+`amep-protocol` 0.3.1 on PyPI and `@stafordtituss/amep` 0.3.1 on npm, with suite v0.3.3: 291 core vectors (76 positive, 215 must-reject), 16 approval-path vectors and 20 delegation-continuity vectors, 327 in all, plus seven cross-packet sequences. The sections below marked "shipped in 0.3.1" are what it contains. In brief:
+- **Three verdicts that said more than their evidence**, from tclancy's review (#34, #35, #36):
+  - a host-signed `principal_confirmed` no longer clears a finding by itself; the confirmation is the principal's own signed approval, naming the principal and made with the principal present (`webauthn` or `chat_user`);
+  - an effect inside a declared propagation window is `preserved`, and windows are bounded at an hour;
+  - an effect whose invocation is missing from the packet is `unresolved`, with no one blamed.
+- **Calls whose effects aren't known in advance** (`declared.scope`, spec 5.8.2), found while importing Kilo Code sessions.
+- **A seventh cross-packet sequence**, from Andrii Akhtanin's rerun of the 0.3.0 sequences.
+- **Two import profiles in `amep-conformance`:**
+  - Agent Receipts (#37), whose maintainers reviewed the profile's reading of their receipts in agent-receipts/obsigna#1204;
+  - Kilo Code (#38).
+
+**Outcomes that change from 0.3.0** (all from #34 to #36, each listed in the section below):
+- `influence-confirmed-by-principal` and `quarantined-content-promoted-by-the-principal` stay `preserved`, but now carry the principal's signed confirmation;
+- `bypass--effect-without-invocation` and `audit-only-discovery-of-an-unknown-agent--a6` become `unresolved` (I11);
+- `revoked-mid-action--inside-the-declared-propagation-window` becomes `preserved`.
+
+Every other vector keeps its outcome. Producers that relied on `principal_confirmed: true` alone must add the principal's signed approval with `findings` (spec 5.11.1).
+
+## A seventh cross-packet sequence: restoring a violated call's approval use (shipped in 0.3.1; 2026-11-26)
 
 - **From Andrii Akhtanin's rerun of 0.3.0** (OpenID AIIM list, 26 November): all 17 steps of the six sequences passed in both reference verifiers. He asked for the transition none of them showed. Spec 5.10 says a violated call's use of an approval isn't counted against later calls, but if a later packet resolves that violation, the use MUST be counted again.
 - **`vectors/sequences/operation-state.json` now has 7 sequences.** In the new one:
@@ -13,7 +33,7 @@ Specification drafts, conformance-suite versions and package versions are listed
 
   Both reference verifiers already behaved this way; this pins it. No code changes.
 
-## Review fixes from tclancy: three verdicts that said more than their evidence (unreleased, 2026-11-26)
+## Review fixes from tclancy: three verdicts that said more than their evidence (shipped in 0.3.1; 2026-11-26)
 
 tclancy found AMEP through the OpenSSF agenda request (ossf/ai-ml-security#61) and filed three findings the next day. All three are fixed here, each in both reference verifiers, with vectors.
 
@@ -28,13 +48,14 @@ tclancy found AMEP through the OpenSSF agenda request (ossf/ai-ml-security#61) a
   - It is now `unresolved` (I11), gap `invocation`, with no one blamed.
   - An effect despite a deny, or despite a `not_executed` statement, is still `violated`.
   - Two vectors change their expected outcome.
-- **Suite v0.3.3:** 289 core vectors (76 positive, 213 must-reject), with both reference verifiers, the browser page and the bundled MCP suite in agreement. Five expected outcomes change, as listed. The JSON Schemas and CDDL gain `findings` on approvals.
+- **tclancy's follow-up on #39, also in this release:** the confirmation must name the chain's root principal as `approver` and have presence `webauthn` or `chat_user`, since `host_ui` and `none` would be the host vouching for itself. Two more must-reject vectors cover it. His other two notes are tracked for later: a structured member for the propagation window, and a completeness record modelled on signed heartbeats with sequence numbers (#41).
+- **Suite v0.3.3:** 291 core vectors (76 positive, 215 must-reject), with both reference verifiers, the browser page and the bundled MCP suite in agreement. Five expected outcomes change, as listed. The JSON Schemas and CDDL gain `findings` on approvals.
 - **Also fixed:**
   - this changelog named the npm package `amep-protocol`; it's `@stafordtituss/amep`;
   - the 0.3.0 sections still said "proposal, unreleased";
   - LIMITS.md still listed audience as missing, though audience binding shipped in 0.3.0.
 
-## Calls whose effects aren't known in advance, and a Kilo Code demo (unreleased, 2026-11-26)
+## Calls whose effects aren't known in advance, and a Kilo Code demo (shipped in 0.3.1; 2026-11-26)
 
 - **The gap, found while importing Kilo Code sessions (`interop/kilo/`):** every effect of a call had to match the call's declared effect exactly. A shell command can't name its writes in advance. So every write by an allowed `npm install` read as a departure charged to the server, the harmless ones included.
 - **Now (spec 5.8.2):** `declared.scope`, `{actions, resources}` in the shape of a grant, lets such a call declare where its effects may land.
@@ -119,14 +140,14 @@ The packages leave alpha: `amep-protocol` 0.3.0 on PyPI and `@stafordtituss/amep
 - **His question about approvals that name a maximum** is open as [#31](https://github.com/stafordtituss/amep/issues/31).
 
 
-## Verdict statements can name the admitted artifact as subject (unreleased, 2026-11-24)
+## Verdict statements can name the admitted artifact as subject (shipped in 0.3.0; 2026-11-24)
 
 - **From Sankalp Gilda's review of in-toto/attestation#625:** when the evaluated actions produced an artifact a policy admits (a commit, a release, a payment), that artifact should be the statement's subject, with the evidence packet as an input.
 - **Both statement builders now take optional `subjects`:** `statement(..., subjects=[...])` in Python and `statement(..., { subjects })` in JavaScript. Each subject is an in-toto ResourceDescriptor with a name and a digest of lowercase hex values. The packet stays in the predicate as `packet.sha256`.
 - **Without `subjects`, nothing changes:** the packet is the subject, and both verifiers still produce byte-identical statements for all 287 vectors.
 - `interop/in-toto/PREDICATE.md` describes the new subject model, and the example statement is regenerated for the current key set.
 
-## AP2: the checkout binding is checked, not just reported (unreleased, 2026-11-24)
+## AP2: the checkout binding is checked, not just reported (shipped in 0.3.0; 2026-11-24)
 
 - **Finding, from nmatt1's APAF-1 column (AP2 #402):** none of AMEP's SDK fixtures carried `payment.reference`, which AP2's schema requires on every open payment mandate. The omission was in AMEP's generator. AP2's SDK emits the constraint, and its own samples set it to the hash of the user's open checkout mandate.
 - **A second SDK fixture family, with checkouts** (`interop/ap2/make_sdk_bundles_v2.py`, `sdk-bundles-v2.json`). It is schema-valid and built with AP2's SDK at `e1ea56d`, following AP2's sample flow. The first family and `verdicts.json` are unchanged (still `93aa9005…`), because others have pinned them; the new family's verdicts are in `interop/ap2/verdicts-checkout.json`.
@@ -137,7 +158,7 @@ The packages leave alpha: `amep-protocol` 0.3.0 on PyPI and `@stafordtituss/amep
   
   AP2's own SDK agrees on both new cases. This closes the profile's former gap, "payment.reference binds the checkout mandate, which this profile does not read".
 
-## Two fixes from Andrii's review on the OpenID AIIM list (unreleased, 2026-11-24)
+## Two fixes from Andrii's review on the OpenID AIIM list (shipped in 0.3.0; 2026-11-24)
 
 Andrii (Radiolaria) reported both, with reproductions against the published code and vectors, on openid-aiim on 24 November.
 
@@ -150,7 +171,7 @@ Andrii (Radiolaria) reported both, with reproductions against the published code
   - **Tests:** his four controls are `prototypes/mcp-amep-evidence-ts/test/failure-window.test.mjs`, and the README's integration example says which statement each failure gets.
 - **JS core, as on the protect-mcp branch:** the I10 result for a host-only deny names its gap, `independent_observer`, as the Python core does. `tools/compare_verifiers.py` now agrees on all 287 vectors.
 
-## An independent implementation, and four clarifications from it (unreleased, 2026-11-24)
+## An independent implementation, and four clarifications from it (shipped in 0.3.0; 2026-11-24)
 
 - **zambo-amep-verify 0.1.0,** by Brennan Zambo, was written from the specification and the published vectors alone, without reading either reference verifier. It agrees with all 228 single-packet vectors of the core suite: the deciding invariant as well as the outcome, for every positive and must-reject vector (stafordtituss/amep#18). Cross-packet state (Section 10.7) and the interop suites are its next rows. Recorded in spec 15.2 and LIMITS.md.
 - **What his reading found unclear,** now stated in the text (no verdict changes; every vector is unchanged):
@@ -159,7 +180,7 @@ Andrii (Radiolaria) reported both, with reproductions against the published code
   - **Section 10.2:** where call statements (Section 5.14) and limits run. New steps 9a (statement rules 1 to 5), 14a (rule 6, receipt counts) and 15a (limits).
   - **Section 10.2, step 13:** laid out so the `mediated` comparison is plainly the only one when `mediated` is present.
 
-## Observer independence by operator, not only by name (unreleased, 2026-11-24)
+## Observer independence by operator, not only by name (shipped in 0.3.0; 2026-11-24)
 
 - **The gap,** listed in LIMITS.md: for high-impact effects, I10 requires an observer other than the actor, but AMEP compared identifiers only. A host could sign the invocation with one key and the receipt with another, under a different name, and I10 was met.
 - **Now (spec 12.5, I10, 5.14 rule 5):** a key may carry `operator`, the organisation that controls it. When the key that signed an effect receipt or a `not_executed` statement and the key that signed the invocation both name the same operator, I10 is not met: `unresolved`, need `independent_observer`. A key set that names no operators behaves as before.
@@ -347,7 +368,7 @@ From Carlos Vendrell Felici's rerun of his payments review against this draft (s
   Both reference verifiers agree on every phase, and the generator asserts each verdict. The FINOS mapping links it.
 - **A gap it found, now closed by holds (above):** across packets, verifier state didn't carry an instruction with an unknown outcome forward. Phases 8 and 9 now show the lost instruction held in a later batch, and then released by the bank's statement.
 
-## Comparison with EMILIA Protocol's vectors (unreleased, 2026-11-23)
+## Comparison with EMILIA Protocol's vectors (shipped in 0.3.0; 2026-11-23)
 
 - **EP profile** (`packages/conformance/src/profiles/ep.mjs`) and **`interop/ep/`:** AMEP beside two of EP's published suites (draft-schrock-ep-authorization-receipts).
   - **`receipts.v1`:** EP-RECEIPT-v1, checked by a clean-room reading of EP's rules (written from the vectors and EP's documentation, not its code). It agrees with EP's expected result on all 14 vectors.
@@ -358,7 +379,7 @@ From Carlos Vendrell Felici's rerun of his payments review against this draft (s
   - EP's predicates (exact values, sets, minimums, counts) are richer than AMEP's claims. Count limits are now needed by two outside formats.
 - The vectors are vendored, unchanged and with their licence, as test fixtures (Apache-2.0); their digests match EP's manifest.
 
-## Comparison with the Delegation Receipt Protocol's vectors (unreleased, 2026-11-22)
+## Comparison with the Delegation Receipt Protocol's vectors (shipped in 0.3.0; 2026-11-22)
 
 - **DRP profile** (`packages/conformance/src/profiles/drp.mjs`) and **`interop/drp/`:** AMEP beside the 14 published vectors of DRP's reference SDK (draft-nelson-agent-delegation-receipts). Each receipt is checked by DRP's own rule first (signature, receipt id, orchestrator binding); only `invalid-signature` fails, as intended. AMEP then answers the matching question, had the action run as proposed, with the scope the DRP verifier was given adopted as authority and labelled as such. Of the 8 vectors that can be compared, AMEP agrees on 6. The remaining 2 are DRP's single-use receipts, which AMEP doesn't have. The 6 that can't be compared state authority only in natural language, or decide by the verifier's chain-depth limit.
 - **Findings, in the README:**
@@ -370,7 +391,7 @@ From Carlos Vendrell Felici's rerun of his payments review against this draft (s
 - **`interop/COVERAGE.md`** has a DRP column.
 - The vectors are vendored, unchanged and with their licence, as test fixtures (MIT).
 
-## Grants: authority as a union of products (unreleased, 2026-11-22)
+## Grants: authority as a union of products (shipped in 0.3.0; 2026-11-22)
 
 - **Spec 5.3:** a claim set may carry `grants`, a list of `{actions, resources}`, instead of `actions` and `resources`. Each grant permits its actions on its resources, and the authority is their union. One product (`actions` × `resources`) can't express "read the documents, write the reports" without also permitting "write the documents"; grants can. Plain claims count as one grant, so the two forms mix along a chain:
   - an effect satisfies the claims when one grant permits both its action and its resource (I2);
@@ -379,19 +400,19 @@ From Carlos Vendrell Felici's rerun of his payments review against this draft (s
 - Raised by comparing AMEP with the Delegation Receipt Protocol, whose scopes allow (operation, resource) pairs.
 - Suite v0.3.0 is now 221 vectors (59 positive, 162 must-reject), 7 of them new. Both verifiers agree on all 257 vectors of the three suites; JSON Schema and CDDL are updated.
 
-## Coverage matrix (unreleased, 2026-11-22)
+## Coverage matrix (shipped in 0.3.0; 2026-11-22)
 
 - **AER-1 profile, binding gap wording:** the report now says what `input_hash_layout` means. Under `rfc8785-jcs-utf8-v1`, `input_hash` *is* AMEP's `args_digest`. Under another layout, it equals `args_digest` only for arguments that serialize identically under both. The report also says whether a binding was made. This is wording only; binding stays by digest. It was noted before the blind fixture run in amep#11 and fixed after it, so the run used the code the expectations were written against.
 
 - **`interop/COVERAGE.md`:** for each format AMEP can import (AER-1, OpenID DA action receipts, Provared) and for AMEP's own evidence, which parts of the question (I1 to I11, binding to the call, confirmed non-execution) the format's records can settle. Each cell is based on the import profile's code, its gap report and its tests. The format authors are invited to correct their rows.
 
-## Provared import; comparison with the Provared checker (unreleased, 2026-11-22)
+## Provared import; comparison with the Provared checker (shipped in 0.3.0; 2026-11-22)
 
 - **`amep-conformance import-book`**, with a profile for Provared books (draft-izmaylov-agent-permission-receipts). Every record is checked by the format's own rules first: the envelope, labels, canonical form, both hybrid signatures (Ed25519 and ML-DSA-87), the passkey (WebAuthn) signatures, fingerprints, the chain, and countersignature and approval binding. The verified records are then re-expressed as AMEP evidence (slip → mandate, stubs → invocations, countersigned stubs → service-observed effects at L1, one-sided stubs → the agent's own report at L0, approvals → approvals). Limits AMEP can't express exactly are reported as gaps.
 - **`interop/provared/`:** AMEP's verdicts on the format's own sample book beside the Provared checker's expected findings, generated by `compare.mjs`. They agree on 3 of the 6 actions, and both flag a fourth. AMEP is stricter on one (a message recorded only by the agent). The sixth is an AMEP gap: a deletion outside the permission, recorded only by the agent, is `unresolved` in AMEP, not `violated`. That and three other open questions are in the README.
 - The sample book is vendored, unchanged and with its notice, as a test fixture (Apache-2.0).
 
-## Operation approvals (unreleased, 2026-11-22)
+## Operation approvals (shipped in 0.3.0; 2026-11-22)
 
 - **Spec 5.10:** an approval may carry `effect_digests`, a non-empty list of effect digests, instead of `effect_digest`. It approves the effects of one call. Every executed effect of that invocation must be listed, and no body may run more often than it is listed; otherwise the result is `violated` (I8). An approved effect that didn't run is not a violation. It's single use like any approval, so a retry that cites it is `violated` (I8). An approval with both members, or with an empty or malformed list, is `unresolved` (I7).
 - **Additive:** approvals with `effect_digest` are evaluated exactly as before (every earlier vector and `verify` output is unchanged), and a verifier without this rule never returns `preserved` for one.
@@ -399,13 +420,13 @@ From Carlos Vendrell Felici's rerun of his payments review against this draft (s
 - Motivated by Takao Sato's VATE reference case 1 for openid/authzen#795: a single admission covering an operation that writes two files had no AMEP equivalent. `interop/authzen-receipts/vate-01-lost-response` adds the admission, and the retry is now `violated` (I8).
 - Suite v0.3.0 is now 214 vectors (57 positive, 157 must-reject), 10 of them new; both verifiers agree on all 250 vectors of the three suites. JSON Schema (with `oneOf`, now in the built-in validator too) and CDDL updated.
 
-## AER-1 refusal records; VATE case 1 (unreleased, 2026-11-22)
+## AER-1 refusal records; VATE case 1 (shipped in 0.3.0; 2026-11-22)
 
 - **Fix (`amep-conformance import`, AER-1 profile):** a record of a call a gateway refused imported as an executed effect, although its committed output says `"executed": false`. Such records now produce no effect; the call stays `unresolved`, since an unsigned record can't confirm non-execution either. Only content inside the record's output commitment counts. Found by Brennan Zambo running the import over 12 live Zambo receipts ([amep#11](https://github.com/stafordtituss/amep/issues/11)); the same records now give 8 imported and 4 not.
 - The AER-1 profile cites draft-zambo-aer1-26, and the conformance README gives the install step beside the import example (both from the same report).
 - **`interop/authzen-receipts/vate-01-lost-response`:** Takao Sato's VATE case 1 for openid/authzen#795 (a lost response, then recovery) as AMEP evidence. Three signed packets and the caller's signed verdict for each phase; both verifiers agree on all three.
 
-## amep-mcp on the v0.3 suites (unreleased, 2026-11-22)
+## amep-mcp on the v0.3 suites (shipped in 0.3.0; 2026-11-22)
 
 - **Fix:** amep-mcp still bundled conformance suite v0.2.3, so its own `check_suite` disagreed with the v0.3 verifier on `status-current-as-of-the-action`, the one vector v0.3 deliberately changed. The bundle is now suite v0.3.0 (204 vectors), the delegation suite (20) and the approval-path attacks (16, draft), including the vectors that exist only as exact JSON text.
 - **Fix (security):** an MCP client's JSON text was parsed loosely before the verifier saw it, so a packet with a duplicated member name, which v0.3 makes `unresolved`, could come back `preserved`. The MCP SDK parses any JSON-looking string argument into an object unless the parameter is typed as a plain string. `verify_packet` now takes `packet_text`, which is parsed strictly; `packet` still takes an object; every result reports `parsed_strictly`.
@@ -413,7 +434,7 @@ From Carlos Vendrell Felici's rerun of his payments review against this draft (s
 - Spec Section 15 states suite v0.3.0 (204 vectors) instead of v0.2.3.
 - **Release order:** the next amep-mcp release needs `blame` and `gaps`, which are newer than amep-protocol 0.3.0a1. Release amep-protocol first, then amep-mcp with its dependency raised to that version.
 
-## Blame and evidence gaps (unreleased, 2026-11-22)
+## Blame and evidence gaps (shipped in 0.3.0; 2026-11-22)
 
 - **Spec 10.5.1:** every result now carries `blame` and `gaps`. On a `violated` result, `blame` names the party whose own signed record first departs from authority: `agent`, `delegator`, `host`, `transport` or `server`. On an `unresolved` result, `gaps` names the evidence that would let the evaluation continue (`{need, ref}`, from a fixed set of values). Both are derived from the signed evidence only.
 - **`tools/compare_verifiers.py`:** a differential check that both reference verifiers return the same outcome, invariant, blame and gaps for every result of every vector, not only the same verdict. It agrees on all 258 results of the 240 vectors in the three suites.

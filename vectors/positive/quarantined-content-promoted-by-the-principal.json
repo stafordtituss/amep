@@ -159,6 +159,7 @@
     "id": "ap-q",
     "kind": "approval",
     "presence": "webauthn",
+    "approver": "user:alice",
     "findings": [
      "f-1"
     ],
@@ -166,7 +167,7 @@
     "proof": {
      "kid": "issuer-1",
      "alg": "Ed25519",
-     "sig": "721bd54c084928b5d87157380d4284abf8b7284419336f28c6747c8a9a91cf13c10a777786c465d7ec0d4ba548037816b5a82a8a2afd79d1fc0ad263e1bcea05"
+     "sig": "df7f549e9008360d5f4f82b93c16208d32a6b0ff0121f521e2188dea58d7015e6618a396ec89dcbdb3f51b4f17ef401ab4e288c625ee81c6abd321f7a8f03a0b"
     }
    }
   ],
