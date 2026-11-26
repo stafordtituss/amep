@@ -152,16 +152,19 @@ def vectors():
     # A host-signed principal_confirmed: true on its own leaves the call unresolved, never cleared.
     def influenced(p, H, **kw):
         p.update(invocations=[H.sign({**p["invocations"][0], "influenced_by": ["f-1"], **kw})])
-    def confirmed(p, I, H, signer=None, findings=("f-1",)):
+    def confirmed(p, I, H, signer=None, findings=("f-1",), presence="webauthn", approver="user:alice"):
         influenced(p, H, principal_confirmed=True)
         ap = {"id": "ap-c", "kind": "approval", "effect_digest": approval_digest(p["effects"][0]["executed"]),
-              "presence": "webauthn", "findings": list(findings)}
+              "presence": presence, "approver": approver, "findings": list(findings)}
         p.update(approvals=[(signer or I).sign(ap)],
                  invocations=[H.sign({**{k: v for k, v in p["invocations"][0].items() if k != "proof"}, "approval_ref": "ap-c"})])
     add("influence confirmed by principal", ("preserved", "-"), lambda p, I, H, O, X: confirmed(p, I, H))
     add("influence confirmed only by the host's flag", ("unresolved", "I4"), lambda p, I, H, O, X: influenced(p, H, principal_confirmed=True))
     add("principal confirmation that does not name the finding", ("unresolved", "I4"), lambda p, I, H, O, X: confirmed(p, I, H, findings=("f-2",)))
     add("principal confirmation signed by a host key", ("unresolved", "I4"), lambda p, I, H, O, X: confirmed(p, I, H, signer=H))
+    # From tclancy's follow-up on #39: the principal must be present, and the confirmation must be the principal's.
+    add("principal confirmation with host_ui presence", ("unresolved", "I4"), lambda p, I, H, O, X: confirmed(p, I, H, presence="host_ui"))
+    add("principal confirmation by an approver other than the principal", ("unresolved", "I4"), lambda p, I, H, O, X: confirmed(p, I, H, approver="user:mallory"))
     add("influenced read-only action", ("preserved", "-"), lambda p, I, H, O, X: (
         p.update(invocations=[H.sign({**p["invocations"][0], "influenced_by": ["f-1"], "declared": {"action": "fs.read", "resource": "repo:app/src/auth.ts", "effect": "read"}})]),
         p.update(delegations=[I.sign({**p["delegations"][0], "claims": claims_of(p, "delegations", actions=["fs.write", "fs.read"])})]),
@@ -304,7 +307,7 @@ def vectors():
         approvals = []
         if confirmed == "signed":   # the principal's own confirmation, bound to the effect of i-2 (spec 5.11, v0.3.3)
             later["approval_ref"] = "ap-q"
-            approvals = [I.sign({"id": "ap-q", "kind": "approval", "presence": "webauthn", "findings": ["f-1"],
+            approvals = [I.sign({"id": "ap-q", "kind": "approval", "presence": "webauthn", "approver": "user:alice", "findings": ["f-1"],
                                  "effect_digest": approval_digest({"action": "fs.read", "resource": "repo:app/src/auth.ts", "effect": "read", "released": [], "t": 21})})]
         if approvals: p["approvals"] = approvals
         p.update(findings=[untrusted(H)], invocations=[read, H.sign(later)],

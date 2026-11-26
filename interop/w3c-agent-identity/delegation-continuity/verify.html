@@ -605,7 +605,16 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   // principal_confirmed: true is the party being judged vouching for itself, so it never confirms on its own.
   const principalConfirms = (inv, needed) => {
     const ap = "approval_ref" in inv ? objs[inv.approval_ref] : undefined;
-    return !!ap && ap.kind === "approval" && verify(ap) && Array.isArray(ap.findings) && needed.every(f => ap.findings.includes(f));
+    // From tclancy's follow-up on #39: the confirmation must be the principal's own, with the principal present. It names
+    // the chain's root principal as approver, and its presence is webauthn or chat_user; host_ui and none are the host
+    // vouching for itself again.
+    return !!ap && ap.kind === "approval" && verify(ap) && ["webauthn", "chat_user"].includes(ap.presence)
+      && ap.approver === rootPrincipal(inv) && Array.isArray(ap.findings) && needed.every(f => ap.findings.includes(f));
+  };
+  const rootPrincipal = inv => {
+    let node = objs[inv.authority_ref]; const seen = new Set();
+    while (node && node.kind === "delegation" && !seen.has(node.id)) { seen.add(node.id); node = objs[node.parent]; }
+    return node && node.kind === "mandate" ? node.principal : undefined;
   };
   for (const kind of ["mandates", "delegations", "intents", "interpretations", "invocations", "effects", "approvals", "findings"])
     for (const o of pk[kind] || []) if (o && typeof o === "object" && "id" in o) objs[o.id] = o;

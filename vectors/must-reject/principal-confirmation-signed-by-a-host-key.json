@@ -123,13 +123,14 @@
     "kind": "approval",
     "effect_digest": "1552a4eb969252887ce5452cb6d8d9e6ae4d30b0317db4b54cac9163f779b2a8",
     "presence": "webauthn",
+    "approver": "user:alice",
     "findings": [
      "f-1"
     ],
     "proof": {
      "kid": "host-1",
      "alg": "Ed25519",
-     "sig": "de4991560a860b48424e099bad806d2cf6b6b1da2dc29a7f7d2de87c1a32fae9d586560c802b218f726ad27b38f9a0b1b5fe73f7c4b8b36692da74745f8d3b03"
+     "sig": "850660621476475a43258b988d288883e114780426bffabf7fb1fc756e278411e9f5accf56d5bc9ed0952f5ce650ac81d0c987b6af2523bb52e91b9c3e4c7d0f"
     }
    }
   ]
