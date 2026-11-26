@@ -3,6 +3,16 @@
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
 
+## A seventh cross-packet sequence: restoring a violated call's approval use (unreleased, 2026-11-26)
+
+- **From Andrii Akhtanin's rerun of 0.3.0** (OpenID AIIM list, 26 November): all 17 steps of the six sequences passed in both reference verifiers. He asked for the transition none of them showed. Spec 5.10 says a violated call's use of an approval isn't counted against later calls, but if a later packet resolves that violation, the use MUST be counted again.
+- **`vectors/sequences/operation-state.json` now has 7 sequences.** In the new one:
+  1. `i-1` is `violated` (I2), and its use of `ap-1` isn't counted;
+  2. `i-2` then uses `ap-1` and is `preserved`;
+  3. `i-1` is presented again without the contradicting receipt, its use comes back into the count, and it is `violated` (I8, "approval already used by i-2").
+
+  Both reference verifiers already behaved this way; this pins it. No code changes.
+
 ## Review fixes from tclancy: three verdicts that said more than their evidence (unreleased, 2026-11-26)
 
 tclancy found AMEP through the OpenSSF agenda request (ossf/ai-ml-security#61) and filed three findings the next day. All three are fixed here, each in both reference verifiers, with vectors.

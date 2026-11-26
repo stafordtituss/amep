@@ -154,7 +154,7 @@ class TestSequences(unittest.TestCase):
     def test_operation_state_sequences(self):
         here = os.path.dirname(os.path.abspath(__file__))
         doc = json.load(open(os.path.join(here, "..", "..", "..", "vectors", "sequences", "operation-state.json")))
-        self.assertEqual(len(doc["sequences"]), 6)
+        self.assertEqual(len(doc["sequences"]), 7)
         for seq in doc["sequences"]:
             state = {}
             for n, step in enumerate(seq["steps"]):

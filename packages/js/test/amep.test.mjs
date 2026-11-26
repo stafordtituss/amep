@@ -250,7 +250,7 @@ test("the actor's own key is the actor, whatever observed_by says (I10; found by
 // (spec 5.8.1). From Andrii Akhtanin's review: rejected evidence must not release a hold or record an operation done.
 test("operation-state sequences: verdict and carried state at every step", () => {
   const doc = JSON.parse(readFileSync(join(VECTORS, "sequences", "operation-state.json"), "utf8"));
-  assert.equal(doc.sequences.length, 6);
+  assert.equal(doc.sequences.length, 7);
   for (const seq of doc.sequences) {
     const state = {};
     seq.steps.forEach((step, n) => {

@@ -1318,6 +1318,24 @@ def sequences():
     S.append(("a single-use approval used in one packet is still used in the next", [
         (approved("i-1", 10), ("preserved", "-"), {}, {}, {"ap-1": "i-1"}),
         (approved("i-2", 20), ("violated", "I8"), {}, {}, {"ap-1": "i-1"})]))
+    # restoration of a violated call's approval use (spec 5.10, "facts are counted completely; blame is charged once").
+    # From Andrii Akhtanin's rerun of 0.3.0 on the OpenID AIIM list (26 November): no sequence showed a later packet
+    # resolving an earlier call's violation, after which its use of the approval must be counted again.
+    #   1. i-1 uses ap-1, but a second receipt shows it executed something other than it declared: violated (I2). Its
+    #      use of ap-1 is not counted, since the violation is already charged to it.
+    #   2. i-2 uses ap-1. It is judged on what it could see: preserved, and the use is i-2's.
+    #   3. i-1 is presented again without the contradicting receipt, so its violation is no longer shown. Its use of
+    #      ap-1 comes back into the count, and the double use is charged to i-1 (I8), not to nobody.
+    def restoring(inv_id, t, extra_receipt=False):
+        p = approved(inv_id, t)
+        if extra_receipt:
+            e = {k: v for k, v in p["effects"][0].items() if k != "proof"}
+            p["effects"].append(O.sign({**e, "id": f"e-{inv_id}-b", "executed": {**e["executed"], "resource": "repo:app/src/secrets.ts", "t": t + 2}}))
+        return p
+    S.append(("a violated call's approval use comes back into the count when its violation is resolved", [
+        (restoring("i-1", 10, extra_receipt=True), ("violated", "I2"), {}, {}, {}),
+        (approved("i-2", 20), ("preserved", "-"), {}, {}, {"ap-1": "i-2"}),
+        (restoring("i-1", 10), ("violated", "I8"), {}, {}, {"ap-1": "i-2"})]))
     keys = {s.kid: s.public() for s in (I, H, O)}
     out = []
     for name, steps in S:
