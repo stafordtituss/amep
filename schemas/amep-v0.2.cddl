@@ -198,6 +198,7 @@ approval = {                                   ; [approver]
   ? nbf: amep-time
   ? expiry: amep-time
   ? consumed: bool
+  ? findings: [+ ref]                          ; v0.3.3: a principal's confirmation names the findings shown (spec 5.11)
   ? proof: proof
   * extension-key => any
 }

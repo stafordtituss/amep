@@ -1,7 +1,7 @@
 {
  "name": "audit-only discovery of an unknown agent (A6)",
  "expect": {
-  "outcome": "violated",
+  "outcome": "unresolved",
   "invariant": "I11"
  },
  "packet": {

@@ -1,0 +1,202 @@
+{
+ "name": "quarantined content promoted only by the host's flag",
+ "expect": {
+  "outcome": "unresolved",
+  "invariant": "I4"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "fs.*",
+      "process.exec"
+     ],
+     "resources": [
+      "repo:app/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 100,
+     "depth": 2
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "a304f205fe39051b7d74ed0834b3b2a037373d16b28549edc6e190520ed92801700c5a4cdfd80a5de5d27737fc39114f173721acaf52f6baec22343a153e3f01"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "fs.write",
+      "fs.read"
+     ],
+     "resources": [
+      "repo:app/src/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 90,
+     "depth": 1
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "3298f60618ea694f13d1968b7c8f4a8d6f19857f82d848b9e8ab472cd5147cb069982aefaf11c9b35323fe21139ab54f44618eaaae7537389befbc9b3c519803"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "host_shell",
+    "version": "r9",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "185d02d49c8440af31134eec4b820a71cfa92a89dd007f0b912acbcb9bf860641ff6e3ff58e7a08754e6bf9c27d2269d166521b86e39293ad09957a61fe75a09"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "fs.read",
+     "resource": "repo:app/src/README.md",
+     "effect": "read"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "ddba37eb4a45812cbfcfc6aa4f12ce472a8a244ed034b3ab7ac1963ca5b9fa219e8f35ab1443f83430358796263cbb45666c7ee89ed4d7c9a92058c2ae01420b"
+    }
+   },
+   {
+    "id": "i-2",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 20,
+    "declared": {
+     "action": "fs.read",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "read"
+    },
+    "influenced_by": [
+     "f-1"
+    ],
+    "principal_confirmed": true,
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "1cd656065bbbceddda5bccd5dc417eee4f5d4990bb8e551219879c98c071484590d9c1c0b6fd7c4af3280a04b5bb82960c92201e2bb8c2950a26874b1de43f04"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "hook:host",
+    "assurance": "L1",
+    "executed": {
+     "action": "fs.read",
+     "resource": "repo:app/src/README.md",
+     "effect": "read",
+     "released": [],
+     "t": 11
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "sig": "046f5f140960210fabd4dcf739d6d433f1e6622079c25be8a81487857b39164e693c9e2417f1cb344e3b38a3baf7639be6055b0627601dc14c07d7e88cc7bf05"
+    }
+   },
+   {
+    "id": "e-2",
+    "kind": "effect",
+    "invocation": "i-2",
+    "observed_by": "hook:host",
+    "assurance": "L1",
+    "executed": {
+     "action": "fs.read",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "read",
+     "released": [],
+     "t": 21
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "sig": "834d8f2855ec386a2ac775bfb89476a6ec44e9a43265be7ae5b45bc5a083cd9d346596f6a73abb10d4d8b1e7a69b60acd79a7c7e86801d7cbb693cba20a5300e"
+    }
+   }
+  ],
+  "findings": [
+   {
+    "id": "f-1",
+    "kind": "finding",
+    "source_locator": "repo:app/README.md",
+    "content_hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+    "hidden_mechanism": "html_comment",
+    "integrity_label": "untrusted",
+    "requested": {
+     "action": "http.post",
+     "object": "env",
+     "recipient": "external"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "a8a2865745baa8b2357f594eef9d2388de168c5f84ba0b3e37b26bb4d65fb498e1021419adedc10d9a4f95500c193ce4d400ad598ee5c5b803f6f90045fcd305"
+    }
+   }
+  ],
+  "decisions": [
+   {
+    "id": "cd-7",
+    "kind": "decision",
+    "invocation": "i-1",
+    "outcome": "preserved",
+    "mode": "quarantine",
+    "phase": "pre_execution",
+    "quarantined": [
+     "f-1"
+    ],
+    "enforcement": {
+     "pep": "host-hook/2.0",
+     "fail_mode": "closed",
+     "host_supports": [
+      "replace_output"
+     ]
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "fc8248cf4b1250b49c3da2db52c7e94829bc94c7acd127ba38aaf73464a0ec4b02ef3df5930bba8b92a8c96043fe1f7ae9d7ff60afd01481893128675905800f"
+    }
+   }
+  ]
+ }
+}
