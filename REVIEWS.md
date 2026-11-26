@@ -42,9 +42,14 @@ Entries are added only with the person's agreement and link to the public record
 
 ### References to AMEP in others' work
 
+These are public works by others, listed as published, with a link to the record. A listing says only what the work says about AMEP, and no more. An author who would like their entry worded differently, or removed, need only ask.
+
 | Date | Work | Authors | Relationship to author | Link |
 |---|---|---|---|---|
-| | *None yet* | | | |
+| 2026-11-18 | W3C AI KR Community Group, [Trust Initiative Explorer](https://github.com/w3c-cg/aikr/blob/903b573/trust/trustinitiativeexplorer.html): AMEP listed among the initiatives that define delegated authority | AI KR CG (chair Paola Di Maio) | None. AMEP's author later sent corrections for its entry and was asked to coordinate updates with the trust folder's maintainers | [w3c-cg/aikr `903b573`](https://github.com/w3c-cg/aikr/commit/903b573) |
+| 2026-11-23 to 25 | Verifiable Agent Trust Envelope: AMEP's evaluations of reference cases 1 to 3 merged into the project's comparison, under `reference/amep/` | Takao Sato (maintainer), after reproducing the verdicts and checking the signatures | None. AMEP's author proposed the cases | [#138](https://github.com/Poke-nushi/Verifiable-Agent-Trust-Envelope/pull/138), [#139](https://github.com/Poke-nushi/Verifiable-Agent-Trust-Envelope/pull/139), [#142](https://github.com/Poke-nushi/Verifiable-Agent-Trust-Envelope/pull/142) |
+| 2026-11-25 | OWASP Agentic Evidence, scenario proposal D and E: AMEP's propagation-window vectors listed as candidate cross-checks for `unordered-revocation` | AngeYobo (scenario author) | None. Public discussion on #2 and #21 | [OWASP/Agentic-Evidence#21](https://github.com/OWASP/Agentic-Evidence/issues/21) |
+| 2026-11-26 | OpenID AIIM use case "An agent buying from a merchant it has never used", revision 3: AMEP's Internet-Draft listed among the possible building blocks, and AMEP's author credited as a contributor for "the view afterwards" | Tejaswi Suresh (RankSaga Ltd), with Francesco Marinoni Moretto and Andrii Akhtanin | AMEP's author contributed rows to the use case on the list | [OpenID AIIM list, 26 Nov 2026](https://lists.openid.net/pipermail/openid-aiim/Week-of-Mon-20261123/000277.html) |
 
 ### Public reviews and discussion
 
