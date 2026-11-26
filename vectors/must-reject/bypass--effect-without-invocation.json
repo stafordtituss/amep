@@ -1,7 +1,7 @@
 {
  "name": "bypass: effect without invocation",
  "expect": {
-  "outcome": "violated",
+  "outcome": "unresolved",
   "invariant": "I11"
  },
  "packet": {

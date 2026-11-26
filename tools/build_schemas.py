@@ -146,6 +146,8 @@ schemas["approval"] = obj("approval", "ApprovalBinding (spec 5.10). Signed by ro
     "effect_digests": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
     "presence": {"enum": ["webauthn", "chat_user", "host_ui", "none"]}, "approver": {"type": "string"},
     "resource_version": {"type": "string"}, "nbf": ref("time"), "expiry": ref("time"), "consumed": {"type": "boolean"},
+    "findings": {"description": "For a principal's confirmation: the ids of the findings the principal was shown (spec 5.11, v0.3.3).",
+                 "type": "array", "minItems": 1, "items": ref("ref")},
     "proof": ref("proof")}, "approval")
 schemas["approval"]["oneOf"] = [{"required": ["effect_digest"]}, {"required": ["effect_digests"]}]
 schemas["finding"] = obj("finding", "ContentFinding (spec 5.11). Counts as trusted only when signed (role host or observer).",

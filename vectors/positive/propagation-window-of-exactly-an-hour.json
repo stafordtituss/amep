@@ -1,8 +1,8 @@
 {
- "name": "revoked mid-action, inside the declared propagation window",
+ "name": "propagation window of exactly an hour",
  "expect": {
-  "outcome": "unresolved",
-  "invariant": "I6"
+  "outcome": "preserved",
+  "invariant": "-"
  },
  "packet": {
   "mandates": [
@@ -26,12 +26,12 @@
      "depth": 2
     },
     "revocation": {
-     "window": 10
+     "window": 3600
     },
     "proof": {
      "kid": "issuer-1",
      "alg": "Ed25519",
-     "sig": "9b224c6ecb60f92acbdf069725a5a75529e579910503a657d2f18a0dd859df4a4f074569310a3ee746b9209fa884422a979123e53e978e9bc5c2e228bc4ad604"
+     "sig": "d52213182630f35cd19a46eed1ab1eb25b183187a46fc331911f4921518291ce9cfaf0d71bbe5ba2cea0049825ae3edcf063f4357fbef905f9aeccfb2baf1b0f"
     }
    }
   ],

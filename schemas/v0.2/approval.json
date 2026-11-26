@@ -51,6 +51,14 @@
   "consumed": {
    "type": "boolean"
   },
+  "findings": {
+   "description": "For a principal's confirmation: the ids of the findings the principal was shown (spec 5.11, v0.3.3).",
+   "type": "array",
+   "minItems": 1,
+   "items": {
+    "$ref": "common.json#/$defs/ref"
+   }
+  },
   "proof": {
    "$ref": "common.json#/$defs/proof"
   }
