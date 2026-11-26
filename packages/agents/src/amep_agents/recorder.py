@@ -21,6 +21,8 @@ from typing import Any, Callable, Iterable
 from amep_protocol import sdk
 from amep_protocol.core import evaluate, verdict
 
+from . import otel
+
 
 @dataclass(frozen=True)
 class Effect:
@@ -55,6 +57,8 @@ class EvidenceRecorder:
                    `chain` so the packet is self-contained.
     interpret      maps (tool_name, args) to the Effect the call declares, or None for ungoverned tools.
     executed       maps (tool_name, args, output) to the Effect the tool reports it executed. Default: declared.
+    trace          when OpenTelemetry is installed and a span is recording, put AMEP ids, digests and verdicts on it,
+                   and its trace context on each invocation. Default: True. Never puts arguments or outputs on spans.
     """
     host_key: sdk.Key
     observer_key: sdk.Key
@@ -67,6 +71,7 @@ class EvidenceRecorder:
     adapter: str = "amep-agents"
     adapter_version: str = "0"
     clock: Callable[[], float] = time.time
+    trace: bool = True   # join to OpenTelemetry when it's installed and a span is recording (amep_agents.otel)
     _calls: dict[str, _Call] = field(default_factory=dict, init=False, repr=False)
     _invocations: list[dict] = field(default_factory=list, init=False, repr=False)
     _effects: list[dict] = field(default_factory=list, init=False, repr=False)
@@ -89,9 +94,11 @@ class EvidenceRecorder:
             n = next(self._seq)
             inv = self.host_key.sign(sdk.invocation(
                 f"i-{n}", self.authority_ref, self._interp["id"], self._now(), eff.action, eff.resource, eff.effect,
-                actor=self.actor))
+                actor=self.actor, correlation=otel.correlation(call_id) if self.trace else None))
             self._calls[call_id] = _Call(tool, args or {}, eff, inv)
             self._invocations.append(inv)
+        if self.trace:
+            otel.mark_invocation(inv)
         return inv
 
     def observe(self, call_id: str, output: Any = None, *, error: BaseException | str | None = None) -> dict | None:
@@ -109,6 +116,8 @@ class EvidenceRecorder:
             receipt = self.observer_key.sign(sdk.effect(
                 "e-" + call.invocation["id"][2:], call.invocation["id"], self.observed_by, "L1", body))
             self._effects.append(receipt)
+        if self.trace:
+            otel.mark_effect(receipt)
         return receipt
 
     def packet(self) -> dict:
@@ -119,4 +128,7 @@ class EvidenceRecorder:
     def evaluate(self, keys: dict, state: dict | None = None):
         """Evaluate the packet. Returns (packet verdict, per-invocation results)."""
         results = evaluate(self.packet(), keys, state=state)
-        return verdict(results), results
+        v = verdict(results)
+        if self.trace:
+            otel.mark_verdict(v)
+        return v, results

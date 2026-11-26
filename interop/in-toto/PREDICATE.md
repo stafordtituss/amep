@@ -51,7 +51,9 @@ The predicates compose. Both reference verifiers also publish the verdict as an 
 
 ## Model
 
-- **Subject:** the evidence packet, identified by the SHA-256 of the exact bytes the verifier evaluated. The name is conventionally `amep-packet`. Hashing bytes rather than a parsed form means a record also covers a packet that doesn't parse, which comes out `unresolved`.
+- **Subject:** the artifact the evaluated actions produced, when there is one a policy admits: a commit, a release, a payment, identified by its own digest. The evidence packet is then an input, named in the predicate by `packet.sha256`.
+- **When there is no artifact** (a call that was refused, or whose outcome is unresolved), the subject is the evidence packet itself, identified by the SHA-256 of the exact bytes the verifier evaluated and conventionally named `amep-packet`. Hashing bytes rather than a parsed form means a record also covers a packet that doesn't parse, which comes out `unresolved`.
+- Both reference implementations take the artifact subjects as an optional argument (`statement(..., subjects=[...])` in Python, `statement(..., { subjects })` in JavaScript). Without it, the packet is the subject. *(Changed after review in in-toto/attestation#625.)*
 - **Producer:** an AMEP verifier, such as a CI job, an auditor or a gateway, signing with its own key.
 - **Consumer:** a policy engine, an archive, or a party re-checking the verdict.
 
@@ -63,7 +65,7 @@ The predicates compose. Both reference verifiers also publish the verdict as an 
   "subject": [{ "name": "amep-packet", "digest": { "sha256": "<hex>" } }],
   "predicateType": "https://github.com/stafordtituss/amep/verdict/v0.3",
   "predicate": {
-    "packet":   { "sha256": "<hex>" },                       // required; equals the subject digest
+    "packet":   { "sha256": "<hex>" },                       // required; the subject digest when the packet is the subject
     "keyset":   { "sha256": "<hex>" },                       // required
     "verdict":  { "outcome": "<outcome>", "invariant": "<id>", "blame": "<party>" | null, "gaps": [<gap>] },  // required
     "results":  [{ "id": "<invocation id>", "outcome": "...", "invariant": "...", "blame": ..., "gaps": [...] }],  // required
@@ -120,7 +122,7 @@ amep-protocol verify packet.json --keys keys.json --verdict-out verdict.dsse.jso
 - Python: `amep-protocol` (PyPI), `amep_protocol.verdicts`.
 - JavaScript: `@stafordtituss/amep` (npm), `@stafordtituss/amep/verdict`.
 
-`tools/compare_verifiers.py` checks that the two produce byte-identical statements over all 287 AMEP conformance vectors (all three suites). Both implementations are by the same author.
+`tools/compare_verifiers.py` checks that the two produce byte-identical statements over all 313 AMEP conformance vectors (all three suites). Both implementations are by the same author.
 
 Outside use: in the Verifiable Agent Trust Envelope project, signed verdict envelopes for a lost-response and recovery case are kept under `reference/amep/case-01-lost-response/`. Its maintainer re-ran the pinned Python verifier on them and reported that all five verdicts matched ([VATE PR #138](https://github.com/Poke-nushi/Verifiable-Agent-Trust-Envelope/pull/138)).
 

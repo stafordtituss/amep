@@ -1,0 +1,130 @@
+{
+ "name": "presentation replayed to another audience",
+ "expect": {
+  "outcome": "violated",
+  "invariant": "I2"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "fs.*",
+      "process.exec"
+     ],
+     "resources": [
+      "repo:app/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 100,
+     "depth": 2,
+     "audiences": [
+      "tool:reports-api"
+     ]
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "eef756fd62b7d65108a982561ada41437e2db320cf9c59eb5d38a49de08260a24fcafb7788557fb3074a867e08810c6446fcdba8630e0416957054ae8cb6f107"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "fs.write"
+     ],
+     "resources": [
+      "repo:app/src/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 90,
+     "depth": 1,
+     "audiences": [
+      "tool:reports-api"
+     ]
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "626acb3fe6cc18b5448a3d876a530b3286a0d7e4ab6a436255ee49ab662d4e0b958c15533adf5c27f84e52b5d69ec63fecb2c944c6e61e7068a7fcaabd0aa10b"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "host_shell",
+    "version": "r9",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "39a6a8663dcd45b7c212805d517d108e3864048bd5b8146837d1d638a4138dca2ed75e828946f9e33e507e9c2efc26a71c216a2e698d868963db309d5523380c"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "write_local"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "cb2566b49dfd1ab2204711d122799b4edf4cfaa7713fa72702e1135cd00b1e3fe6823b55eafe25e1b87b6869706c2840d9875868cea1e9c5ee9691984aa5430a"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "hook:host",
+    "assurance": "L1",
+    "executed": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "write_local",
+     "released": [],
+     "t": 11,
+     "audience": "tool:analytics-api"
+    },
+    "invocation_digest": "f1fd8c0cbcb9df48b65ef0ea454bfc59eadb6c672d7ca528b1aeb84f11a41d58",
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "95fa994c8615a191c6af49320d19a5872a3ffdab7771385deb73a5935a611923cdfda7dbda3a7a1b92217e31af9d9bc4f720d28cf459eee7b5a27249a506a307"
+    }
+   }
+  ],
+  "amep_version": "0.3"
+ }
+}

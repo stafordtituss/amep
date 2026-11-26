@@ -289,6 +289,15 @@
      "items": {
       "$ref": "#/$defs/limit"
      }
+    },
+    "audiences": {
+     "description": "Services the authority may be exercised at; absent means any (spec 5.3, v0.3.2).",
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "type": "string",
+      "minLength": 1
+     }
     }
    }
   },
@@ -360,6 +369,11 @@
     },
     "value": {
      "$ref": "#/$defs/value"
+    },
+    "audience": {
+     "description": "The service the effect was sent to (spec 5.3, v0.3.2).",
+     "type": "string",
+     "minLength": 1
     }
    }
   },

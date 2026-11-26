@@ -1,0 +1,158 @@
+{
+ "name": "retry under a fresh mandate is still held for the first attempt",
+ "expect": {
+  "outcome": "unresolved",
+  "invariant": "I7"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "fs.*",
+      "process.exec"
+     ],
+     "resources": [
+      "repo:app/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 100,
+     "depth": 2
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "71a1c45384cea9f9903c7a93ce5a8b27af9bd96ad5f52fe6b02bcf9e97951fc417f4e2e532b3926490b6fa7f2c38ea4cd916693bc4d8f275ba75556d580daa06"
+    }
+   },
+   {
+    "id": "m-2",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "fs.*",
+      "process.exec"
+     ],
+     "resources": [
+      "repo:app/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 100,
+     "depth": 2
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "b30ad6c3f2139403f93a11fb23cc1bbe8208269bb63dcaa5e3013b6d9408b97640bc830400c1ead109b0a0aed034b5ce8719ee88c20a5f14af8e4413840dbd05"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "fs.write"
+     ],
+     "resources": [
+      "repo:app/src/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "write_local",
+     "exp": 90,
+     "depth": 1
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "957c8193fb37d4e3a104139fa1df83d17357076aec57015ae4de7e1d32b9da0cc61f3e84a75853d9e288193baefb4122d3ad6c1c60e35cf2542935d7a364c20f"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "host_shell",
+    "version": "r9",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "39a6a8663dcd45b7c212805d517d108e3864048bd5b8146837d1d638a4138dca2ed75e828946f9e33e507e9c2efc26a71c216a2e698d868963db309d5523380c"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "m-2",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "write_local"
+    },
+    "operation": "op-7f3a",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "a74687ca6b704c7b002eeb5ed33c84bffc22bce327b81beb913c9632a715ccc55834a0bb489513bc095d8c70a3bd6db3b20c4ab2ec4e9ed740e8f399df078505"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "hook:host",
+    "assurance": "L1",
+    "invocation_digest": "d3fe520c3a51b51ac42d1dd8e52054b5ce503e8e4c87dc363aae254d67e0fc46",
+    "executed": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "write_local",
+     "released": [],
+     "t": 11
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "cc9e9dc98152cb24a190585ecadc1ce7b3f0e6c4f8ab5e5561aeff93ced9c4ca4637be5be5bb44facad228b3fd618ca1599d7779195edb5307ff5913ac4afc03"
+    }
+   }
+  ],
+  "amep_version": "0.3"
+ },
+ "state": {
+  "operations_held": {
+   "op-7f3a": {
+    "invocation": "i-0",
+    "digest": "7415c316e36e452b5d1c14c9b007f172a2eafde2dc8add551f68d623063ca4e8"
+   }
+  }
+ }
+}

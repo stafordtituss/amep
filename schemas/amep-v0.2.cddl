@@ -62,6 +62,7 @@ claims = {
   ? depth: uint
   ? budget: uint
   ? limits: [+ limit]                          ; quantity limits (spec 7.6)
+  ? audiences: [+ tstr .size (1..256)]         ; services the authority may be exercised at (spec 5.3; v0.3.2)
   * extension-key => any
 }
 
@@ -84,6 +85,7 @@ executed-body = {
   ? accessed: [* tstr .regexp "[a-z_]+"]       ; data classes this effect read (spec 5.9.1)
   ? recipient: tstr .regexp "[a-z_]+"          ; recipient class of what this effect sent or wrote
   ? value: value                               ; quantity moved or touched (spec 5.9.2)
+  ? audience: tstr .size (1..256)              ; the service the effect was sent to (spec 5.3; v0.3.2)
   t: amep-time
   * extension-key => any
 }
@@ -145,6 +147,7 @@ invocation = {                                 ; [host]
   ? budget_spent: uint
   ? args_digest: hex-digest                    ; SHA-256 of JCS(arguments sent) (spec 5.14)
   ? reserve: { amount: amount, unit: unit }    ; the most this call can move (spec 5.8, 7.6 rule 6; v0.3)
+  ? operation: tstr .size (1..256)            ; the logical operation, the same on every attempt (spec 5.8.1; v0.3.2)
   ? correlation: { ? session_ref: tstr, ? prompt_ref: tstr, ? tool_use_ref: tstr, ? traceparent: tstr }
   ? proof: proof
   * extension-key => any

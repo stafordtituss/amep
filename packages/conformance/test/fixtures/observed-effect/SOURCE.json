@@ -1,0 +1,30 @@
+{
+ "source": "probityai/agent-evidence-vectors v0.17.5 (8e9cc6c), vectors-observed-effect",
+ "license": "Apache-2.0, copied unchanged with attribution",
+ "keys": {
+  "observedParty": {
+   "keyid": "93c4e5b640e83ba0ed87effe9a86f05e",
+   "publicKey": "763929ab5e25073572c6c63a261bc5b375a5b66f1cfe26cafe36885402d69632"
+  },
+  "observer": {
+   "keyid": "f3cb9b6750737ef6789a72b71d8305f2",
+   "publicKey": "4f2a59edc8367deb40047ce83ee7f5ce711a57d93abbda9d1ce8588c56a3ce88"
+  }
+ },
+ "expected": {
+  "authoritative-baseline": {
+   "absenceEstablished": true,
+   "codes": [],
+   "derivedTier": "authoritative",
+   "effectsIndependentlyObserved": true,
+   "verdict": "valid"
+  },
+  "voluntary-self-vantage": {
+   "absenceEstablished": false,
+   "codes": [],
+   "derivedTier": "voluntary",
+   "effectsIndependentlyObserved": false,
+   "verdict": "valid"
+  }
+ }
+}

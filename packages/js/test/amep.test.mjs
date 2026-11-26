@@ -194,3 +194,72 @@ test("a signature gap says why the signature was refused (spec 10.5.1)", () => {
   const s = JSON.parse(readFileSync(join(VECTORS, "must-reject/self-approval-signed-by-host-key.json"), "utf8"));
   assert.ok(gaps(s.packet).every(x => !("cause" in x)));
 });
+
+test("verdict statement: the artifact as subject, the packet as an input (in-toto/attestation#625)", (t) => {
+  const f = join(VECTORS, "must-reject", "payment-over-the-per-call-limit-without-approval.json");
+  if (!existsSync(f)) return t.skip("conformance vectors not present");
+  const v = JSON.parse(readFileSync(f, "utf8"));
+  const keys = JSON.parse(readFileSync(join(VECTORS, "keys.json"), "utf8"));
+  const bytes = Buffer.from(JSON.stringify(v.packet), "utf8");
+  const res = evaluate(JSON.parse(bytes.toString()), keys, sigOk);
+  const commit = { name: "git+https://example.com/app@refs/heads/main", digest: { gitCommit: "a".repeat(40) } };
+  const st = verdicts.statement(bytes, keys, res, undefined, { subjects: [commit] });
+  assert.deepEqual(st.subject, [commit]);
+  assert.equal(st.predicate.packet.sha256, createHash("sha256").update(bytes).digest("hex"));
+  // without subjects, unchanged: the packet is the subject, byte for byte as before
+  assert.deepEqual(verdicts.statement(bytes, keys, res).subject, [{ name: "amep-packet", digest: { sha256: st.predicate.packet.sha256 } }]);
+  assert.throws(() => verdicts.statement(bytes, keys, res, undefined, { subjects: [] }));
+  assert.throws(() => verdicts.statement(bytes, keys, res, undefined, { subjects: [{ name: "x", digest: { sha256: "ZZ" } }] }));
+});
+
+test("a not_executed statement only the actor signed releases no hold (spec 5.8.1, from review of #24)", () => {
+  const I = Key.generate("issuer-x", ["issuer"]), H = Key.generate("host-x", ["host"]), O = Key.generate("obs-x", ["observer"]);
+  const keys = keyset(I, H, O);
+  const m = I.sign(sdk.mandate("m-1", "user:x", sdk.claims(["tickets.update"], ["tickets:*"], "write_shared", 2000000000)), { v: 2 });
+  const a = H.sign(sdk.interpretation("a-1", "tickets", "1"), { v: 2 });
+  const inv = (id, t) => H.sign({ ...sdk.invocation(id, "m-1", "a-1", t, "tickets.update", "tickets:issue/1", "write_shared", { actor: "agent:x" }), operation: "op-1" }, { v: 2 });
+  const i0 = inv("i-0", 5), i1 = inv("i-1", 10);
+  const run = observedBy => {
+    const c0 = O.sign(sdk.callStatement("c-0", "i-0", observedBy, "not_executed", 0, 6), { v: 2 });
+    const e1 = O.sign(sdk.effect("e-1", "i-1", "server:tickets", "L1", sdk.effectBody("tickets.update", "tickets:issue/1", "write_shared", 11)), { v: 2 });
+    const res = evaluate(sdk.packet([m, a, i0, i1, c0, e1], { amepVersion: "0.3" }), keys, sigOk);
+    return Object.fromEntries(res.map(r => [r.id, [r.outcome, r.invariant]]));
+  };
+  // the actor's own word: i-0 stays unknown, so the retry is held
+  assert.deepEqual(run("agent:x"), { "i-0": ["unresolved", "I10"], "i-1": ["unresolved", "I7"] });
+  // an independent observer's statement: i-0 provably did nothing, so the retry proceeds
+  assert.deepEqual(run("server:tickets"), { "i-0": ["preserved", "-"], "i-1": ["preserved", "-"] });
+});
+
+test("the actor's own key is the actor, whatever observed_by says (I10; found by the model check in formal/)", () => {
+  const I = Key.generate("issuer-x", ["issuer"]), H = Key.generate("host-x", ["host", "observer"]), O = Key.generate("obs-x", ["observer"]);
+  const keys = keyset(I, H, O);
+  const m = I.sign(sdk.mandate("m-1", "user:x", sdk.claims(["tickets.update"], ["tickets:*"], "write_shared", 2000000000)), { v: 2 });
+  const a = H.sign(sdk.interpretation("a-1", "tickets", "1"), { v: 2 });
+  const inv = (id, t) => H.sign({ ...sdk.invocation(id, "m-1", "a-1", t, "tickets.update", "tickets:issue/1", "write_shared", { actor: "agent:x" }), operation: "op-1" }, { v: 2 });
+  const i0 = inv("i-0", 5), i1 = inv("i-1", 10);
+  const e1 = O.sign(sdk.effect("e-1", "i-1", "server:tickets", "L1", sdk.effectBody("tickets.update", "tickets:issue/1", "write_shared", 11)), { v: 2 });
+  const run = (...objs) => Object.fromEntries(evaluate(sdk.packet([m, a, i0, i1, ...objs], { amepVersion: "0.3" }), keys, sigOk).map(r => [r.id, [r.outcome, r.invariant]]));
+  const c0 = H.sign(sdk.callStatement("c-0", "i-0", "server:tickets", "not_executed", 0, 6), { v: 2 });
+  assert.deepEqual(run(c0, e1), { "i-0": ["unresolved", "I10"], "i-1": ["unresolved", "I7"] });
+  const e0 = H.sign(sdk.effect("e-0", "i-0", "server:tickets", "L1", sdk.effectBody("tickets.update", "tickets:issue/1", "write_shared", 6)), { v: 2 });
+  assert.deepEqual(run(e0)["i-0"], ["unresolved", "I10"]);
+});
+
+// vectors/sequences: verifier state carried across packets; each step's verdict and the operation state it leaves
+// (spec 5.8.1). From Andrii Akhtanin's review: rejected evidence must not release a hold or record an operation done.
+test("operation-state sequences: verdict and carried state at every step", () => {
+  const doc = JSON.parse(readFileSync(join(VECTORS, "sequences", "operation-state.json"), "utf8"));
+  assert.equal(doc.sequences.length, 6);
+  for (const seq of doc.sequences) {
+    const state = {};
+    seq.steps.forEach((step, n) => {
+      const v = verdict(evaluate(step.packet, doc.keys, sigOk, [], state));
+      const got = Object.fromEntries(["operations_held", "operations_done"].map(k =>
+        [k, Object.fromEntries(Object.entries(state[k] || {}).map(([o, h]) => [o, h.invocation]))]));
+      if ("approvals_used" in step.state_after) got.approvals_used = Object.fromEntries(Object.entries(state.approvals_used || {}).map(([a, u]) => [a, u[0]]));
+      assert.deepEqual([v.outcome, v.invariant], [step.expect.outcome, step.expect.invariant], `${seq.name}, step ${n + 1}`);
+      assert.deepEqual(got, step.state_after, `${seq.name}, step ${n + 1}`);
+    });
+  }
+});

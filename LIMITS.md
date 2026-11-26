@@ -13,6 +13,7 @@ The entries fall into three groups:
 |---|---|---|
 | **A signer is trusted for what it signs.** No format can catch an observer that lies consistently. | Contradictory signed records are caught (I11). L3 receipts come from the system that executed the effect itself, and spec 17 recommends a second independent observer for `destructive` and `financial` effects. | `must-reject/receipt-contradicts-a-not-executed-statement` (`violated`, I11) |
 | **A record that was never produced can't be read.** | The answer is `unresolved` (I7), naming the missing receipt, never `preserved`. | `must-reject/missing-effect-receipt` (`unresolved`, I7) |
+| **An effect nobody recorded can't be seen.** The presented records may not be all there is. | For file writes, a signed Observed Effect record from an observer below the agent, graded authoritative with absence established, lists every write in a path scope over an interval. `amep-conformance` reconciles it with a packet: writes with no receipt, receipts the observer never saw, and calls whose outcome the record settles. Outside that scope and interval, nothing is concluded. | `packages/conformance/test/observed-effect.test.mjs`; `interop/in-toto/OBSERVED-EFFECT.md` |
 
 ## B. Closed by a record AMEP already defines
 

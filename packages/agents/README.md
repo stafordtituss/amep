@@ -89,6 +89,10 @@ verdict, results = recorder.evaluate(keys)
 
 The interrupt and retry cases are in [`tests/test_langgraph_interrupt_retry.py`](tests/test_langgraph_interrupt_retry.py).
 
+## How-to guides
+
+Runnable guides for each framework, for saving and checking evidence, for keeping the observer key away from the agent, and for publishing a signed verdict: [HOWTO.md](HOWTO.md). CI runs every one.
+
 ## Keys and trust
 
 - **Keep the observer key away from the agent.** It should live in the tool runtime or a proxy, so that high-impact effects are observed by someone other than the actor (I10). In-process hooks give assurance level L1.

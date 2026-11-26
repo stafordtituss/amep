@@ -12,6 +12,90 @@ Specification drafts, conformance-suite versions and package versions are listed
 
   It never produces an effect: a decision made before execution shows neither that the tool ran nor that it didn't (spec 10.3). Run over the three fixtures of ScopeBlind's pinned quickstart (`95ecaa3`, `protect-mcp@0.32.5`): allow, `unresolved` (I7, `receipt`); deny, `unresolved` (I10, `independent_observer`); the altered copy, `invalid_signature`. See `interop/protect-mcp/` and ScopeBlind/scopeblind-gateway#31.
 - **Fix, JS core:** for a high-impact call denied with only the host's own enforcement claim, the I10 result now names its gap, `independent_observer`, with `blame` null, as the Python core already did. Outcome and invariant are unchanged, so no vector changes. The browser verifier is rebuilt.
+## 0.3.0 (2026-11-25)
+
+The packages leave alpha: `amep-protocol` 0.3.0 on PyPI and `amep-protocol` 0.3.0 on npm. With them, Internet-Draft -02 and suite v0.3.2. The sections below, back to 0.3.0a4, are what this release contains. In brief:
+- **Operation identity:** a retry under fresh authorization can't take effect unnoticed. Rejected evidence changes nothing.
+- **Admissions:** the actor's own record can show a violation, never compliance.
+- **Audience binding.**
+- **Key status at the time of use.**
+- **The suite:** 313 vectors in three suites, plus six cross-packet sequences.
+
+**Outside contributors to this release:**
+- Carlos Vendrell Felici (Zealynx Security): twelve vectors of his own (#30), the first by an outside author;
+- Andrii Akhtanin (Radiolaria): key status, operation identity, and rejected evidence (#22, #24);
+- Brennan Zambo: an independent verifier, and the review of operation identity (#19, #24);
+- Takao Sato: the VATE cases, merged upstream;
+- the rest are recorded in `vectors/CREDITS.md` and `REVIEWS.md`.
+## Audience binding (proposal, unreleased, 2026-11-25)
+
+- **The gap, stafordtituss/amep#16 (found with delegation-control-bench, scenario VC-03):** the core claims had no audience. A presentation bound to one service, replayed to another with an action and resource in scope, was `preserved`.
+- **Now (spec 5.3):** claims may carry `audiences`, a list of patterns, and a receipt's executed body may carry `audience`.
+  - An effect sent to an audience the claims don't name is `violated` (I2).
+  - Where the claims name audiences, a receipt without `audience` is `unresolved` (I7), gap `audience`.
+  - A delegation can only narrow its parent's audiences (I1), and along a chain they intersect.
+  - `audiences` is an AMEP 0.3 member: in an unversioned packet it is malformed (`unresolved`, I7), as for `grants`.
+- **Suite v0.3.2:** 5 more core vectors (1 positive, 4 must-reject). The core suite now has 261 vectors (69 positive, 192 must-reject), 297 across the three suites. No existing vector changes.
+- **Schemas:** `audiences` in claims, `audience` in the executed body, in the JSON Schemas and the CDDL.
+
+
+
+## Admissions: the actor's own record can show a violation (proposal, unreleased, 2026-11-25)
+
+- **Found in an analysis of outside traces** (MasDrift, NYU Abu Dhabi; results with the authors before publication): when the only record of an outcome is the agents' own log, a forbidden external send that the log itself records came out `unresolved` (I10), because nobody independent observed it.
+- **The rule (I10, spec 8):** a record from the actor, or from a key of the actor's own operator, can't establish that the actor stayed within authority, but it can establish that it didn't.
+  - Where it shows the actor executing what it declared, outside its authority, the result is `violated`, charged to the actor, with "on the actor's own record; not independently observed" in the reason.
+  - It never convicts another party: a self-record in which the executed effect differs from the declared one, which would charge the server, stays `unresolved`. So does every self-report of an in-scope action.
+- **The vectors:** four new ones, two `violated` and two `unresolved`. No existing vector changes.
+
+## Operation identity: a retry can't take effect unnoticed (proposal, unreleased, 2026-11-25)
+
+- **The gap, from Andrii's review (Radiolaria) on the OpenID AIIM list:** an attempt whose outcome is unknown, retried under a fresh authorization, started clean. If both attempts took effect, the operation ran twice and no rule was broken. AAuth Budgets has the same gap across auth tokens.
+- **Now (spec 5.8.1):** an invocation may carry `operation`, the same identifier on every attempt.
+  - An unknown outcome holds the operation, and a later attempt is `unresolved` with gap `held_outcome`, whatever authorization it carries.
+  - A second attempt that takes effect after one already did is `violated` (I2), "executed twice".
+  - The hold is released when the first attempt is shown not executed. Other operations proceed.
+  - Verifier state carries `operations_held` and `operations_done` across packets (spec 10.7).
+- **The limit, stated in 5.8.1:** the identifier is chosen by the party that retries, so it binds only what that party records.
+- **Suite v0.3.2:** 5 core vectors (3 must-reject, all `preserved` before this change; 2 positive). No existing vector changes. The core suite now has 256 vectors (68 positive, 188 must-reject), 292 across the three suites.
+- **Schemas:** `operation` is an optional string of 1 to 256 characters in `invocation.json` and the CDDL.
+- **What releases a hold (from Brennan Zambo's review on #24):** only a showing someone other than the actor can check. A high-impact first attempt reported not executed only by the actor's own side stays unknown, and every hold it had stays (operation, approval, period reserve). Before this, such a statement failed I10 for the first attempt but still let a retry through; tests in both packages pin it.
+- **The actor is its key, not its name (found by the exhaustive model check in `formal/`).** I10 compared `observed_by` with `actor`, and operators where the key set names them. A host key that also had the `observer` role could sign its own `not_executed` statement, or its own receipt for a high-impact call, under another `observed_by`, and pass: a retry was then released on the actor's own word. A record signed by the invocation's own key is now the actor's, whatever name it gives (spec 5.14 rule 5, 8 I10, 12.5; both cores). No vector changes; tests in both packages fail without the fix.
+- **No hold hides a double use (found by the same model check).** Three orderings let an `unresolved` hold mask a violation that verified receipts had already proved, against spec 5.10's rule that checks deciding `violated` come first. First, an approval's single-use check ran after its hold check. Second, a call held on an approval didn't record its use, so a third use was held too. Third, "executed twice" (5.8.1) ran last, after the approval hold. Both cores now check single use and "executed twice" before any hold. No vector changes; the cases need three calls, and the model check (`formal/`) covers them.
+- **Rejected evidence changes nothing (rule 5, from Andrii Akhtanin's review on the OpenID AIIM list, 25 November):** an unverifiable `not_executed` statement had released the hold, and an unverifiable receipt had recorded the operation as done. Carried state now changes only on evidence that passed its checks (`settle()` in both cores). Five cross-packet sequences in `vectors/sequences/operation-state.json` check the verdict and the operation state after every step, including Andrii's two sequences and three controls.
+- **Status:** a proposal. Brennan Zambo agreed with all five expected answers (#24); Andrii's review is open.
+
+## Twelve payment-limit vectors, written by Carlos Vendrell Felici (unreleased, 2026-11-25)
+
+- **The first vectors written by someone outside the project** ([#30](https://github.com/stafordtituss/amep/pull/30)): 4 positive and 8 must-reject, on the readings invited in #10. They cover:
+  - a monthly figure that leaves a daily limit unresolved;
+  - a second payment service counted against one total;
+  - two identical payments in one second, which count twice;
+  - on-chain amounts up to uint128, where 40 digits is invalid;
+  - an approval of the pre-fee amount, which doesn't bind the debit;
+  - limits in the debit currency.
+- **Both reference verifiers agree on every one,** and regeneration is byte-identical.
+- **He also ran weakened copies of the core** against the suite. Three of four passed every earlier vector and fail only on the new ones, so these vectors close real gaps in what the suite could catch.
+- **His question about approvals that name a maximum** is open as [#31](https://github.com/stafordtituss/amep/issues/31).
+
+
+## Verdict statements can name the admitted artifact as subject (unreleased, 2026-11-24)
+
+- **From Sankalp Gilda's review of in-toto/attestation#625:** when the evaluated actions produced an artifact a policy admits (a commit, a release, a payment), that artifact should be the statement's subject, with the evidence packet as an input.
+- **Both statement builders now take optional `subjects`:** `statement(..., subjects=[...])` in Python and `statement(..., { subjects })` in JavaScript. Each subject is an in-toto ResourceDescriptor with a name and a digest of lowercase hex values. The packet stays in the predicate as `packet.sha256`.
+- **Without `subjects`, nothing changes:** the packet is the subject, and both verifiers still produce byte-identical statements for all 287 vectors.
+- `interop/in-toto/PREDICATE.md` describes the new subject model, and the example statement is regenerated for the current key set.
+
+## AP2: the checkout binding is checked, not just reported (unreleased, 2026-11-24)
+
+- **Finding, from nmatt1's APAF-1 column (AP2 #402):** none of AMEP's SDK fixtures carried `payment.reference`, which AP2's schema requires on every open payment mandate. The omission was in AMEP's generator. AP2's SDK emits the constraint, and its own samples set it to the hash of the user's open checkout mandate.
+- **A second SDK fixture family, with checkouts** (`interop/ap2/make_sdk_bundles_v2.py`, `sdk-bundles-v2.json`). It is schema-valid and built with AP2's SDK at `e1ea56d`, following AP2's sample flow. The first family and `verdicts.json` are unchanged (still `93aa9005…`), because others have pinned them; the new family's verdicts are in `interop/ap2/verdicts-checkout.json`.
+- **The AP2 profile now verifies the checkout link** that `payment.reference` creates. It checks each checkout chain, and binds each payment to the open checkout it was made under, through `transaction_id` = `checkout_hash`. The AMEP resource carries that checkout. Results:
+  - a payment for another checkout than the one the user named is `violated` (I2);
+  - a payment whose checkout chain isn't presented is `unresolved`;
+  - the eight earlier scenarios give the same verdicts as before.
+  
+  AP2's own SDK agrees on both new cases. This closes the profile's former gap, "payment.reference binds the checkout mandate, which this profile does not read".
 
 ## Two fixes from Andrii's review on the OpenID AIIM list (unreleased, 2026-11-24)
 

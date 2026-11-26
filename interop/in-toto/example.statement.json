@@ -14,7 +14,7 @@
       "sha256": "b0b46388661ff3e4dd396d31c0172bc3c82f123e109592552d4dfff596c0d5d0"
     },
     "keyset": {
-      "sha256": "150056c1465cdc2bdb8a14c3df7f8c272d0ef43df378481f0d574c396bbf9c54"
+      "sha256": "82b644694884604ff863fbe32cc32efc941f1c0dac225b131af5b12becab09c1"
     },
     "verdict": {
       "outcome": "violated",
@@ -33,7 +33,7 @@
     ],
     "verifier": {
       "name": "amep-protocol",
-      "version": "0.3.0a4"
+      "version": "0.3.0"
     }
   }
 }
