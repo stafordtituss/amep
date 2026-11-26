@@ -1,0 +1,155 @@
+{
+ "name": "self-report of two executions, one independently observed",
+ "expect": {
+  "outcome": "unresolved",
+  "invariant": "I10"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "fs.*",
+      "process.exec"
+     ],
+     "resources": [
+      "repo:app/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "external_send",
+     "exp": 100,
+     "depth": 2
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "af140821659e3cd1a92144f06ef1126790e050e7103a72dea58f0af8cd00c26317e910c33fe636242e942347e180d4fef992a38e0636df8d6a040c26989ad902"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "fs.write"
+     ],
+     "resources": [
+      "repo:app/src/*"
+     ],
+     "data": [
+      "source->internal"
+     ],
+     "ceiling": "external_send",
+     "exp": 90,
+     "depth": 1
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "sig": "a6d439a7f1865b41589d528d8122086285d5066d466706e4edb044387e7a231afdc71e5834cf49cd9c4c205ce3a9419218578dcf32ce3486299088c7c0b7fc0f"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "host_shell",
+    "version": "r9",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "185d02d49c8440af31134eec4b820a71cfa92a89dd007f0b912acbcb9bf860641ff6e3ff58e7a08754e6bf9c27d2269d166521b86e39293ad09957a61fe75a09"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "external_send"
+    },
+    "actor": "agent:assistant-1",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "sig": "2e4a30f74bb75b4d0add614f484c29d0a8380529402dfa3589d96a166eb40f194279af4c0a8b972ed2d354784b6ba0afd8c80e38747dd478c6d8ab8b658f190c"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "proxy:egress",
+    "assurance": "L2",
+    "executed": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "external_send",
+     "released": [],
+     "t": 11
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "sig": "f15e325c53a8670c1a4f7a52e186baae4fe3925a98b0a821f227d4325631fd699f786f9b07bdf4a6fb9c606a1e4902210fa404236cc0f382681e24f6f7948e01"
+    }
+   },
+   {
+    "id": "e-self-0",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "agent:assistant-1",
+    "assurance": "L1",
+    "executed": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "external_send",
+     "released": [],
+     "t": 11
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "sig": "66add7eeb476a3064d860d57da7a7a5e105bf0705e2061d21263127de9d54d26dfda8b758a7e520abcabd1730694a7761f84173c70bf551f1c1cf9255b187e01"
+    }
+   },
+   {
+    "id": "e-self-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "agent:assistant-1",
+    "assurance": "L1",
+    "executed": {
+     "action": "fs.write",
+     "resource": "repo:app/src/auth.ts",
+     "effect": "external_send",
+     "released": [],
+     "t": 11
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "sig": "551c4f1b97f8fa7ed95efa826efe8d0ba2930fe00b2690b59608cd84001082889b29d44aa9a1a4aee0b09f1142a76b5d9d3fc7f8b508e80e15ae69f95de7f700"
+    }
+   }
+  ]
+ }
+}

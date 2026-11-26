@@ -171,6 +171,17 @@ def vectors():
         p.update(effects=[O.sign({**p["effects"][0], "executed": {**p["effects"][0]["executed"], "action": "fs.read", "effect": "read"}})])))
     add("mediated effect not honored", ("violated", "I2"), lambda p, I, H, O, X: p.update(invocations=[H.sign({**p["invocations"][0], "mediated": {**p["effects"][0]["executed"], "resource": "repo:app/src/build/x"}})]))
     add("self-reported high-impact effect", ("unresolved", "I10"), lambda p, *a: high_impact(p, observed_by="agent:assistant-1", assurance="L0"))
+    # spec 10.2: the same effect recorded by several observers is one effect, so the actor's own receipt beside an
+    # independent receipt of the same body is corroborated. Found while mapping the OWASP Agentic Evidence scenario A1
+    # (OWASP/Agentic-Evidence#2): an asserted tool.result next to an independent observation came out unresolved.
+    def corroborate(p, O, copies):
+        e = {k: v for k, v in p["effects"][0].items() if k != "proof"}
+        for n in range(copies):
+            p["effects"].append(O.sign({**e, "id": f"e-self-{n}", "observed_by": "agent:assistant-1", "assurance": "L1"}))
+    add("self-reported high-impact effect corroborated by an independent observer", ("preserved", "-"), lambda p, I, H, O, X: (
+        high_impact(p), corroborate(p, O, 1)))
+    add("self-report of two executions, one independently observed", ("unresolved", "I10"), lambda p, I, H, O, X: (
+        high_impact(p), corroborate(p, O, 2)))
     # From tclancy's review (stafordtituss/amep#36): an invocation missing from the packet may have been left out by its
     # assembler, so the effect is unresolved (need invocation), with no one blamed (spec 10.4, v0.3.3).
     add("bypass: effect without invocation", ("unresolved", "I11"), lambda p, I, H, O, X: p["effects"].append(O.sign({"id": "e-9", "kind": "effect", "invocation": "i-404", "observed_by": "provider:github", "assurance": "L3",
@@ -566,6 +577,26 @@ def vectors():
         window(p, I, 3601), times(p, H, O, eff_t=20), rev(p, I, 15)))
     add("propagation window of exactly an hour", ("preserved", "-"), lambda p, I, H, O, X: (
         window(p, I, 3600), times(p, H, O, eff_t=20), rev(p, I, 15)))
+    # Clocks of different operators (spec 5.12.2, v0.3.4), stafordtituss/amep#43, from OWASP/Agentic-Evidence#21
+    # (unordered-revocation): the authority source and the observer each declare a clock skew in the key set. Where an
+    # effect falls within their combined skew of the boundary that decides the verdict, the order is not established.
+    IS, OS = Signer("issuer-skewed", ["issuer"]), Signer("observer-skewed", ["observer"])
+    OB = Signer("observer-skew-malformed", ["observer"])
+    keys[IS.kid] = {**IS.public(), "operator": "op:authority-source.example", "clock_skew": 2}
+    keys[OS.kid] = {**OS.public(), "operator": "op:store.example", "clock_skew": 2}
+    keys[OB.kid] = {**OB.public(), "operator": "op:store.example", "clock_skew": 7200}
+    def skewed(p, I, O, rev_t, eff_t, signer=None, w=None):
+        if w is not None: window(p, I, w)
+        p.update(revocations=[IS.sign({"kind": "revocation", "target": "m-1", "t": rev_t})])
+        p.update(effects=[(signer or OS).sign({**p["effects"][0], "executed": {**p["effects"][0]["executed"], "t": eff_t}})])
+    add("revocation and effect on different operators' clocks, within their skew", ("unresolved", "I6"), lambda p, I, H, O, X:
+        skewed(p, I, O, 13, 11))
+    add("revocation and effect on different operators' clocks, outside their skew", ("preserved", "-"), lambda p, I, H, O, X:
+        skewed(p, I, O, 16, 11))
+    add("effect within the clocks' skew of the end of the propagation window", ("unresolved", "I6"), lambda p, I, H, O, X:
+        skewed(p, I, O, 3, 12, w=10))
+    add("clock skew longer than an hour", ("unresolved", "I7"), lambda p, I, H, O, X:
+        skewed(p, I, O, 50, 11, signer=OB))
     add("revoked mid-action, after the propagation window", ("violated", "I6"), lambda p, I, H, O, X: (
         window(p, I, 3), times(p, H, O, eff_t=20), rev(p, I, 15)))
 

@@ -40,6 +40,36 @@
    "observer"
   ]
  },
+ "issuer-skewed": {
+  "kid": "issuer-skewed",
+  "alg": "Ed25519",
+  "x": "69fe7ec62a699121a0da9f25130de2b8d9d07cba1d061861bee7545ee4973d5b",
+  "roles": [
+   "issuer"
+  ],
+  "operator": "op:authority-source.example",
+  "clock_skew": 2
+ },
+ "observer-skewed": {
+  "kid": "observer-skewed",
+  "alg": "Ed25519",
+  "x": "97418b5029ff00292a2bed6dc92e277de56bd66a5c9b63cc9ee3a15dcc79a5d6",
+  "roles": [
+   "observer"
+  ],
+  "operator": "op:store.example",
+  "clock_skew": 2
+ },
+ "observer-skew-malformed": {
+  "kid": "observer-skew-malformed",
+  "alg": "Ed25519",
+  "x": "39bce89895831b17d42977c148dfd31634843f1b234cadcb9aae149efd98db2b",
+  "roles": [
+   "observer"
+  ],
+  "operator": "op:store.example",
+  "clock_skew": 7200
+ },
  "bank-observer-1": {
   "kid": "bank-observer-1",
   "alg": "Ed25519",

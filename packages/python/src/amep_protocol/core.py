@@ -746,7 +746,18 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
         x = operator_of(a)
         return x is not None and x == operator_of(b)
 
-    ctx = {"v03": v03, "totals": totals, "prior_windows": prior_windows, "same_operator": same_operator, "notes": {},
+    def clock_skew(o):
+        # spec 5.12.2 (v0.3.4): the clock skew a key's signer declares for the times it reports, in seconds, from the key set
+        kid = (o.get("proof") or {}).get("kid") if isinstance(o, dict) else None
+        k = keys.get(kid) if isinstance(kid, str) else None
+        if not isinstance(k, dict) or "clock_skew" not in k:
+            return 0
+        v = k["clock_skew"]
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or v != v or v < 0 or v > 3600:
+            raise Malformed(f"key {kid}: clock_skew must be a number of seconds from 0 to 3600")
+        return v
+
+    ctx = {"v03": v03, "totals": totals, "prior_windows": prior_windows, "same_operator": same_operator, "notes": {}, "clock_skew": clock_skew,
            "held": {d: h for d, h in held_in.items() if d not in present}, "new_held": {}, "first_cause": first_cause,
            # spec 5.10, held approvals (v0.3): approvals held for earlier invocations whose outcome is unknown; one held by an
            # invocation in this packet is set aside, since this packet decides that invocation afresh
@@ -1056,13 +1067,20 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
     by_id = {n["id"]: n for n in chain}
     revs = [r for r in revocations if r.get("target") in ids]
     sts = [s for s in statuses if s.get("target") in ids and vsig(s)]
-    revoked_at = [(to_time(r["t"]), r["target"], "ancestor revoked") for r in revs if vsig(r)] + \
-                 [(to_time(s["revoked_at"]), s["target"], "status shows ancestor revoked") for s in sts if s.get("revoked_at") is not None]
+    revoked_at = [(to_time(r["t"]), r["target"], "ancestor revoked", r) for r in revs if vsig(r)] + \
+                 [(to_time(s["revoked_at"]), s["target"], "status shows ancestor revoked", s) for s in sts if s.get("revoked_at") is not None]
 
-    def liveness(t, what):
-        for r_t, target, why in sorted(revoked_at):
+    def liveness(t, what, timed):
+        for r_t, target, why, rec in sorted(revoked_at, key=lambda x: x[:3]):
+            w = _revocation_window(by_id[target])
+            # spec 5.12.2 (v0.3.4), stafordtituss/amep#43, from OWASP/Agentic-Evidence#21 (unordered-revocation): a
+            # revocation and an action timed by different operators' clocks can't be ordered more finely than their
+            # declared skew. Where the action falls within that skew of the boundary that decides the verdict (the
+            # revocation, plus any window), the order is not established.
+            skew = ctx["clock_skew"](rec) + ctx["clock_skew"](timed)
+            _check(skew > 0 and not ctx["same_operator"](rec, timed) and abs(t - (r_t + w)) <= skew, "unresolved", "I6",
+                   f"{why} within {skew:g}s of {what}, on clocks of different operators: the order is not established", need="ordering", ref=target)
             if r_t <= t:
-                w = _revocation_window(by_id[target])
                 # spec 5.12.1 (v0.3.3), from stafordtituss/amep#35: the window is part of the signed grant, so an action
                 # inside it is within the authority as granted. Nothing is missing, so the result isn't unresolved; the
                 # revocation is noted in the reason instead.
@@ -1077,7 +1095,7 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
                 fresh = [s for s in sts if s["target"] == n["id"] and to_time(s["as_of"]) >= t]
                 _check(not fresh, "unresolved", "I7", f"no signed revocation status for {n['id']} as of {what}", need="revocation_status", ref=n['id'])
 
-    liveness(t_inv, "invocation")
+    liveness(t_inv, "invocation", inv)
     _check(any(not vsig(r) for r in revs), "unresolved", "I7", "unverifiable revocation on the chain", need="revocation_signature", ref=rid,
            cause=first_cause(revs))
     fresh_status(t_inv, "the invocation")
@@ -1165,6 +1183,32 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
     appr = objs.get(inv.get("approval_ref")) if "approval_ref" in inv else None
     # 11-15. every receipt for this invocation is checked (spec 10.2)
     by_observer: dict = {}   # observer -> effect identity digest -> its receipts, in packet order
+
+    # spec 10.2: the same effect recorded by several observers is one effect. So a receipt from the actor's side of a
+    # high-impact effect is corroborated, not merely self-reported, when observers independent of the actor recorded the
+    # same executed body at least as many times. Extra evidence must never weaken a verdict. Found while mapping the
+    # OWASP Agentic Evidence scenarios: an asserted tool.result beside an independent observation came out unresolved.
+    def identity_of(r):
+        try:
+            return approval_digest(r["executed"])
+        except (KeyError, TypeError, AttributeError, ValueError, Malformed):
+            return None
+
+    def independent(r):
+        return (vsig(r) and isinstance(r.get("observed_by"), str) and not ("invocation_digest" in r and r["invocation_digest"] != inv_digest)
+                and r.get("observed_by") != inv.get("actor") and r.get("assurance") != "L0" and not ctx["same_operator"](r, inv))
+
+    def corroborated(e):
+        d = identity_of(e)
+        if d is None:
+            return False
+        mine_count = sum(1 for r in mine if r.get("observed_by") == e.get("observed_by") and identity_of(r) == d)
+        by_indep: dict = {}
+        for r in mine:
+            if independent(r) and identity_of(r) == d:
+                by_indep[r["observed_by"]] = by_indep.get(r["observed_by"], 0) + 1
+        return max(by_indep.values(), default=0) >= mine_count
+
     for e in mine:
         _check(not vsig(e), "unresolved", "I7", "effect receipt unsigned or signer lacks the role", need="receipt_signature", ref=e.get('id', '?'),
                cause=first_cause([e]))
@@ -1175,13 +1219,15 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
             _check(not inv.get("actor"), "unresolved", "I10", "actor not recorded; observer independence cannot be shown", need="actor", ref=rid)
             if e.get("observed_by") == inv["actor"] or ctx["same_operator"](e, inv):
                 _admission(e, inv, eff_claims, extra_protected, ctx)
-            _check(e.get("observed_by") == inv["actor"] or e.get("assurance") == "L0", "unresolved", "I10", "high-impact effect only self-reported", need="independent_observer", ref=e.get('id', '?'))
-            _check(ctx["same_operator"](e, inv), "unresolved", "I10", "high-impact effect observed only by a key of the host's own operator",
+            selfish = e.get("observed_by") == inv["actor"] or e.get("assurance") == "L0"
+            corr = (selfish or ctx["same_operator"](e, inv)) and corroborated(e)
+            _check(not corr and selfish, "unresolved", "I10", "high-impact effect only self-reported", need="independent_observer", ref=e.get('id', '?'))
+            _check(not corr and ctx["same_operator"](e, inv), "unresolved", "I10", "high-impact effect observed only by a key of the host's own operator",
                    need="independent_observer", ref=e.get('id', '?'))
         x = e["executed"]
         # liveness at each effect's own time (spec 8 I6, v0.3): authority must still be in force when the effect
         # occurs, not only when it was invoked. Proposed by Cliff Singletary on audit@ietf.org, 19 Nov 2026.
-        liveness(to_time(x["t"]), f"effect {e.get('id', '?')}")
+        liveness(to_time(x["t"]), f"effect {e.get('id', '?')}", e)
         fresh_status(to_time(x["t"]), f"effect {e.get('id', '?')}")
         if "mediated" in inv:
             _check(canon(x) != canon(inv["mediated"]), "violated", "I2", "executed differs from mediated effect", blame="server")

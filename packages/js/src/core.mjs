@@ -499,6 +499,12 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   // matters, not the identifiers a record uses: a host that signs its own "not executed", or its own receipt, with its invocation
   // key is the actor, whatever it puts in observed_by. Found by the exhaustive model check in formal/ (v0.3.2).
   const kidOf = o => (o && typeof o === "object" && o.proof && typeof o.proof === "object" && typeof o.proof.kid === "string") ? o.proof.kid : null;
+  // spec 5.12.2 (v0.3.4): the clock skew a key's signer declares for the times it reports, in seconds, from the key set.
+  const clockSkew = o => { const kid = kidOf(o); const k = kid !== null && Object.hasOwn(keys, kid) ? keys[kid] : null;
+    if (!k || !("clock_skew" in k)) return 0;
+    const v = k.clock_skew;
+    if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > 3600) throw new Malformed(`key ${kid}: clock_skew must be a number of seconds from 0 to 3600`);
+    return v; };
   const sameOperator = (a, b) => { const ka = kidOf(a); if (ka !== null && ka === kidOf(b)) return true; const x = operatorOf(a); return x !== null && x === operatorOf(b); };
   // spec 10.5.1 (v0.3): why a refused signature was refused, in a fixed order every verifier shares
   const sigCause = o => {
@@ -705,12 +711,20 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     const ids = new Set(chain.map(c => c.id)), byId = new Map(chain.map(c => [c.id, c]));
     const revs = revocations.filter(r => ids.has(r.target));
     const sts = statuses.filter(s => ids.has(s.target) && verify(s));
-    const revokedAt = [...revs.filter(r => verify(r)).map(r => [toTime(r.t), r.target, "ancestor revoked"]),
-      ...sts.filter(s => s.revoked_at != null).map(s => [toTime(s.revoked_at), s.target, "status shows ancestor revoked"])]
+    const revokedAt = [...revs.filter(r => verify(r)).map(r => [toTime(r.t), r.target, "ancestor revoked", r]),
+      ...sts.filter(s => s.revoked_at != null).map(s => [toTime(s.revoked_at), s.target, "status shows ancestor revoked", s])]
       .sort((a, b) => a[0] - b[0] || (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0) || (a[2] < b[2] ? -1 : a[2] > b[2] ? 1 : 0));
-    const liveness = (t, what) => {
-      for (const [rT, target, why] of revokedAt) if (rT <= t) {
+    const liveness = (t, what, timed) => {
+      for (const [rT, target, why, rec] of revokedAt) {
         const w = revocationWindow(byId.get(target));
+        // spec 5.12.2 (v0.3.4), stafordtituss/amep#43, from OWASP/Agentic-Evidence#21 (unordered-revocation): a revocation
+        // and an action timed by different operators' clocks can't be ordered more finely than their declared skew. Where
+        // the action falls within that skew of the boundary that decides the verdict (the revocation, plus any window),
+        // the order is not established.
+        const skew = clockSkew(rec) + clockSkew(timed);
+        check(skew > 0 && !sameOperator(rec, timed) && Math.abs(t - (rT + w)) <= skew, "unresolved", "I6",
+          `${why} within ${fmt(skew)}s of ${what}, on clocks of different operators: the order is not established`, { need: "ordering", ref: target });
+        if (rT > t) continue;
         // spec 5.12.1 (v0.3.3), from stafordtituss/amep#35: the window is part of the signed grant, so an action inside it
         // is within the authority as granted. Nothing is missing, so the result isn't unresolved; the revocation is
         // noted in the reason instead.
@@ -725,7 +739,7 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       for (const c of chain) if (c.revocation && c.revocation.status_ref)
         check(!sts.some(s => s.target === c.id && toTime(s.as_of) >= t), "unresolved", "I7", `no signed revocation status for ${c.id} as of ${what}`, { need: "revocation_status", ref: c.id });
     };
-    liveness(tInv, "invocation");
+    liveness(tInv, "invocation", inv);
     check(revs.some(r => !verify(r)), "unresolved", "I7", "unverifiable revocation on the chain", { need: "revocation_signature", ref: id, cause: firstCause(revs) });
     freshStatus(tInv, "the invocation");
     check(isGuardrail(inv.declared.resource, extraProtected), "violated", "I9", "targets guardrail/evidence store", { blame: "agent" });
@@ -794,6 +808,20 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     if (intent) claims = meet(intent.claims, claims, v03);
     const ap = "approval_ref" in inv ? objs[inv.approval_ref] : undefined;
     const byObserver = new Map();   // observer -> effect identity digest -> its receipts, in packet order
+    // spec 10.2: the same effect recorded by several observers is one effect. So a receipt from the actor's side of a
+    // high-impact effect is corroborated, not merely self-reported, when observers independent of the actor recorded the
+    // same executed body at least as many times. Extra evidence must never weaken a verdict. Found while mapping the
+    // OWASP Agentic Evidence scenarios: an asserted tool.result beside an independent observation came out unresolved.
+    const identityOf = r => { try { return approvalDigest(r.executed); } catch { return null; } };
+    const independent = r => verify(r) && typeof r.observed_by === "string" && !("invocation_digest" in r && r.invocation_digest !== invDigest)
+      && r.observed_by !== inv.actor && r.assurance !== "L0" && !sameOperator(r, inv);
+    const corroborated = e => {
+      const d = identityOf(e); if (d === null) return false;
+      const mineCount = mine.filter(r => r.observed_by === e.observed_by && identityOf(r) === d).length;
+      const byIndep = new Map();
+      for (const r of mine) if (independent(r) && identityOf(r) === d) byIndep.set(r.observed_by, (byIndep.get(r.observed_by) ?? 0) + 1);
+      return Math.max(0, ...byIndep.values()) >= mineCount;
+    };
     for (const e of mine) {
       check(!verify(e), "unresolved", "I7", "effect receipt unsigned or signer lacks the role", { need: "receipt_signature", ref: e.id ?? "?", cause: firstCause([e]) });
       check(typeof e.observed_by !== "string", "unresolved", "I7", `receipt ${e.id ?? "?"} names no observer`, { need: "receipt_observer", ref: e.id ?? "?" });
@@ -801,13 +829,14 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       if (highImpact) {
         check(!inv.actor, "unresolved", "I10", "actor not recorded; observer independence cannot be shown", { need: "actor", ref: id });
         if (e.observed_by === inv.actor || sameOperator(e, inv)) admission(e, inv, claims);
-        check(e.observed_by === inv.actor || e.assurance === "L0", "unresolved", "I10", "high-impact effect only self-reported", { need: "independent_observer", ref: e.id ?? "?" });
-        check(sameOperator(e, inv), "unresolved", "I10", "high-impact effect observed only by a key of the host's own operator", { need: "independent_observer", ref: e.id ?? "?" });
+        const corr = (e.observed_by === inv.actor || e.assurance === "L0" || sameOperator(e, inv)) && corroborated(e);
+        check(!corr && (e.observed_by === inv.actor || e.assurance === "L0"), "unresolved", "I10", "high-impact effect only self-reported", { need: "independent_observer", ref: e.id ?? "?" });
+        check(!corr && sameOperator(e, inv), "unresolved", "I10", "high-impact effect observed only by a key of the host's own operator", { need: "independent_observer", ref: e.id ?? "?" });
       }
       const x = e.executed;
       // liveness at each effect's own time (spec 8 I6, v0.3): authority must still be in force when the effect occurs,
       // not only when it was invoked. Proposed by Cliff Singletary on audit@ietf.org, 19 Nov 2026.
-      liveness(toTime(x.t), `effect ${e.id ?? "?"}`);
+      liveness(toTime(x.t), `effect ${e.id ?? "?"}`, e);
       freshStatus(toTime(x.t), `effect ${e.id ?? "?"}`);
       if ("mediated" in inv) check(canon(x) !== canon(inv.mediated), "violated", "I2", "executed differs from mediated effect", { blame: "server" });
       else check(!withinDeclared(x, inv, v03), "violated", "I2",
