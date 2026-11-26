@@ -2,7 +2,7 @@
 
 **Pinned to:** agent-receipts/obsigna at commit `7c5a02ccabfb4092bb4c2ec7bbcfcd677565c22f`, spec v0.5.0, `cross-sdk-tests/`. AMEP 0.3.0.
 
-**What this is:** the AMEP import profile run offered in agent-receipts/obsigna#1204. The profile (`packages/conformance/src/profiles/agent-receipts.mjs`) carries the four corrections from the maintainers' review in that issue. The Agent Receipts maintainers reviewed the profile's reading of their receipts there. That review covers the reading, and is not an endorsement of AMEP.
+**What this is:** the AMEP import profile run offered in agent-receipts/obsigna#1204. The profile (`packages/conformance/src/profiles/agent-receipts.mjs`) carries the four corrections the Agent Receipts maintainers gave in that issue on 25 November 2026, before the run. The maintainers then reviewed this profile and report at commit `1700014` (agent-receipts/obsigna#1204, 26 November 2026): they read them against their spec and asked for three wording changes, which are made here. That review covers whether the profile reads Agent Receipts correctly, and is not an endorsement of AMEP.
 
 **Method:** `node interop/agent-receipts/run.mjs <obsigna checkout>`. It reads the vector files as data and runs no code from the obsigna repository. Canonicalization, hashing and signature checks use AMEP's own code. The full output is in `results.json`.
 
@@ -41,7 +41,7 @@ Each gap below is a gap in what a receipt alone shows. The mechanism Agent Recei
 | The grant the action is judged against | `authorization.scopes`, opaque and asserted by the issuer, in 1 of 48 receipts | The grounded-principal tier (spec 7.9), which checks that a grant exists for the principal through `grant_ref`. Whether the action stayed within it is #1207. |
 | The resource acted on | `action.target`, optional, absent from every signed receipt | — |
 | Binding to the authorizing call | `parameters_hash`, if both sides hash the same JCS parameters (unstated) | — |
-| The logical operation, for retries | `action.idempotency_key` (spec 7.3.6) | Duplicate-key warning |
+| The logical operation, for retries | `action.idempotency_key` (defined in Agent Receipts spec 4.3.2; duplicates in 7.3.6) | Duplicate-key warning |
 
 ## C. Worked AMEP verdicts
 
@@ -55,14 +55,14 @@ The importer re-expresses the receipt's issuer as the AMEP observer. It gives th
 | Case | Mode, as the verifier declares it | AMEP verdict |
 |---|---|---|
 | One high-risk command (`v040.idempotencyKeyReceipt`) | Client-side (ADR-0020): the agent signs its own receipt | `unresolved` I10: the high-impact effect is only self-reported |
-| Same | Daemon mode (ADR-0010), daemon run by the agent's own operator | `unresolved` I10: observed only by a key of the host's own operator |
+| Same | Daemon mode (ADR-0010), daemon run by the agent's own operator | `unresolved` I10: observed only by a key of the host's own operator. That is AMEP's operator rule. Daemon mode still protects against something this verdict doesn't measure: the daemon alone holds the key, as its own OS user, so a compromised agent can't forge receipts even when one operator runs both (ADR-0010). |
 | Same | Daemon run by an operator other than the agent's | `preserved` |
 | Timeout, then a retry under the same `idempotency_key` (`v040.duplicateIdempotencyChain`) | Any | `unresolved` I7: the operation is held for the first call, whose outcome is unknown. A signed `not_executed` statement from a party other than the agent would release it, and the retry would be `preserved`. |
-| Two successes under one `idempotency_key` (constructed for this run: the chain above plus a second success, signed with the published test key) | Daemon run by another operator | `violated` I2 on the second call: "executed twice" |
+| Two successes under one `idempotency_key` (constructed for this run: the chain above plus a second success, signed with the published test key) | Daemon run by another operator | `violated` I2 on the second call: "executed twice". **This is AMEP's rule, not an Agent Receipts outcome.** In Agent Receipts, duplicates are a warning for an auditor on purpose (spec 7.3.6): a receipt can't tell a harmless retry of an idempotent tool from a real double execution. |
 
 The "unresolved until a second party signs" outcome for high-risk actions is AMEP's rule, not an Agent Receipts outcome. The Agent Receipts spec defines no co-signing. Its answer for high-risk actions is the grounded-principal tier (spec 7.9), and under it these three receipts would be rejected because none carries a `grant_ref`.
 
-The last two rows are where the two specs meet. Spec 7.3.6 surfaces a duplicate key as a warning and leaves it to "review whether the duplicates represent expected retries or unexpected double-counting". AMEP's operation identity rules (spec 5.8.1) make that review a verdict:
+The last two rows are where the two specs meet. Agent Receipts spec 7.3.6 surfaces a duplicate key as a warning and leaves it to "review whether the duplicates represent expected retries or unexpected double-counting". AMEP's operation identity rules (AMEP spec 5.8.1) make that review a verdict, under AMEP's own rule, which treats every operation as one that must take effect at most once:
 - a retry after an unknown outcome stays held;
 - a retry after the first attempt is shown not executed proceeds;
 - a second success under the same key is a double execution.

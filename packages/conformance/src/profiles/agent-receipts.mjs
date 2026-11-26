@@ -2,7 +2,8 @@
 // each signed Ed25519Signature2020 over the RFC 8785 (JCS) form of the receipt without its proof, hash-chained by
 // chain.previous_receipt_hash and chain.sequence.
 //
-// What the profile reads, as reviewed by the Agent Receipts maintainers in agent-receipts/obsigna#1204:
+// What the profile reads, with the corrections the Agent Receipts maintainers gave in agent-receipts/obsigna#1204 on
+// 25 November 2026. They reviewed the profile's reading of their receipts at commit 1700014 (same issue, 26 November):
 // - Who signs depends on the deployment. In daemon mode (ADR-0010) a separate daemon holds the key and is the issuer;
 //   in client-side mode (ADR-0020) the agent's own process signs. Nothing in a receipt proves which mode produced it
 //   (tracked in obsigna#1206), so the profile takes the mode from the verifier, out of band, and defaults to the
@@ -12,8 +13,9 @@
 //   receipt (obsigna#1207). The spec's own check for high-risk actions is the grounded-principal tier (spec 7.9).
 // - issuer.operator names the entity operating the agent. The spec does not bind keys to operators; using it as the
 //   AMEP key operator (spec 12.5) is AMEP's interpretation, and the profile says so where it uses it.
-// - action.idempotency_key is the logical operation (spec 7.3.6). Agent Receipts surfaces a duplicate as a warning
-//   and leaves the judgement to an auditor; AMEP's operation identity rules (spec 5.8.1) make that judgement.
+// - action.idempotency_key is the logical operation (Agent Receipts spec 4.3.2; duplicates, 7.3.6). Agent Receipts
+//   surfaces a duplicate as a warning on purpose, since a receipt can't tell a harmless retry of an idempotent tool
+//   from a double execution. AMEP's operation identity rules (AMEP spec 5.8.1) judge it under AMEP's own rule.
 import { createHash, createPublicKey, verify as edVerify } from "node:crypto";
 import { canon } from "@stafordtituss/amep/core";
 
@@ -107,7 +109,7 @@ export const agentReceipts = {
       { need: "binding to the authorizing call", status: mapped.binding,
         detail: info.input_hash ? "parameters_hash may equal the AMEP invocation's args_digest if both are the JCS hash of the same parameters" : "no parameters_hash" },
       { need: "the logical operation (retries)", status: info.operation ? "present" : "missing",
-        detail: info.operation ? `idempotency_key ${info.operation} becomes the AMEP invocation's operation (spec 5.8.1)` : "no idempotency_key: a retry cannot be told from a second operation" },
+        detail: info.operation ? `idempotency_key ${info.operation} (Agent Receipts spec 4.3.2) becomes the AMEP invocation's operation (AMEP spec 5.8.1)` : "no idempotency_key: a retry cannot be told from a second operation" },
     ];
   },
 };

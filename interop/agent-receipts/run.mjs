@@ -138,7 +138,7 @@ second.credentialSubject.chain = { ...second.credentialSubject.chain, sequence: 
 delete second.proof;
 second.proof = { ...dup[1].proof, proofValue: "u" + edSign(null, Buffer.from(canon(second), "utf8"), testPriv).toString("base64url") };
 out.C.push({ case: "two successes under one idempotency_key (constructed: the chain above plus a second success)",
-  mode: "daemon run by another operator", chain_valid: checkChain([...dup, second]).valid,
+  mode: "daemon run by another operator", rule: "AMEP's rule: in Agent Receipts a duplicate key is an auditor's warning (spec 7.3.6)", chain_valid: checkChain([...dup, second]).valid,
   ...packetFor([dup[1], second], { actor: "agent:runtime", observerOperator: "receipts-operator" }) });
 
 // ---------- print ----------

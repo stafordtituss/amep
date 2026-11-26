@@ -142,6 +142,7 @@ AMEP isn't an identity provider, a policy engine or a prompt-injection detector.
 | **OpenID AuthZEN, MCP** | Decisions and tool calls as evidence | [`spec/bindings/`](spec/bindings/) |
 | **OpenTelemetry GenAI** | Joining traces to evidence by id and digest | [interop/otel-genai/](interop/otel-genai/MAPPING.md) |
 | **EU AI Act Article 12** | Signed, re-checkable event records for auditors | [interop/eu-ai-act/](interop/eu-ai-act/ARTICLE-12.md) |
+| **Agent Receipts** | Import profile over the `cross-sdk-tests/` vectors; the Agent Receipts maintainers reviewed the profile's reading of their receipts | [interop/agent-receipts/](interop/agent-receipts/REPORT.md) · [#37](https://github.com/stafordtituss/amep/pull/37) · [agent-receipts/obsigna#1204](https://github.com/agent-receipts/obsigna/issues/1204) |
 
 <details>
 <summary><b>Related work</b></summary>

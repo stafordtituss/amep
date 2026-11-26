@@ -615,3 +615,43 @@ describe("agent-receipts profile", () => {
     assert.deepEqual([retry[1].outcome, retry[1].invariant], ["unresolved", "I7"]);
   });
 });
+
+// ---- Kilo Code sessions (interop/kilo) ----
+import { claimsFromConfig, importSession } from "../src/profiles/kilo.mjs";
+describe("kilo profile", () => {
+  const R = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "interop", "kilo");
+  const J = p => JSON.parse(readFileSync(join(R, p), "utf8"));
+  test("allow rules become grants, deny rules a deny list, and ask grants nothing", () => {
+    const { claims, differences } = claimsFromConfig(J("kilo.json").permission, { commandScopes: { "npm *": ["node_modules/*"] } });
+    assert.deepEqual(claims.deny_resources, ["file:config/prod/*", "cmd:npm run deploy*"]);
+    assert.ok(claims.grants.some(g => g.actions[0] === "fs.write" && g.resources[0] === "file:src/*"));
+    assert.ok(claims.grants.some(g => g.resources[0] === "file:node_modules/*"));
+    assert.ok(!claims.grants.some(g => g.actions[0] !== "fs.read" && ["file:*", "cmd:*"].includes(g.resources[0])), "an ask rule must not become a grant");
+    assert.equal(differences.filter(d => /ask grants nothing/.test(d)).length, 2);
+  });
+  test("a wildcard inside a pattern grants nothing", () => {
+    const { claims, differences } = claimsFromConfig({ edit: { "src/*/test.ts": "allow" } });
+    assert.equal(claims.grants.length, 0);
+    assert.match(differences[0], /wildcard inside the pattern/);
+  });
+  test("a deny followed by an overlapping allow is reported as stricter than Kilo", () => {
+    const { differences } = claimsFromConfig({ bash: { "git *": "deny", "git status": "allow" } });
+    assert.ok(differences.some(d => /AMEP's deny always wins/.test(d)));
+  });
+  test("tool parts become invocations; a shell command declares the workspace as its scope; permission errors become denies", () => {
+    const { calls } = importSession(J("session.json"), { commandEffects: { "npm run deploy*": "external_send" } });
+    assert.equal(calls.length, 5);
+    assert.equal(calls[1].invocation.declared.resource, "file:src/auth.ts");
+    assert.deepEqual(calls[2].invocation.declared.scope, { actions: ["fs.*"], resources: ["file:*"] });
+    assert.equal(calls[3].invocation.declared.effect, "external_send");
+    assert.deepEqual(calls.filter(c => c.decision).map(c => c.callID), ["call_04", "call_05"]);
+  });
+  test("the demo's verdicts", () => {
+    const out = execFileSync(process.execPath, [join(R, "run.mjs")], { encoding: "utf8" });
+    assert.match(out, /call_03 .*violated I2 - resource outside claims \(blame agent\): file:Makefile/);
+    assert.match(out, /call_04 .*preserved/);
+    assert.match(out, /without the deploy target's record: unresolved I10/);
+    assert.match(out, /call_05 .*preserved/);
+    assert.match(out, /session verdict: violated/);
+  });
+});

@@ -5,30 +5,45 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Delegation continuity: offline verifier</title>
 <style>
-:root { --bg:#f7f8fa; --panel:#ffffff; --text:#1b1f24; --muted:#5b6470; --line:#dde1e6; --accent:#2457c5;
-  --ok:#1a7f45; --ok-bg:#e6f4ec; --bad:#b42318; --bad-bg:#fdecea; --warn:#9a6700; --warn-bg:#fff4d6; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0f1216; --panel:#171b21; --text:#e6e9ee;
-  --muted:#9aa4b0; --line:#2a3039; --accent:#7aa2ff; --ok:#56d08a; --ok-bg:#12291d; --bad:#ff8a80; --bad-bg:#2e1513; --warn:#f2c14e; --warn-bg:#2b2310; } }
-:root[data-theme="dark"] { --bg:#0f1216; --panel:#171b21; --text:#e6e9ee; --muted:#9aa4b0; --line:#2a3039; --accent:#7aa2ff;
-  --ok:#56d08a; --ok-bg:#12291d; --bad:#ff8a80; --bad-bg:#2e1513; --warn:#f2c14e; --warn-bg:#2b2310; }
+/* The site's design language (docs/index.html): ink ground, condensed display, mono for anything checkable.
+   No web fonts or other outside requests, so the page stays fully offline. */
+:root { --bg:#0a0e13; --panel:#111821; --panel-2:#17212d; --text:#ece8df; --muted:#8c99a8; --line:#243140; --accent:#8fc3ff; --warm:#e08a3c;
+  --ok:#67d39b; --ok-bg:rgba(103,211,155,.12); --bad:#ff6b57; --bad-bg:rgba(255,107,87,.12); --warn:#f2c14e; --warn-bg:rgba(242,193,78,.12);
+  --display:"Big Shoulders Display","Avenir Next Condensed","Arial Narrow","Roboto Condensed",sans-serif;
+  --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace; color-scheme:dark; }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --bg:#f4f1ea; --panel:#fbfaf6; --panel-2:#ffffff; --text:#121a26; --muted:#586474;
+  --line:#d6d0c2; --accent:#1f5fa6; --warm:#b65f14; --ok:#1d8350; --ok-bg:#e3f2e9; --bad:#c4321e; --bad-bg:#fbe7e3; --warn:#9a6a00; --warn-bg:#fbf0d4; color-scheme:light; } }
+:root[data-theme="light"] { --bg:#f4f1ea; --panel:#fbfaf6; --panel-2:#ffffff; --text:#121a26; --muted:#586474; --line:#d6d0c2; --accent:#1f5fa6; --warm:#b65f14;
+  --ok:#1d8350; --ok-bg:#e3f2e9; --bad:#c4321e; --bad-bg:#fbe7e3; --warn:#9a6a00; --warn-bg:#fbf0d4; color-scheme:light; }
 * { box-sizing:border-box; }
-body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
-main { max-width:960px; margin:0 auto; padding:32px 16px 64px; }
-h1 { font-size:24px; margin:0 0 4px; } h2 { font-size:17px; margin:0 0 12px; }
-p.lead { color:var(--muted); margin:0 0 24px; }
-section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:20px; }
-button { font:inherit; background:var(--accent); color:#fff; border:0; border-radius:7px; padding:8px 14px; cursor:pointer; }
-button:focus-visible, textarea:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-textarea { width:100%; min-height:160px; font:12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; background:var(--bg);
-  color:var(--text); border:1px solid var(--line); border-radius:7px; padding:10px; resize:vertical; }
-label { display:block; font-weight:600; margin:12px 0 6px; }
-.summary { margin:12px 0; font-weight:600; }
+body { margin:0; background:var(--bg); color:var(--text); font:15px/1.55 var(--body); }
+a { color:inherit; }
+header.site { border-bottom:1px solid var(--line); }
+header.site div { max-width:1040px; margin:0 auto; display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;
+  padding:14px max(16px, env(safe-area-inset-right, 0px)) 14px max(16px, env(safe-area-inset-left, 0px)); }
+header.site a.mark { text-decoration:none; font:900 22px/1 var(--display); letter-spacing:.06em; }
+header.site nav { display:flex; gap:18px; flex-wrap:wrap; font-size:14px; }
+header.site nav a { color:var(--muted); text-decoration:none; } header.site nav a:hover { color:var(--text); }
+main { max-width:1040px; margin:0 auto; padding:40px max(16px, env(safe-area-inset-right, 0px)) 72px max(16px, env(safe-area-inset-left, 0px)); }
+.kicker { font:500 11.5px/1 var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--muted); margin:0 0 10px; }
+h1 { font:900 clamp(40px, 7vw, 76px)/.9 var(--display); text-transform:uppercase; margin:0 0 14px; letter-spacing:-.005em; }
+h1 span { color:var(--accent); }
+h2 { font:800 26px/1 var(--display); text-transform:uppercase; letter-spacing:.02em; margin:0 0 8px; }
+p.lead { color:var(--muted); margin:0 0 32px; max-width:40em; font-size:16px; }
+section { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:24px; margin-bottom:20px; }
+button { font:700 17px/1 var(--display); text-transform:uppercase; letter-spacing:.05em; background:var(--accent); color:var(--bg); border:0; border-radius:3px; padding:12px 16px; cursor:pointer; }
+button.ghost { background:transparent; color:var(--accent); border:1px solid var(--line); }
+button:focus-visible, textarea:focus-visible, a:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+textarea { width:100%; min-height:170px; font:12.5px/1.5 var(--mono); background:var(--panel-2); color:var(--text); border:1px solid var(--line); border-radius:4px; padding:12px; resize:vertical; }
+label { display:block; font:500 11.5px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin:18px 0 8px; }
+.summary { margin:14px 0; font:600 14px/1.4 var(--mono); }
 .table-wrap { overflow-x:auto; }
-table { width:100%; border-collapse:collapse; font-size:13.5px; }
-th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
-th { color:var(--muted); font-weight:600; }
-code { font:12.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
-.pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12.5px; font-weight:600; white-space:nowrap; }
+table { width:100%; border-collapse:collapse; font:12.5px/1.45 var(--mono); font-variant-numeric:tabular-nums; }
+th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+th { color:var(--muted); font-weight:500; text-transform:uppercase; letter-spacing:.1em; font-size:10.5px; }
+code { font:12.5px var(--mono); }
+.pill { display:inline-block; padding:2px 8px; border-radius:3px; font:700 11px/1.5 var(--mono); text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; }
 .preserved { color:var(--ok); background:var(--ok-bg); } .violated { color:var(--bad); background:var(--bad-bg); }
 .unresolved { color:var(--warn); background:var(--warn-bg); }
 .note { color:var(--muted); font-size:13px; }
@@ -36,8 +51,13 @@ code { font:12.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
 </style>
 </head>
 <body>
+<header class="site"><div>
+<a class="mark" href="../">AMEP</a>
+<nav aria-label="Main"><a href="../#mandate">Mandate</a><a href="../#evidence">Evidence</a><a href="../#verdict">Verdict</a><a href="https://github.com/stafordtituss/amep">GitHub</a></nav>
+</div></header>
 <main>
-<h1>Delegation continuity: offline verifier</h1>
+<p class="kicker">Verifier · runs in this page</p>
+<h1>Check the <span>evidence.</span></h1>
 <p class="lead">Checks AMEP v0.2 evidence packets entirely in this page. Nothing is uploaded. Signatures are verified with your browser's WebCrypto Ed25519.</p>
 <p id="unsupported">This browser does not support Ed25519 in WebCrypto, so signatures cannot be checked here. Use a current Chrome, Edge, Safari or Firefox, or the command-line verifiers.</p>
 
@@ -55,15 +75,15 @@ code { font:12.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
 <textarea id="packet" spellcheck="false" placeholder='{ "mandates": [...], "invocations": [...], "effects": [...] }'></textarea>
 <label for="keys">Key set (JSON, as served at /.well-known/amep-keys.json)</label>
 <textarea id="keys" spellcheck="false"></textarea>
-<p><button id="run-packet">Verify packet</button> <button id="load-example" style="background:transparent;color:var(--accent);border:1px solid var(--line)">Load an example</button></p>
+<p><button id="run-packet">Verify packet</button> <button id="load-example" class="ghost">Load an example</button></p>
 <div class="summary" id="packet-summary" aria-live="polite"></div>
 <div class="table-wrap"><table id="packet-table" hidden><thead><tr><th>Object</th><th>Outcome</th><th>Invariant</th><th>Reason</th></tr></thead><tbody></tbody></table></div>
 </section>
-<p class="note">AMEP v0.2.0-draft.4 · evaluation code generated from <code>packages/js/src/core.mjs</code> · suite of 20 vectors.</p>
+<p class="note">AMEP v0.3.0-draft.1 · evaluation code generated from <code>packages/js/src/core.mjs</code> · suite of 20 vectors.</p>
 </main>
 <script id="amep-data" type="application/json">{"keys":{"issuer-1":{"kid":"issuer-1","alg":"Ed25519","x":"f10ab371f310e425f6fd490914900d91dcbf0f8f9092b97a5b54db03fd159cfd","roles":["issuer","approver"]},"host-1":{"kid":"host-1","alg":"Ed25519","x":"a47b0cbe987f84a9fe8cbd26c70ecd88af027be1bb6b3d238afc46deb644b24e","roles":["host"]},"observer-1":{"kid":"observer-1","alg":"Ed25519","x":"0b9e3158bf50c36b257b0b765958ab985c83b568abb3b56e2ae990b666b2663f","roles":["observer"]}},"suite":[{"file":"positive/approval-bound-to-effect.json","name":"approval-bound-to-effect","question":"A required human approval covers exactly the effect executed.","aria":"hitlRequired: approval present and bound","expect":{"outcome":"preserved","invariant":"-"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":100,"depth":2},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"1b74976ee6e63b6b3143dbf05fae6e7d5f1b9329d94942adffae46b8bbf601d46db50d6c28b225a2fc6da64f5a1fea07b1b18c97f50a533dadbcdf06b0310f0c"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":90,"depth":0},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"81df4cf9a7b11f2814b7a679bded3369c5cd44db4999869dee13e13a3220b93c4ae688e8b061ee3cd2a7d70429b933384628cf0b0f2bf10fe81cca68da86bf09"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"approval_ref":"ap-1","proof":{"kid":"host-1","alg":"Ed25519","sig":"9755f3ad39a182eb343330912af14f1e78976d9012667d5ddde6d69974f431c39cf81f3097545701347d22b522db0df0be308bcf6bec09d8956fce09034c500f"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"}}],"approvals":[{"id":"ap-1","kind":"approval","effect_digest":"20d18ff78360c8520dfae23069432616da48ff7d2963a7e5483619f3aabed30b","presence":"webauthn","expiry":50,"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"0ba5da238f46146517fffae9e03f73fc33fa898c193f1ab3e359e210eba9c03143c50856d9c19638f0013a9803c3d72a6416c7d329120b32135eb810f3a98504"}}]}},{"file":"positive/deny-added-by-delegate.json","name":"deny-added-by-delegate","question":"A delegate may add restrictions.","aria":"§6 scope narrowing; deny overrides allow","expect":{"outcome":"preserved","invariant":"-"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":100,"depth":2},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"1b74976ee6e63b6b3143dbf05fae6e7d5f1b9329d94942adffae46b8bbf601d46db50d6c28b225a2fc6da64f5a1fea07b1b18c97f50a533dadbcdf06b0310f0c"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"deny_resources":["calendar:interview/executive/*","calendar:interview/req-1042/panel-2/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":90,"depth":0},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"a821e6b1050cf8a571056ed250971bbd70a5b88ec825a00102ee75284264b7dc4148db7b96e8eb676eb642877c1f135bfcfd5914d8b5649a614681228cfbff0b"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"proof":{"kid":"host-1","alg":"Ed25519","sig":"fb9095ec5110caaa76e6665c7cb7ee55243aad85a1793a013e82fdb54751597550acdb246b43132323bb78fb3f3495e5c15f7d704521f6a7e69dfca721aca20c"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"}}]}},{"file":"positive/fresh-status.json","name":"fresh-status","question":"Revocable authority, status checked after the action.","aria":"§7 Bitstring Status List freshness","expect":{"outcome":"preserved","invariant":"-"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":100,"depth":2},"revocation":{"status_ref":"https://acme.example/status/m-1"},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"5e84ed9cf34232ee674ac41573c33be134627a007359b255f99528961a86edced6834dfb6cba4ae4db637b12efd2e517ab199736a93be763c39794f2f5fc7d0e"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":90,"depth":0},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"81df4cf9a7b11f2814b7a679bded3369c5cd44db4999869dee13e13a3220b93c4ae688e8b061ee3cd2a7d70429b933384628cf0b0f2bf10fe81cca68da86bf09"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"proof":{"kid":"host-1","alg":"Ed25519","sig":"fb9095ec5110caaa76e6665c7cb7ee55243aad85a1793a013e82fdb54751597550acdb246b43132323bb78fb3f3495e5c15f7d704521f6a7e69dfca721aca20c"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"}}],"statuses":[{"kind":"status","target":"m-1","as_of":12,"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"c7b5eb86b06b4fca6b764f90da99fd906e2a9306487375fee18cd1bf105ab31318db3877bf34e5d36be8fe1036561039d204c49262e4803350a94730e8545c00"}}]}},{"file":"positive/revoked-after-the-action.json","name":"revoked-after-the-action","question":"Was the authority in force at the time of the action (state at a past date)?","aria":"§7 revocation is terminal, but not retroactive; agenda 4.3.6","expect":{"outcome":"preserved","invariant":"-"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":100,"depth":2},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"1b74976ee6e63b6b3143dbf05fae6e7d5f1b9329d94942adffae46b8bbf601d46db50d6c28b225a2fc6da64f5a1fea07b1b18c97f50a533dadbcdf06b0310f0c"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":90,"depth":0},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"81df4cf9a7b11f2814b7a679bded3369c5cd44db4999869dee13e13a3220b93c4ae688e8b061ee3cd2a7d70429b933384628cf0b0f2bf10fe81cca68da86bf09"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"proof":{"kid":"host-1","alg":"Ed25519","sig":"fb9095ec5110caaa76e6665c7cb7ee55243aad85a1793a013e82fdb54751597550acdb246b43132323bb78fb3f3495e5c15f7d704521f6a7e69dfca721aca20c"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"}}],"revocations":[{"kind":"revocation","target":"m-1","t":50,"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"17d18980ec8850703adc59d050a1cfeb9cddecdc9238fe3d00ec401249d6c33dd2a7ad7c418c5e94f7862574bd4de2fe85a4ba347414066866a4428ce3e3cd08"}}]}},{"file":"positive/within-bounds.json","name":"within-bounds","question":"Can B prove whose authority it holds, and that the effect stayed inside it?","aria":"§6: every hop signed, scope only narrows, principal traceable","expect":{"outcome":"preserved","invariant":"-"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":100,"depth":2},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"1b74976ee6e63b6b3143dbf05fae6e7d5f1b9329d94942adffae46b8bbf601d46db50d6c28b225a2fc6da64f5a1fea07b1b18c97f50a533dadbcdf06b0310f0c"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":90,"depth":0},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"81df4cf9a7b11f2814b7a679bded3369c5cd44db4999869dee13e13a3220b93c4ae688e8b061ee3cd2a7d70429b933384628cf0b0f2bf10fe81cca68da86bf09"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"proof":{"kid":"host-1","alg":"Ed25519","sig":"fb9095ec5110caaa76e6665c7cb7ee55243aad85a1793a013e82fdb54751597550acdb246b43132323bb78fb3f3495e5c15f7d704521f6a7e69dfca721aca20c"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"}}]}},{"file":"must-reject/approval-for-a-different-effect.json","name":"approval-for-a-different-effect","question":"The human approved one effect; another was executed (time of check vs time of use).","aria":"hitlRequired: approval must bind to the effect","expect":{"outcome":"violated","invariant":"I8"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":100,"depth":2},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"1b74976ee6e63b6b3143dbf05fae6e7d5f1b9329d94942adffae46b8bbf601d46db50d6c28b225a2fc6da64f5a1fea07b1b18c97f50a533dadbcdf06b0310f0c"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":90,"depth":0},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"81df4cf9a7b11f2814b7a679bded3369c5cd44db4999869dee13e13a3220b93c4ae688e8b061ee3cd2a7d70429b933384628cf0b0f2bf10fe81cca68da86bf09"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"approval_ref":"ap-2","proof":{"kid":"host-1","alg":"Ed25519","sig":"b5ceb36138e471a47d10788fa31d0134b765b55db574e8b73438dda65303d3cd27aa296271c80c2a79d9681885c02e329ac6cd033c836335c684b3955aea5a0d"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"}}],"approvals":[{"id":"ap-2","kind":"approval","effect_digest":"0000000000000000000000000000000000000000000000000000000000000000","presence":"webauthn","expiry":50,"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"3f201c91f75ce5e571056f020fd1d31b3806bd5721816acb8081a33004d45849e4a7518909e50187c9db28e45a1e67728b36d6d8c6e961ece826672a760fe80d"}}]}},{"file":"must-reject/approval-replayed.json","name":"approval-replayed","question":"An approval already consumed is presented again.","aria":"hitlRequired: single use","expect":{"outcome":"violated","invariant":"I8"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":100,"depth":2},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"1b74976ee6e63b6b3143dbf05fae6e7d5f1b9329d94942adffae46b8bbf601d46db50d6c28b225a2fc6da64f5a1fea07b1b18c97f50a533dadbcdf06b0310f0c"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":90,"depth":0},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"81df4cf9a7b11f2814b7a679bded3369c5cd44db4999869dee13e13a3220b93c4ae688e8b061ee3cd2a7d70429b933384628cf0b0f2bf10fe81cca68da86bf09"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"approval_ref":"ap-3","proof":{"kid":"host-1","alg":"Ed25519","sig":"aec1b77df7e1beec1a658a188d3538eb707a307f50c4e4db4b0f41544a800fbda511242b4bcedf205423ae014393e0f45895849a1fd210bcc4e1d7d6dced7a06"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"}}],"approvals":[{"id":"ap-3","kind":"approval","effect_digest":"20d18ff78360c8520dfae23069432616da48ff7d2963a7e5483619f3aabed30b","presence":"webauthn","expiry":50,"consumed":true,"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"4a485f6eeaf29883fc6ca0f36fe70f290514f6d53fed6dcd3a97a7fdc70e32ad534f72be78555625457329706ecaad0cbcb80208396bfae02b996577c6898e0f"}}]}},{"file":"must-reject/delegation-drops-a-deny.json","name":"delegation-drops-a-deny","question":"Did a constraint from H's authorization fail to survive the delegation?","aria":"§6; a matching deny overrides an allow","expect":{"outcome":"violated","invariant":"I1"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":100,"depth":2},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"1b74976ee6e63b6b3143dbf05fae6e7d5f1b9329d94942adffae46b8bbf601d46db50d6c28b225a2fc6da64f5a1fea07b1b18c97f50a533dadbcdf06b0310f0c"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":90,"depth":0},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"cf5a26508020e2fbde80cbcd2c28b74df89bd41ac341f7d6e6caa1fb529832414104ba376d8dba8c7cc2dade0d4c95230ce994e73e39439e9fa88ae28eeb2e0f"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"proof":{"kid":"host-1","alg":"Ed25519","sig":"fb9095ec5110caaa76e6665c7cb7ee55243aad85a1793a013e82fdb54751597550acdb246b43132323bb78fb3f3495e5c15f7d704521f6a7e69dfca721aca20c"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"}}]}},{"file":"must-reject/delegation-outlives-parent.json","name":"delegation-outlives-parent","question":"Does the delegation stay valid after the authority it came from expires?","aria":"§6 scope can only narrow (validity)","expect":{"outcome":"violated","invariant":"I1"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":100,"depth":2},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"1b74976ee6e63b6b3143dbf05fae6e7d5f1b9329d94942adffae46b8bbf601d46db50d6c28b225a2fc6da64f5a1fea07b1b18c97f50a533dadbcdf06b0310f0c"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":200,"depth":0},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"8bb8cd8f67eb9bbb6d42f6363bd9467af1a55714457e90af64dfccd14c31d5458f65e0cc65a966f60e191aa876ac13498870e5bdb87e86e152243956bd727b09"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"proof":{"kid":"host-1","alg":"Ed25519","sig":"fb9095ec5110caaa76e6665c7cb7ee55243aad85a1793a013e82fdb54751597550acdb246b43132323bb78fb3f3495e5c15f7d704521f6a7e69dfca721aca20c"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"}}]}},{"file":"must-reject/delegation-raises-effect-class.json","name":"delegation-raises-effect-class","question":"B's grant carries a higher effect class (sending outside the organization) than the authority it came from.","aria":"§6 scope can only narrow (action class)","expect":{"outcome":"violated","invariant":"I1"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":100,"depth":2},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"955962dc96080eb339375d1b90b791ba36c25952002e000e9f276b0a8916b9be9312e4792dbf01fbd4ac42fac3c636d6e1487e9ba24e24dd1c7cac11522dd60a"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":90,"depth":0},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"33f3c6f445a2274bf25348bc32ac738f5666b6f9388d34f62fd3e7f070be874ccbe9dd7b9611c0b47c7758c60df9df9f7c23f0acea800bf4e0be52c0f6e4eb0e"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"proof":{"kid":"host-1","alg":"Ed25519","sig":"fb9095ec5110caaa76e6665c7cb7ee55243aad85a1793a013e82fdb54751597550acdb246b43132323bb78fb3f3495e5c15f7d704521f6a7e69dfca721aca20c"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"}}]}},{"file":"must-reject/delegation-widens-scope.json","name":"delegation-widens-scope","question":"Did the effective scope expand along the chain?","aria":"§6 scope can only narrow","expect":{"outcome":"violated","invariant":"I1"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":100,"depth":2},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"1b74976ee6e63b6b3143dbf05fae6e7d5f1b9329d94942adffae46b8bbf601d46db50d6c28b225a2fc6da64f5a1fea07b1b18c97f50a533dadbcdf06b0310f0c"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":90,"depth":0},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"4d17a3f694324c15bdaa1fe805a9f4d184f26e2aa42507f5e5280c0c860d6517b788dfd1df669276560c4f2d8e5aa41c0661c69a8f4750d43803dcf77d374702"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"proof":{"kid":"host-1","alg":"Ed25519","sig":"fb9095ec5110caaa76e6665c7cb7ee55243aad85a1793a013e82fdb54751597550acdb246b43132323bb78fb3f3495e5c15f7d704521f6a7e69dfca721aca20c"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"}}]}},{"file":"must-reject/depth-not-decreasing.json","name":"depth-not-decreasing","question":"Each hop must spend delegation depth.","aria":"§6 delegationDepth","expect":{"outcome":"violated","invariant":"I1"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":100,"depth":2},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"1b74976ee6e63b6b3143dbf05fae6e7d5f1b9329d94942adffae46b8bbf601d46db50d6c28b225a2fc6da64f5a1fea07b1b18c97f50a533dadbcdf06b0310f0c"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":90,"depth":2},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"97cf470c9a1b8274b68fa6918d5a2b7ef97ac6b59eba8d14a20bac7b7e069960c4983985e11f4210591153d1c6c0d7da599d20be7dce7e1582b51f55822a2c02"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"proof":{"kid":"host-1","alg":"Ed25519","sig":"fb9095ec5110caaa76e6665c7cb7ee55243aad85a1793a013e82fdb54751597550acdb246b43132323bb78fb3f3495e5c15f7d704521f6a7e69dfca721aca20c"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"}}]}},{"file":"must-reject/effect-outside-delegated-scope.json","name":"effect-outside-delegated-scope","question":"B acts on a different requisition than it was delegated.","aria":"receiver policy; scope is intent only","expect":{"outcome":"violated","invariant":"I2"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":100,"depth":2},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"1b74976ee6e63b6b3143dbf05fae6e7d5f1b9329d94942adffae46b8bbf601d46db50d6c28b225a2fc6da64f5a1fea07b1b18c97f50a533dadbcdf06b0310f0c"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":90,"depth":0},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"81df4cf9a7b11f2814b7a679bded3369c5cd44db4999869dee13e13a3220b93c4ae688e8b061ee3cd2a7d70429b933384628cf0b0f2bf10fe81cca68da86bf09"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-2077/slot-1","effect":"write_shared"},"proof":{"kid":"host-1","alg":"Ed25519","sig":"c39e3bf318611cc70bbf6d0dadd1b5fec2c30af9f74e22add279be36458a1b432bf957ef648db68c34bf047397a0d0d3a936c125ce5ae69301192e6b5f510007"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-2077/slot-1","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"d9d1b9a4cfd0a2db0ee1c8ee814b59257cb5294a9606002e7299a0e2527542449243f7691e49d40482128b955289e74e7fac65b12c1bd3a136a7dbea2be6d00b"}}]}},{"file":"must-reject/executed-differs-from-declared.json","name":"executed-differs-from-declared","question":"The tool reports it deleted the slot B said it would write.","aria":"evidence of the action, not the declared scope","expect":{"outcome":"violated","invariant":"I2"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":100,"depth":2},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"1b74976ee6e63b6b3143dbf05fae6e7d5f1b9329d94942adffae46b8bbf601d46db50d6c28b225a2fc6da64f5a1fea07b1b18c97f50a533dadbcdf06b0310f0c"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":90,"depth":0},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"81df4cf9a7b11f2814b7a679bded3369c5cd44db4999869dee13e13a3220b93c4ae688e8b061ee3cd2a7d70429b933384628cf0b0f2bf10fe81cca68da86bf09"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"proof":{"kid":"host-1","alg":"Ed25519","sig":"fb9095ec5110caaa76e6665c7cb7ee55243aad85a1793a013e82fdb54751597550acdb246b43132323bb78fb3f3495e5c15f7d704521f6a7e69dfca721aca20c"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.delete","resource":"calendar:interview/req-1042/slot-3","effect":"destructive","released":[],"reversible":false,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"a774e220b1700925eb1b9e58f7d6a7d33757d123d67a14101ed5cf14f6e77dea97ff95a4cca4725fdfd28d4a2d4dcfc708e47f2b9da516f04b83655ec3727908"}}]}},{"file":"must-reject/identity-only.json","name":"identity-only","question":"B has a valid identity but no evidence of delegated authority.","aria":"identity is not authorization","expect":{"outcome":"unresolved","invariant":"I7"},"packet":{"mandates":[],"delegations":[],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"proof":{"kid":"host-1","alg":"Ed25519","sig":"fb9095ec5110caaa76e6665c7cb7ee55243aad85a1793a013e82fdb54751597550acdb246b43132323bb78fb3f3495e5c15f7d704521f6a7e69dfca721aca20c"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"}}]}},{"file":"must-reject/redelegation-without-right.json","name":"redelegation-without-right","question":"Did A have authority to re-delegate? (B, holding depth 0, delegates on to C)","aria":"§4 maxDelegationDepth, §6 delegationDepth","expect":{"outcome":"violated","invariant":"I1"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":100,"depth":2},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"1b74976ee6e63b6b3143dbf05fae6e7d5f1b9329d94942adffae46b8bbf601d46db50d6c28b225a2fc6da64f5a1fea07b1b18c97f50a533dadbcdf06b0310f0c"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":90,"depth":0},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"81df4cf9a7b11f2814b7a679bded3369c5cd44db4999869dee13e13a3220b93c4ae688e8b061ee3cd2a7d70429b933384628cf0b0f2bf10fe81cca68da86bf09"}},{"id":"d-2","kind":"delegation","parent":"d-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":80,"depth":0},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"f723563e7512acf52cc4cd85d92a982e602e88582aee9be28dce0c397c6006e943baa6b784a01d4f37274fbd37bffa78990d8cfc5154ffd469d471012647c60d"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-2","interpretation_ref":"a-1","actor":"did:aria:acme.example:reminder-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"proof":{"kid":"host-1","alg":"Ed25519","sig":"002ec4b2c0020b6cde0cb8efe01bca110fe941c720fb6a0bce974de13559515eab99913a535f4bf0e9d01846b1d279908d44298564836321110833e3c0287105"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"}}]}},{"file":"must-reject/root-revoked-before-action.json","name":"root-revoked-before-action","question":"Has any upstream authorization since been revoked?","aria":"§7 revocation is terminal and propagates down the chain","expect":{"outcome":"violated","invariant":"I6"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":100,"depth":2},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"1b74976ee6e63b6b3143dbf05fae6e7d5f1b9329d94942adffae46b8bbf601d46db50d6c28b225a2fc6da64f5a1fea07b1b18c97f50a533dadbcdf06b0310f0c"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":90,"depth":0},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"81df4cf9a7b11f2814b7a679bded3369c5cd44db4999869dee13e13a3220b93c4ae688e8b061ee3cd2a7d70429b933384628cf0b0f2bf10fe81cca68da86bf09"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"proof":{"kid":"host-1","alg":"Ed25519","sig":"fb9095ec5110caaa76e6665c7cb7ee55243aad85a1793a013e82fdb54751597550acdb246b43132323bb78fb3f3495e5c15f7d704521f6a7e69dfca721aca20c"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"}}],"revocations":[{"kind":"revocation","target":"m-1","t":5,"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"99448f623657fa9e9310bc4609f9d532960a54731ac0ea5448fe8875f289b7a1486a73472a5ccac012b1b453f77d052f70bec6beb961614dcb9ca99603691e01"}}]}},{"file":"must-reject/self-issued-delegation.json","name":"self-issued-delegation","question":"B signs its own delegation with a key that holds no issuer role.","aria":"§6 every hop signed by the delegator","expect":{"outcome":"unresolved","invariant":"I7"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":100,"depth":2},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"1b74976ee6e63b6b3143dbf05fae6e7d5f1b9329d94942adffae46b8bbf601d46db50d6c28b225a2fc6da64f5a1fea07b1b18c97f50a533dadbcdf06b0310f0c"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":90,"depth":0},"proof":{"kid":"attacker","alg":"Ed25519","sig":"b09097a78ec55662fed54c6bacd0bf1ce6885bad8e37895754c663a2e357c469d808106e9699911f679f57af1735c2d04699d3e540090897f1c4166b908baf00"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"proof":{"kid":"host-1","alg":"Ed25519","sig":"fb9095ec5110caaa76e6665c7cb7ee55243aad85a1793a013e82fdb54751597550acdb246b43132323bb78fb3f3495e5c15f7d704521f6a7e69dfca721aca20c"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"}}]}},{"file":"must-reject/stale-status.json","name":"stale-status","question":"The only status available predates the action.","aria":"§7 freshness (ARIA AP: max age 3600 s)","expect":{"outcome":"unresolved","invariant":"I7"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":100,"depth":2},"revocation":{"status_ref":"https://acme.example/status/m-1"},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"5e84ed9cf34232ee674ac41573c33be134627a007359b255f99528961a86edced6834dfb6cba4ae4db637b12efd2e517ab199736a93be763c39794f2f5fc7d0e"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":90,"depth":0},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"81df4cf9a7b11f2814b7a679bded3369c5cd44db4999869dee13e13a3220b93c4ae688e8b061ee3cd2a7d70429b933384628cf0b0f2bf10fe81cca68da86bf09"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"proof":{"kid":"host-1","alg":"Ed25519","sig":"fb9095ec5110caaa76e6665c7cb7ee55243aad85a1793a013e82fdb54751597550acdb246b43132323bb78fb3f3495e5c15f7d704521f6a7e69dfca721aca20c"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"}}],"statuses":[{"kind":"status","target":"m-1","as_of":3,"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"8cee028fe12a343749f30d035535d4fbc4a8bfffb86ea0056c9c57058c1a9dd9d550a4c9c4a87c424c6c403386785cf224b32b0f903d61e7f270c9a34ef5080e"}}]}},{"file":"must-reject/status-shows-revoked.json","name":"status-shows-revoked","question":"The status list shows the root revoked before the action.","aria":"§7 Bitstring Status List","expect":{"outcome":"violated","invariant":"I6"},"packet":{"mandates":[{"id":"m-1","kind":"mandate","principal":"did:web:acme.example:people:hr-lead","claims":{"actions":["hiring.read","calendar.write","communication.send"],"resources":["hiring:candidate/*","calendar:interview/*","communication:candidate/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"external_send","exp":100,"depth":2},"revocation":{"status_ref":"https://acme.example/status/m-1"},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"5e84ed9cf34232ee674ac41573c33be134627a007359b255f99528961a86edced6834dfb6cba4ae4db637b12efd2e517ab199736a93be763c39794f2f5fc7d0e"}}],"delegations":[{"id":"d-1","kind":"delegation","parent":"m-1","claims":{"actions":["calendar.write"],"resources":["calendar:interview/req-1042/*"],"deny_resources":["calendar:interview/executive/*"],"data":["candidate_pii->internal"],"ceiling":"write_shared","exp":90,"depth":0},"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"81df4cf9a7b11f2814b7a679bded3369c5cd44db4999869dee13e13a3220b93c4ae688e8b061ee3cd2a7d70429b933384628cf0b0f2bf10fe81cca68da86bf09"}}],"interpretations":[{"id":"a-1","kind":"interpretation","source":"curated","adapter":"calendar_api","version":"v3","proof":{"kid":"host-1","alg":"Ed25519","sig":"9de850b145362f00f8a15c4f3dcbb31d3f28c4258ad3845fc44da4775b88a6a417c16f6e96473e64a2a66514cb501e5b1fab61942e11f623113b59733315360e"}}],"invocations":[{"id":"i-1","kind":"invocation","authority_ref":"d-1","interpretation_ref":"a-1","actor":"did:aria:acme.example:scheduling-agent","t":10,"declared":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared"},"proof":{"kid":"host-1","alg":"Ed25519","sig":"fb9095ec5110caaa76e6665c7cb7ee55243aad85a1793a013e82fdb54751597550acdb246b43132323bb78fb3f3495e5c15f7d704521f6a7e69dfca721aca20c"}}],"effects":[{"id":"e-1","kind":"effect","invocation":"i-1","observed_by":"service:calendar.acme.example","assurance":"L3","executed":{"action":"calendar.write","resource":"calendar:interview/req-1042/slot-3","effect":"write_shared","released":[],"reversible":true,"t":11},"proof":{"kid":"observer-1","alg":"Ed25519","sig":"5c86cc3036dd51b35af230325c956047f6fae7613c4a91beef199ca99160bc368b5129a8177c1043909f0d7c9aa85e1b457cce5b9e83523dd8f6ce7d3c081607"}}],"statuses":[{"kind":"status","target":"m-1","as_of":12,"revoked_at":7,"proof":{"kid":"issuer-1","alg":"Ed25519","sig":"a695cfd4cabe407aa8a9d3cae020f642d5657bd55799ad57f200c32be1602d7230fce02c44eefbdf30cfc42d2add7e2575c815c4d80bbea09c1aff54d6b8e707"}}]}}]}</script>
 <script>
-// AMEP v0.2 evaluation core (spec/amep-v0.2.md section 10). Pure JavaScript, no I/O and no platform crypto:
+// AMEP v0.3 evaluation core (spec/amep-v0.2.md section 10). Pure JavaScript, no I/O and no platform crypto:
 // signature checks are injected (`sigOk(obj, key) -> boolean`), so the Node CLI and the in-browser verifier
 // share this exact code. Independent of the Python reference verifier.
 
@@ -75,13 +95,23 @@ const SIGNER_ROLES = {
   delegation: ["issuer", "host"], intent: ["issuer", "host"],
   interpretation: ["host"], invocation: ["host"], decision: ["host"],
   effect: ["observer"], approval: ["approver"], finding: ["host", "observer"],
+  call_statement: ["observer"],
 };
+const DISPOSITIONS = ["completed", "not_executed", "failed_after_effects"];
 const COST_BASE = { read: 0, write_local: 1, write_shared: 3, external_send: 5, destructive: 10, financial: 20 };
 const DATA_MULT = { public: 1, internal: 1, source: 1, confidential: 2, secret: 5, phi: 5, pci: 5 };
 
 class Malformed extends Error {}
-class Stop { constructor(outcome, invariant, reason) { Object.assign(this, { outcome, invariant, reason }); } }
-const check = (cond, outcome, invariant, reason) => { if (cond) throw new Stop(outcome, invariant, reason); };
+// spec 10.5 (v0.3): a violation names the party whose own signed record departs from authority; an unresolved result
+// names the one piece of evidence that would let the evaluation continue
+class Stop {
+  constructor(outcome, invariant, reason, { blame, need, ref, cause } = {}) {
+    Object.assign(this, { outcome, invariant, reason, blame: outcome === "violated" ? blame ?? null : null,
+      gaps: outcome === "unresolved" && need ? [{ need, ref: String(ref), ...(cause ? { cause } : {}) }] : [] });
+  }
+}
+const check = (cond, outcome, invariant, reason, tags) => { if (cond) throw new Stop(outcome, invariant, reason, tags); };
+const result = (id, outcome, invariant, reason, blame = null, gaps = []) => ({ id, outcome, invariant, reason, blame, gaps });
 
 const isGuardrail = (res, extra = []) => {
   const r = "/" + res.replace("~", "home").replace(/^\/+/, "");
@@ -132,15 +162,35 @@ function normDec(s) {
 }
 
 // Parse JSON text for evaluation (spec 12.1). A non-integer number literal must equal, as a decimal, the double it
-// denotes, so two distinct literals can never share one canonical form or approval digest. Integers are checked
-// against the I-JSON range by evaluate(). The literals are read from the text itself (after JSON.parse has
-// accepted it, so it is valid JSON), which works on every engine, without JSON.parse source-text access.
+// denotes, so two distinct literals can never share one canonical form or approval digest. Duplicate member names
+// are rejected (I-JSON, RFC 7493 2.3): parsers disagree on them (first wins, last wins, error), so a packet with
+// `"amount":"10.00", "amount":"840000.00"` could verify as one value and be displayed as another. Integers are
+// checked against the I-JSON range by evaluate(). The text is scanned after JSON.parse has accepted it, so it is
+// valid JSON, which works on every engine without JSON.parse source-text access.
 const NUMBER = /-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
 function parseStrict(text) {
   const value = JSON.parse(text);
+  const stack = []; // one entry per open container: { keys: Set } for objects, null for arrays
+  let expectKey = false;
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
-    if (c === '"') { for (i++; i < text.length && text[i] !== '"'; i++) if (text[i] === "\\") i++; continue; }
+    if (c === '"') {
+      const start = i;
+      for (i++; i < text.length && text[i] !== '"'; i++) if (text[i] === "\\") i++;
+      const top = stack[stack.length - 1];
+      if (top && expectKey) {
+        const name = JSON.parse(text.slice(start, i + 1)); // decoded, so "a" and "a" are the same name
+        if (top.keys.has(name)) throw new Malformed(`duplicate member name ${JSON.stringify(name)}`);
+        top.keys.add(name);
+        expectKey = false;
+      }
+      continue;
+    }
+    if (c === "{") { stack.push({ keys: new Set() }); expectKey = true; continue; }
+    if (c === "[") { stack.push(null); expectKey = false; continue; }
+    if (c === "}" || c === "]") { stack.pop(); expectKey = false; continue; }
+    if (c === ",") { expectKey = !!stack[stack.length - 1]; continue; }
+    if (c === ":") { expectKey = false; continue; }
     if (c !== "-" && (c < "0" || c > "9")) continue;
     NUMBER.lastIndex = i;
     const lit = NUMBER.exec(text)[0];
@@ -149,6 +199,77 @@ function parseStrict(text) {
       throw new Malformed(`number literal ${lit} is not exactly representable as an IEEE 754 double`);
   }
   return value;
+}
+
+// ---- well-formedness (spec 12.1, v0.3). Bounds keep a hostile packet from exhausting a verifier; every verifier
+// applies the same ones. String sizes are counted in UTF-8 bytes, which all languages agree on. ----
+const MAX_DEPTH = 32, MAX_ARRAY = 4096, MAX_STRING = 8192, MAX_NAME = 256;
+const utf8Len = s => new TextEncoder().encode(s).length;
+function badChar(s) {
+  for (const ch of s) {
+    const c = ch.codePointAt(0);
+    if (c >= 0xD800 && c <= 0xDFFF) return "a lone surrogate";
+    if ((c >= 0xFDD0 && c <= 0xFDEF) || (c & 0xFFFE) === 0xFFFE) return "a noncharacter";
+  }
+  return null;
+}
+// Canonical identifiers (spec 6.2, v0.3): already in NFC and without control characters, so two identifiers that
+// look the same always compare the same. The verifier never normalizes silently.
+function identProblem(s) {
+  if (typeof s !== "string") return null;
+  for (const ch of s) { const c = ch.codePointAt(0); if (c < 0x20 || (c >= 0x7F && c <= 0x9F)) return "a control character"; }
+  if (s.normalize("NFC") !== s) return "a form that is not NFC";
+  return null;
+}
+function malformedReason(v, path = "$", depth = 0) {
+  if (depth > MAX_DEPTH) return `nesting deeper than ${MAX_DEPTH} at ${path}`;
+  if (typeof v === "string") {
+    if (utf8Len(v) > MAX_STRING) return `string longer than ${MAX_STRING} bytes at ${path}`;
+    const bad = badChar(v); return bad ? `${bad} at ${path}` : null;
+  }
+  if (Array.isArray(v)) {
+    if (v.length > MAX_ARRAY) return `array longer than ${MAX_ARRAY} at ${path}`;
+    for (let i = 0; i < v.length; i++) { const r = malformedReason(v[i], `${path}[${i}]`, depth + 1); if (r) return r; }
+    return null;
+  }
+  if (v && typeof v === "object") {
+    for (const [k, x] of Object.entries(v)) {
+      if (utf8Len(k) > MAX_NAME) return `member name longer than ${MAX_NAME} bytes at ${path}`;
+      const bad = badChar(k); if (bad) return `${bad} in a member name at ${path}`;
+      if ((k === "action" || k === "resource")) { const p = identProblem(x); if (p) return `identifier with ${p} at ${path}.${k}`; }
+      if (["actions", "resources", "deny_actions", "deny_resources", "audiences"].includes(k) && Array.isArray(x)) {
+        const p = x.map(identProblem).find(Boolean); if (p) return `identifier pattern with ${p} at ${path}.${k}`;
+      }
+      const r = malformedReason(x, `${path}.${k}`, depth + 1); if (r) return r;
+    }
+  }
+  return null;
+}
+
+// ---- signatures (spec 12.2). One exact Ed25519 acceptance rule (v0.3), applied before the platform check, because
+// libraries disagree on edge cases (Chalkias et al., "Taming the many EdDSAs", 2020). Measured: OpenSSL 3.6 accepts
+// the signature (R = identity, S = 0) for EVERY message under the identity public key; OpenSSL 4.1 rejects it.
+// AMEP rejects S >= L, and a public key A or commitment R that is non-canonical (y >= p) or of small order. ----
+const P25519 = (1n << 255n) - 19n;
+const L25519 = (1n << 252n) + 27742317777372353535851937790883648493n;
+const leInt = b => { let n = 0n; for (let i = b.length - 1; i >= 0; i--) n = (n << 8n) | BigInt(b[i]); return n; };
+const fromHex = h => Uint8Array.from(h.match(/../g) || [], x => parseInt(x, 16));
+const SMALL_ORDER_Y = new Set([0n, 1n, P25519 - 1n,
+  ...["26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05", "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a"].map(h => leInt(fromHex(h)))]);
+const pointOk = b => { if (b.length !== 32) return false; const y = leInt(b) & ((1n << 255n) - 1n); return y < P25519 && !SMALL_ORDER_Y.has(y); };
+const HEX64 = /^[0-9a-f]{64}$/, HEX128 = /^[0-9a-f]{128}$/;
+function ed25519StrictOk(xHex, sigHex) {
+  if (typeof xHex !== "string" || typeof sigHex !== "string" || !HEX64.test(xHex) || !HEX128.test(sigHex)) return false;
+  const sig = fromHex(sigHex);
+  return pointOk(fromHex(xHex)) && pointOk(sig.slice(0, 32)) && leInt(sig.slice(32)) < L25519;
+}
+// A version-2 proof signs a domain-separated input, so a signature the same key made for another object kind, or for
+// another system entirely, can never be presented as this AMEP object:  "AMEP-v0.3" 0x00 kind 0x00 canon(object
+// without proof). A proof without "v" (version 1, AMEP v0.2) signs canon(object without proof), exactly as before.
+const SIG_CONTEXT = "AMEP-v0.3";
+function signingInput(o) {
+  const body = canon(stripProof(o));
+  return o.proof && o.proof.v === 2 ? `${SIG_CONTEXT}\u0000${o.kind ?? ""}\u0000${body}` : body;
 }
 
 // ---- SHA-256 over UTF-8 (pure JS, so evaluation stays synchronous in the browser) ----
@@ -180,14 +301,33 @@ function sha256Hex(str) {
 }
 const digest = o => sha256Hex(canon(o));
 // spec 5.10: approvals bind the executed body without its time
-const approvalDigest = x => digest(Object.fromEntries(Object.entries(x).filter(([k]) => k !== "t")));
+// The executed-effect body without what only the observer knows at execution: its time `t`, and the observer's own
+// running totals `value.period_spent` (spec 5.10, 7.6). Approvals bind this, so they can be issued in advance.
+function effectIdentity(x) {
+  const out = Object.fromEntries(Object.entries(x).filter(([k]) => k !== "t"));
+  if (out.value && typeof out.value === "object" && !Array.isArray(out.value) && "period_spent" in out.value)
+    out.value = Object.fromEntries(Object.entries(out.value).filter(([k]) => k !== "period_spent"));
+  return out;
+}
+const approvalDigest = x => digest(effectIdentity(x));
 
 // ---- claim algebra (spec 6.3, 7) ----
 const patMatch = (v, p) => p === "*" || v === p || (p.endsWith("*") && v.startsWith(p.slice(0, -1)));
 const subsumed = (cs, ps) => cs.every(c => ps.some(p => p === "*" || c === p || (p.endsWith("*") && c.replace(/\*+$/, "").startsWith(p.slice(0, -1)))));
-function narrower(c, p) {
-  if (!subsumed(c.actions, p.actions)) return [false, "actions widened"];
-  if (!subsumed(c.resources, p.resources)) return [false, "resources widened"];
+// grants (spec 5.3, v0.3): authority as a union of (actions x resources) products instead of one product. Plain
+// actions and resources are one grant. Used only in v0.3 packets; elsewhere the original single-product rules apply.
+const usesGrants = (c, v03) => v03 && "grants" in c;
+const grantsOf = (c, v03) => (usesGrants(c, v03) ? c.grants : [{ actions: c.actions, resources: c.resources }]);
+function narrower(c, p, v03 = false) {
+  if (usesGrants(c, v03) || usesGrants(p, v03)) {
+    // every child grant must lie within one parent grant (sound: it never accepts a widening)
+    const pg = grantsOf(p, v03);
+    if (!grantsOf(c, v03).every(g => pg.some(G => subsumed(g.actions, G.actions) && subsumed(g.resources, G.resources))))
+      return [false, "grants widened"];
+  } else {
+    if (!subsumed(c.actions, p.actions)) return [false, "actions widened"];
+    if (!subsumed(c.resources, p.resources)) return [false, "resources widened"];
+  }
   if (!(c.data || []).every(d => (p.data || []).includes(d))) return [false, "data classes widened"];
   if (CEILING.indexOf(c.ceiling) > CEILING.indexOf(p.ceiling)) return [false, "effect ceiling raised"];
   if (toTime(c.exp) > toTime(p.exp)) return [false, "validity extended"];
@@ -196,6 +336,8 @@ function narrower(c, p) {
   // spec 7.1: denies only grow; every parent deny must be covered by an equal-or-broader child deny
   for (const key of ["deny_actions", "deny_resources"])
     if (!(p[key] || []).every(d => subsumed([d], c[key] || []))) return [false, `${key} removed`];
+  // spec 5.3 (v0.3.2): audiences only narrow. A parent that names audiences binds every child to a subset of them.
+  if ("audiences" in p && !("audiences" in c && subsumed(c.audiences, p.audiences))) return [false, "audiences widened"];
   if ("budget" in p && (c.budget ?? p.budget) > p.budget) return [false, "risk budget widened"];
   if ("depth" in p) {
     if (p.depth === 0) return [false, "parent may not be delegated (depth 0)"];
@@ -204,22 +346,44 @@ function narrower(c, p) {
   }
   return [true, ""];
 }
-function meet(a, b) {
-  const m = { actions: a.actions.filter(x => subsumed([x], b.actions)), resources: a.resources.filter(x => subsumed([x], b.resources)),
+function meet(a, b, v03 = false) {
+  const authority = (usesGrants(a, v03) || usesGrants(b, v03))
+    ? { grants: grantsOf(a, v03).flatMap(g => grantsOf(b, v03).map(G => ({ actions: g.actions.filter(x => subsumed([x], G.actions)),
+        resources: g.resources.filter(x => subsumed([x], G.resources)) }))).filter(p => p.actions.length && p.resources.length) }
+    : { actions: a.actions.filter(x => subsumed([x], b.actions)), resources: a.resources.filter(x => subsumed([x], b.resources)) };
+  const m = { ...authority,
     data: (a.data || []).filter(d => (b.data || []).includes(d)).sort(),
     ceiling: CEILING[Math.min(CEILING.indexOf(a.ceiling), CEILING.indexOf(b.ceiling))], exp: Math.min(toTime(a.exp), toTime(b.exp)) };
   const nbfs = [a, b].filter(c => "nbf" in c).map(c => toTime(c.nbf)); if (nbfs.length) m.nbf = Math.max(...nbfs);
   if ("purpose" in a || "purpose" in b) m.purpose = a.purpose ?? b.purpose;
+  if ("audiences" in a || "audiences" in b) // audiences intersect (v0.3.2)
+    m.audiences = ("audiences" in a && "audiences" in b) ? a.audiences.filter(x => subsumed([x], b.audiences)) : (a.audiences ?? b.audiences);
   for (const key of ["deny_actions", "deny_resources"]) // denies are unioned: no hop or intent can lift one
     if (key in a || key in b) m[key] = [...new Set([...(a[key] || []), ...(b[key] || [])])].sort();
   return m;
 }
-function effectOk(x, c) {
-  if (!c.actions.some(p => patMatch(x.action, p))) return [false, "action outside claims"];
+// spec 5.8 (v0.3.3): an executed effect matches its call's declaration. A call whose effects are not known in advance,
+// such as a shell command, may declare a scope {actions, resources} instead of naming one effect: an effect then matches
+// when its action and resource fall within the scope and its class is at most the declared class.
+function withinDeclared(x, inv, v03 = false) {
+  const d = inv.declared, sc = v03 ? d.scope : undefined;
+  if (sc === undefined) return x.action === d.action && x.resource === d.resource;
+  return sc.actions.some(p => patMatch(x.action, p)) && sc.resources.some(p => patMatch(x.resource, p))
+    && CEILING.indexOf(x.effect) <= CEILING.indexOf(d.effect);
+}
+const scopeWellFormed = sc => !!sc && typeof sc === "object" && !Array.isArray(sc)
+  && Object.keys(sc).length === 2 && ["actions", "resources"].every(k => Array.isArray(sc[k]) && sc[k].length > 0
+  && sc[k].every(v => typeof v === "string" && v.length > 0));
+function effectOk(x, c, v03 = false) {
+  const act = grantsOf(c, v03).filter(g => g.actions.some(p => patMatch(x.action, p)));
+  if (!act.length) return [false, "action outside claims"];
   if ((c.deny_actions || []).some(p => patMatch(x.action, p))) return [false, "action denied"];
-  if (!c.resources.some(p => patMatch(x.resource, p))) return [false, "resource outside claims"];
+  // with grants, the action and the resource must fall within the same grant
+  if (!act.some(g => g.resources.some(p => patMatch(x.resource, p)))) return [false, "resource outside claims"];
   if ((c.deny_resources || []).some(p => patMatch(x.resource, p))) return [false, "resource denied"];
   if (CEILING.indexOf(x.effect) > CEILING.indexOf(c.ceiling)) return [false, "effect above ceiling"];
+  // spec 5.3 (v0.3.2), from stafordtituss/amep#16: an effect sent to a service the principal never named is outside authority
+  if ("audiences" in c && typeof x.audience === "string" && !c.audiences.some(p => patMatch(x.audience, p))) return [false, "audience outside claims"];
   for (const d of x.released || []) if (!(c.data || []).includes(d)) return [false, `released ${d} not allowed`];
   if (toTime(x.t) > toTime(c.exp)) return [false, "after validity"];
   if ("nbf" in c && toTime(x.t) < toTime(c.nbf)) return [false, "before validity"];
@@ -231,27 +395,238 @@ const cost = x => {
   return COST_BASE[x.effect] * m * rev;
 };
 
-// ---- evaluation (spec 10) ----
-// state (spec 10.6): { approvals_used: {id: [invocation, digest]}, spent: {node: points} }, read on entry and
-// updated on exit, so approval single use and risk budgets hold across a stream of packets.
-function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
-  const bad = unsafeNumber(pk);
-  if (bad) {   // spec 12.1: such a packet cannot be canonicalized the same way by every verifier
-    const ids = (pk.invocations || []).map(i => (i && typeof i === "object" && i.id) || "?");
-    return (ids.length ? ids : ["-"]).map(id => ({ id, outcome: "unresolved", invariant: "I7", reason: `number outside the I-JSON range at ${bad}` }));
+// ---- quantities and limits (spec 5.9, 7.6, v0.3). An executed effect may carry value = {amount, unit}: an exact
+// decimal string and a unit such as "iso4217:EUR", "caip19:…", "count:records" or "bytes". Claims may carry limits
+// that cap it per call and per period. Amounts are compared as exact decimals (scaled BigInts), never as floats. ----
+const AMOUNT = /^(0|[1-9][0-9]{0,38})(\.[0-9]{1,18})?$/, UNIT = /^[a-z][a-z0-9-]{0,31}:[!-~]{1,128}$/;
+const SCALE = 10n ** 18n;
+const MONEY_UNITS = ["iso4217:", "caip19:"];
+const CLAIM_MEMBERS = new Set(["actions", "resources", "grants", "data", "ceiling", "exp", "nbf", "purpose", "deny_actions", "deny_resources", "depth", "budget", "limits", "audiences"]);
+const LIMIT_MEMBERS = new Set(["unit", "per_effect", "per_call", "per_period", "period", "actions", "counted_by"]);
+const INTEGER_AMOUNT = /^(0|[1-9][0-9]{0,38})$/, PERIOD_KEY = /^[1-9][0-9]{0,15}$/;
+// Amounts in caip19: units are integers in the asset's smallest unit, as the chain records them (spec 5.9.2).
+function amountUnits(s, unit) {
+  if (unit !== undefined && unit.startsWith("caip19:") && !(typeof s === "string" && INTEGER_AMOUNT.test(s)))
+    throw new Malformed(`amount ${JSON.stringify(s)} in ${unit} must be an integer in the asset's smallest unit`);
+  if (typeof s !== "string" || !AMOUNT.test(s)) throw new Malformed(`malformed amount ${JSON.stringify(s)} (a decimal string such as "1200.00" is required)`);
+  if (unit !== undefined && unit.startsWith("caip19:") && !INTEGER_AMOUNT.test(s))
+    throw new Malformed(`amount ${JSON.stringify(s)} in ${unit} must be an integer in the asset's smallest unit`);
+  const [ip, fp = ""] = s.split(".");
+  return BigInt(ip) * SCALE + BigInt((fp + "0".repeat(18)).slice(0, 18));
+}
+// value.period_spent: the observer's own totals, keyed by period length in seconds (spec 5.9.2). Each is
+// {"from": <window start>, "total": <amount>}, or a bare amount, which names no window and so never counts as a limit's
+// total (amep#10). Returns period -> [window start or null, amount].
+function periodSpentOf(v, unit) {
+  const ps = "period_spent" in v ? v.period_spent : {};
+  if (!ps || typeof ps !== "object" || Array.isArray(ps) || !Object.keys(ps).every(k => PERIOD_KEY.test(k)))
+    throw new Malformed('period_spent must map period lengths in seconds to totals, for example {"2592000": {"from": 0, "total": "300.00"}}');
+  return new Map(Object.entries(ps).map(([k, a]) => {
+    if (a && typeof a === "object" && !Array.isArray(a)) {
+      if (Object.keys(a).sort().join() !== "from,total") throw new Malformed("a period_spent total must be {from, total}");
+      return [k, [toTime(a.from), amountUnits(a.total, unit)]];
+    }
+    return [k, [null, amountUnits(a, unit)]];
+  }));
+}
+const unitOf = u => { if (typeof u !== "string" || !UNIT.test(u)) throw new Malformed(`malformed unit ${JSON.stringify(u)}`); return u; };
+const unitsStr = u => { const ip = u / SCALE, fp = (u % SCALE).toString().padStart(18, "0").replace(/0+$/, ""); return fp ? `${ip}.${fp}` : `${ip}`; };
+const isExtensionMember = name => name.startsWith("x-") || name.includes(".");
+function checkLimits(lims) {
+  if (!Array.isArray(lims) || !lims.length) throw new Malformed("limits must be a non-empty array");
+  for (const lim of lims) {
+    if (!lim || typeof lim !== "object" || Array.isArray(lim)) throw new Malformed("limit must be an object");
+    const unit = unitOf(lim.unit);
+    for (const k of ["per_effect", "per_call"]) if (k in lim) amountUnits(lim[k], unit);
+    if (("per_period" in lim) !== ("period" in lim)) throw new Malformed("per_period and period go together");
+    if ("counted_by" in lim && !(typeof lim.counted_by === "string" && lim.counted_by)) throw new Malformed("counted_by must name an observer");
+    if ("per_period" in lim) {
+      amountUnits(lim.per_period, unit);
+      if (!Number.isInteger(lim.period) || lim.period <= 0) throw new Malformed("period must be a positive integer number of seconds");
+    }
+    if ("actions" in lim && !(Array.isArray(lim.actions) && lim.actions.every(p => typeof p === "string")))
+      throw new Malformed("limit actions must be an array of action patterns");
   }
-  // signature valid AND the signing key holds a role allowed for this object kind (spec 12.5)
+  return lims;
+}
+// The running-total key of one limit window (spec 7.6): one total per limit, so limits that differ only in their actions
+// are separate caps (amep#10).
+// Start time of the limit window that contains t (spec 7.6): windows of `period` seconds from the node's nbf, or 0.
+function windowStart(node, lim, t) {
+  const anchor = "nbf" in node.claims ? toTime(node.claims.nbf) : 0;
+  return anchor + Math.floor((toTime(t) - anchor) / lim.period) * lim.period;
+}
+function periodKey(node, lim, unit, t) {
+  const anchor = "nbf" in node.claims ? toTime(node.claims.nbf) : 0;
+  const window = Math.floor((toTime(t) - anchor) / lim.period);
+  return `${node.id}|${unit}|${lim.period}|${window}` + ("actions" in lim ? `|${[...lim.actions].sort().join(",")}` : "");
+}
+// An invocation's reserve (spec 5.8, v0.3): {amount, unit}, the most the call can move in the unit.
+function checkReserve(r) {
+  if (!r || typeof r !== "object" || Array.isArray(r) || Object.keys(r).sort().join() !== "amount,unit")
+    throw new Malformed("reserve must be an object with exactly amount and unit");
+  amountUnits(r.amount, unitOf(r.unit));
+  return r;
+}
+// Verifier state's holds (spec 10.7, v0.3): invocation digest -> {invocation, amounts: {period key: amount | null}}.
+function heldOf(state) {
+  const h = "held" in state ? state.held : {};
+  const ok = h && typeof h === "object" && !Array.isArray(h) && Object.values(h).every(v =>
+    v && typeof v === "object" && typeof v.invocation === "string" && v.amounts && typeof v.amounts === "object" && !Array.isArray(v.amounts)
+    && Object.values(v.amounts).every(a => a === null || (typeof a === "string" && AMOUNT.test(a))));
+  if (!ok) throw new Malformed("state.held must map invocation digests to {invocation, amounts}");
+  return h;
+}
+// Verifier state's approval holds (spec 5.10, held approvals, v0.3): approval id -> {invocation, digest} of the earlier
+// invocation that cited it and whose outcome is still unknown.
+function approvalsHeldOf(state) {
+  const h = "approvals_held" in state ? state.approvals_held : {};
+  const ok = h && typeof h === "object" && !Array.isArray(h) && Object.values(h).every(v =>
+    v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).sort().join() === "digest,invocation"
+    && typeof v.invocation === "string" && typeof v.digest === "string" && /^[0-9a-f]{64}$/.test(v.digest));
+  if (!ok) throw new Malformed("state.approvals_held must map approval ids to {invocation, digest}");
+  return h;
+}
+// Verifier state's operation records (spec 5.8.1, v0.3.2): operation -> {invocation, digest} of the attempt that holds it
+// (outcome unknown) or that took effect. One logical operation may be attempted several times; at most one attempt may
+// take effect, and while one attempt's outcome is unknown, later attempts are held, whatever authorizes them.
+function operationsOf(state, name) {
+  const h = name in state ? state[name] : {};
+  const ok = h && typeof h === "object" && !Array.isArray(h) && Object.values(h).every(v =>
+    v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).sort().join() === "digest,invocation"
+    && typeof v.invocation === "string" && typeof v.digest === "string" && /^[0-9a-f]{64}$/.test(v.digest));
+  if (!ok) throw new Malformed(`state.${name} must map operation ids to {invocation, digest}`);
+  return h;
+}
+// A limit with `actions` applies to effects whose action matches; without, to every financial effect.
+const limitApplies = (lim, x) => ("actions" in lim) ? lim.actions.some(p => patMatch(x.action, p)) : x.effect === "financial";
+// I1 for limits: a child may add limits, but never raise one the parent sets for the same unit and period.
+function limitsNarrower(c, p) {
+  for (const pl of p.limits || []) for (const cl of c.limits || []) {
+    if (cl.unit !== pl.unit || JSON.stringify(cl.actions) !== JSON.stringify(pl.actions)) continue;
+    for (const k of ["per_effect", "per_call"])
+      if (k in pl && k in cl && amountUnits(cl[k]) > amountUnits(pl[k])) return `${k.replace("_", "-")} limit raised for ${pl.unit}`;
+    if ("per_period" in pl && cl.period === pl.period && "per_period" in cl && amountUnits(cl.per_period) > amountUnits(pl.per_period))
+      return `per-period limit raised for ${pl.unit}`;
+  }
+  return null;
+}
+const MAX_REVOCATION_WINDOW = 3600;   // spec 5.12.1 (v0.3.3): a window may not outlast an hour
+function revocationWindow(node) {
+  const w = (node.revocation || {}).window ?? 0;
+  if (typeof w !== "number" || !Number.isFinite(w) || w < 0) throw new Malformed("revocation window must be a non-negative number of seconds");
+  if (w > MAX_REVOCATION_WINDOW) throw new Malformed(`revocation window of ${fmt(w)}s exceeds the ${MAX_REVOCATION_WINDOW}s maximum (spec 5.12.1)`);
+  return w;
+}
+const fmt = n => String(n); // Python's :g for the integer and short decimal times used in reasons
+
+// ---- evaluation (spec 10) ----
+// state (spec 10.6): { approvals_used: {id: [invocation, digest]}, spent: {node: points}, period_totals: {key: amount} },
+// read on entry and updated on exit, so approval single use, risk budgets and period limits hold across packets.
+const allUnresolved = (pk, reason) => {
+  const ids = (pk.invocations || []).map(i => (i && typeof i === "object" && i.id) || "?");
+  return (ids.length ? ids : ["-"]).map(id => result(id, "unresolved", "I7", reason, null, [{ need: "well_formed_packet", ref: "-" }]));
+};
+function evaluateText(text, keys, sigOk, extraProtected = [], state = {}) {
+  let pk;
+  try { pk = parseStrict(text); } catch (e) { return [result("-", "unresolved", "I7", `malformed packet text: ${e.message}`, null, [{ need: "well_formed_packet", ref: "-" }])]; }
+  return evaluate(pk, keys, sigOk, extraProtected, state);
+}
+function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
+  if (!pk || typeof pk !== "object" || Array.isArray(pk)) return [result("-", "unresolved", "I7", "packet is not a JSON object", null, [{ need: "well_formed_packet", ref: "-" }])];
+  let bad = unsafeNumber(pk);
+  if (bad) return allUnresolved(pk, `number outside the I-JSON range at ${bad}`); // spec 12.1
+  bad = malformedReason(pk);
+  if (bad) return allUnresolved(pk, `malformed packet: ${bad}`); // spec 12.1 (v0.3)
+  const version = pk.amep_version ?? null;
+  if (![null, "0.2", "0.3"].includes(version)) return allUnresolved(pk, `unsupported amep_version ${JSON.stringify(version)}`); // spec 16
+  const v03 = version === "0.3";
+  // Object ids are unique within a packet (spec 5.2, v0.3): two objects with one id would let a receipt or a
+  // statement be read as evidence for the wrong one.
+  const seenIds = new Set();
+  for (const kind of ["mandates", "delegations", "intents", "interpretations", "invocations", "effects", "approvals", "findings", "call_statements"])
+    for (const o of pk[kind] || []) if (o && typeof o === "object" && "id" in o) {
+      if (seenIds.has(o.id)) return allUnresolved(pk, `malformed packet: duplicate object id ${JSON.stringify(o.id)}`);
+      seenIds.add(o.id);
+    }
+  // signature valid AND the signing key holds a role allowed for this object kind (spec 12.5), under the exact
+  // Ed25519 acceptance rule; AMEP 0.3 packets must use domain-separated (version 2) proofs
+  // spec 12.4: a key marked revoked, or used outside its nbf-exp interval, signs nothing. An object is placed in the
+  // key's interval by its own time (t, or executed.t); an object with no time of its own is checked for revocation only.
+  const keyStatusOk = (k, o) => {
+    if ("revoked" in k && k.revoked !== false) return false;
+    if (!("nbf" in k) && !("exp" in k)) return true;
+    const own = o.t !== undefined ? o.t : o.executed && typeof o.executed === "object" ? o.executed.t : undefined;
+    if (own === undefined) return true;
+    try {
+      const t = toTime(own);
+      if ("nbf" in k && t < toTime(k.nbf)) return false;
+      if ("exp" in k && t >= toTime(k.exp)) return false;
+      return true;
+    } catch { return false; }
+  };
   const verify = o => {
     if (!o || typeof o !== "object" || !o.proof || o.proof.alg !== "Ed25519") return false;
+    const pv = "v" in o.proof ? o.proof.v : 1;
+    if (![1, 2].includes(pv) || (v03 && pv !== 2)) return false;
     const k = keys[o.proof.kid]; if (!k || k.alg !== "Ed25519") return false;
     if (!(k.roles || []).some(r => (SIGNER_ROLES[o.kind] || []).includes(r))) return false;
+    if (!keyStatusOk(k, o)) return false;
+    if (!ed25519StrictOk(k.x, o.proof.sig)) return false;
     try { return sigOk(o, k); } catch { return false; }
   };
+  // spec 12.5 (v0.3): a key may name the operator that controls it. Two keys with the same operator are one party for
+  // observer independence (I10), whatever identifiers their records use.
+  const operatorOf = o => { const kid = o && o.proof ? o.proof.kid : undefined;
+    const k = typeof kid === "string" && Object.hasOwn(keys, kid) ? keys[kid] : null;
+    return k && typeof k.operator === "string" ? k.operator : null; };
+  // one party, for observer independence (I10): the same signing key, or keys of the same named operator (spec 12.5). The key
+  // matters, not the identifiers a record uses: a host that signs its own "not executed", or its own receipt, with its invocation
+  // key is the actor, whatever it puts in observed_by. Found by the exhaustive model check in formal/ (v0.3.2).
+  const kidOf = o => (o && typeof o === "object" && o.proof && typeof o.proof === "object" && typeof o.proof.kid === "string") ? o.proof.kid : null;
+  const sameOperator = (a, b) => { const ka = kidOf(a); if (ka !== null && ka === kidOf(b)) return true; const x = operatorOf(a); return x !== null && x === operatorOf(b); };
+  // spec 10.5.1 (v0.3): why a refused signature was refused, in a fixed order every verifier shares
+  const sigCause = o => {
+    if (!o || typeof o !== "object" || Array.isArray(o) || !o.proof || typeof o.proof !== "object" || Array.isArray(o.proof)) return "missing";
+    const kid = o.proof.kid;
+    const k = typeof kid === "string" && Object.hasOwn(keys, kid) ? keys[kid] : null;
+    if (!k || typeof k !== "object" || Array.isArray(k)) return "unknown_key";
+    const roles = Array.isArray(k.roles) ? k.roles.filter(r => typeof r === "string") : [];
+    if (!roles.some(r => (SIGNER_ROLES[o.kind] || []).includes(r))) return "role";
+    if (!keyStatusOk(k, o)) return "key_status";
+    return "invalid";
+  };
+  const firstCause = os => { const o = os.find(x => !verify(x)); return os.some(x => !verify(x)) ? sigCause(o) : undefined; };
   const objs = {};
+  const notes = new Map();   // per invocation: a note for a preserved result (spec 5.12.1)
+  // spec 5.11 (v0.3.3), from stafordtituss/amep#34: a principal's confirmation of a call shaped by untrusted or
+  // quarantined content is an approval (spec 5.10) signed by an approver key that lists, in `findings`, every finding the
+  // principal was shown. Like any approval it is bound to the executed effect and used once. The host's own
+  // principal_confirmed: true is the party being judged vouching for itself, so it never confirms on its own.
+  const principalConfirms = (inv, needed) => {
+    const ap = "approval_ref" in inv ? objs[inv.approval_ref] : undefined;
+    return !!ap && ap.kind === "approval" && verify(ap) && Array.isArray(ap.findings) && needed.every(f => ap.findings.includes(f));
+  };
   for (const kind of ["mandates", "delegations", "intents", "interpretations", "invocations", "effects", "approvals", "findings"])
     for (const o of pk[kind] || []) if (o && typeof o === "object" && "id" in o) objs[o.id] = o;
   const revocations = pk.revocations || [], statuses = pk.statuses || [], effects = pk.effects || [];
   const spent = { ...(state.spent || {}) };
+  const totals = new Map(Object.entries(state.period_totals || {}).map(([k, v]) => [k, amountUnits(v)]));
+  const priorWindows = new Set(totals.keys());
+  // spec 7.6 rule 6 (v0.3): holds for earlier invocations whose outcome was unknown. A packet that contains a held
+  // invocation decides it afresh, so its hold is set aside while this packet is evaluated, and never counted twice.
+  let heldIn, apprHeldIn, opsHeldIn, opsDoneIn;
+  try { heldIn = heldOf(state); apprHeldIn = approvalsHeldOf(state); opsHeldIn = operationsOf(state, "operations_held"); opsDoneIn = operationsOf(state, "operations_done"); }
+  catch (e) { return allUnresolved(pk, `malformed verifier state: ${e.message}`); }
+  const present = new Set();
+  for (const i of pk.invocations || []) { try { present.add(digest(i)); } catch { /* reported by its own evaluation */ } }
+  const held = Object.fromEntries(Object.entries(heldIn).filter(([d]) => !present.has(d))), newHeld = {};
+  // spec 5.10, held approvals (v0.3): approvals held for earlier invocations whose outcome is unknown; one held by an invocation
+  // in this packet is set aside, since this packet decides that invocation afresh
+  const apprHeld = Object.fromEntries(Object.entries(apprHeldIn).filter(([, h]) => !present.has(h.digest)));
+  // spec 5.8.1 (v0.3.2): an attempt recorded in state but present in this packet is decided afresh here
+  const opsHeld = Object.fromEntries(Object.entries(opsHeldIn).filter(([, h]) => !present.has(h.digest)));
+  const opsDone = Object.fromEntries(Object.entries(opsDoneIn).filter(([, h]) => !present.has(h.digest)));
   const approvalUse = Object.fromEntries(Object.entries(state.approvals_used || {}).map(([k, v]) => [k, [...v]]));
   let out = [];
   const invocations = pk.invocations || [];
@@ -274,90 +649,408 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     const id = inv.id ?? "?";
     try {
       const leaked = (inv.influenced_by || []).filter(f => quarantined.has(f) && n > quarantined.get(f));
-      check(leaked.length > 0 && !inv.principal_confirmed, "violated", "I4", `quarantined content reached the agent (${leaked.join(", ")})`);
-      evalInvocation(inv);
-      out.push({ id, outcome: "preserved", invariant: "-", reason: "continuity preserved" });
+      if (leaked.length > 0 && !principalConfirms(inv, leaked)) {
+        check(!!inv.principal_confirmed, "unresolved", "I4", `quarantined content reached the agent (${leaked.join(", ")}); only the host says the principal confirmed it`,
+          { need: "principal_confirmation", ref: id });
+        check(true, "violated", "I4", `quarantined content reached the agent (${leaked.join(", ")})`, { blame: "host" });
+      }
+      const why = evalInvocation(inv);
+      out.push(result(id, "preserved", "-", why || notes.get(id) || "continuity preserved"));
     } catch (e) {
-      if (e instanceof Stop) out.push({ id, outcome: e.outcome, invariant: e.invariant, reason: e.reason });
-      else out.push({ id, outcome: "unresolved", invariant: "I7", reason: `malformed evidence: ${e.message}` });
+      if (e instanceof Stop) out.push(result(id, e.outcome, e.invariant, e.reason, e.blame, e.gaps));
+      else out.push(result(id, "unresolved", "I7", `malformed evidence: ${e.message}`, null, [{ need: "well_formed_evidence", ref: String(id) }]));
     }
+    settle(inv);
+  }
+
+  // spec 5.8.1 (v0.3.2): commit a change to carried outcome state only on evidence that passed its checks. A receipt that
+  // verifies, from an observer that counts for this call (I10), makes the operation done; a verified, independent
+  // not_executed statement settles the attempt. Anything else, a rejected receipt or statement included, leaves the state
+  // this attempt carried in as it was. From Andrii Akhtanin's review (Radiolaria) on the OpenID AIIM list, 25 Nov 2026.
+  function settle(inv) {
+    let d; try { d = digest(inv); } catch { return; }
+    const id = inv.id;
+    const op = typeof inv.operation === "string" && inv.operation ? inv.operation : undefined;
+    const effect = inv.declared && typeof inv.declared === "object" ? inv.declared.effect : undefined;
+    const hi = CEILING.includes(effect) && CEILING.indexOf(effect) >= CEILING.indexOf("write_shared");
+    const counts = o => !hi || (Boolean(inv.actor) && o.observed_by !== inv.actor && !sameOperator(o, inv));
+    const bound = o => !("invocation_digest" in o) || o.invocation_digest === d;
+    const recs = effects.filter(e => e && typeof e === "object" && e.invocation === id);
+    const executed = recs.some(e => verify(e) && typeof e.observed_by === "string" && bound(e) && !(hi && e.assurance === "L0") && counts(e));
+    const notRun = !recs.length && (pk.call_statements || []).some(c => c && typeof c === "object" && c.invocation === id && verify(c)
+      && c.disposition === "not_executed" && c.effect_count === 0 && bound(c) && counts(c));
+    if (executed && op !== undefined) {
+      if (!Object.hasOwn(opsDone, op)) opsDone[op] = { invocation: id, digest: d };
+      if (Object.hasOwn(opsHeld, op) && opsHeld[op].invocation === id) delete opsHeld[op];
+    }
+    if (executed || notRun || !present.has(d)) return;
+    for (const [o, h] of Object.entries(opsHeldIn)) if (h.digest === d && !Object.hasOwn(opsDone, o) && !Object.hasOwn(opsHeld, o)) opsHeld[o] = h;
+    for (const [o, h] of Object.entries(opsDoneIn)) if (h.digest === d && !Object.hasOwn(opsDone, o)) opsDone[o] = h;
+    for (const [a, h] of Object.entries(apprHeldIn)) if (h.digest === d && !Object.hasOwn(apprHeld, a)) apprHeld[a] = h;
+    if (Object.hasOwn(heldIn, d) && !Object.hasOwn(newHeld, d) && !Object.hasOwn(held, d)) held[d] = heldIn[d];
+  }
+
+  // spec 8, I10 (v0.3.2): the actor's own record cannot establish that it stayed within authority, but it can establish
+  // that it did not. A receipt from the actor, or from a key of its own operator, showing it executed what it declared
+  // outside its authority is an admission: violated, charged to the actor. It never convicts another party, so a record
+  // in which the executed effect differs from the declared one stays unresolved, as does every other self-report.
+  function admission(e, inv, claims) {
+    const x = e.executed;
+    let ok, why;
+    const note = " (on the actor's own record; not independently observed)";
+    try {
+      if (!x || typeof x !== "object" || !withinDeclared(x, inv, v03)) return;
+      check(isGuardrail(x.resource, extraProtected), "violated", "I9", "executed effect targets guardrail/evidence store" + note, { blame: "agent" });
+      [ok, why] = effectOk(x, claims, v03);
+    } catch (err) {
+      if (err instanceof Stop) throw err;
+      return;
+    }
+    check(!ok, "violated", why.startsWith("released") ? "I5" : "I2", why + note, { blame: "agent" });
   }
 
   function evalInvocation(inv) {
     const id = inv.id, tInv = toTime(inv.t);
+    const op = "operation" in inv ? inv.operation : undefined;
+    check(op !== undefined && (typeof op !== "string" || op.length === 0 || op.length > MAX_NAME), "unresolved", "I7",
+      "operation must be a non-empty string", { need: "well_formed_evidence", ref: id });
     const chain = []; const seen = new Set(); let n = objs[inv.authority_ref];
     while (n && !seen.has(n.id)) { seen.add(n.id); chain.unshift(n); n = objs[n.parent]; }
-    check(!chain.length || chain[0].kind !== "mandate", "unresolved", "I7", "no root mandate");
+    check(!chain.length || chain[0].kind !== "mandate", "unresolved", "I7", "no root mandate", { need: "root_mandate", ref: inv.authority_ref ?? "-" });
     const interp = objs[inv.interpretation_ref];
     const needed = [...chain, inv, ...(interp ? [interp] : [])];
+    let intent = null;
     if ("intent_ref" in inv) {
-      const it = objs[inv.intent_ref];
-      check(!it || it.kind !== "intent", "unresolved", "I7", "cited intent not found");
-      needed.push(it);
+      intent = objs[inv.intent_ref];
+      check(!intent || intent.kind !== "intent", "unresolved", "I7", "cited intent not found", { need: "intent", ref: inv.intent_ref ?? "-" });
+      needed.push(intent);
     }
-    check(needed.some(o => !verify(o)), "unresolved", "I7", "missing or invalid signature, or signer lacks the role");
-    check((inv.derived_from || []).some(j => (order.get(j) ?? order.get(id)) >= order.get(id)), "unresolved", "I7", "lineage reference not found among earlier invocations");
-    check(!interp || !["curated", "customer"].includes(interp.source), "unresolved", "I3", "no approved interpretation");
+    check(needed.some(o => !verify(o)), "unresolved", "I7", "missing or invalid signature, or signer lacks the role", { need: "signature", ref: id, cause: firstCause(needed) });
+    check((inv.derived_from || []).some(j => (order.get(j) ?? order.get(id)) >= order.get(id)), "unresolved", "I7", "lineage reference not found among earlier invocations", { need: "lineage", ref: id });
+    // claim members (spec 16, v0.3): an unknown claim member may be a constraint this verifier cannot enforce, so it
+    // is never ignored. Limits are validated wherever they appear.
+    const nodes = [...chain, ...(intent ? [intent] : [])];
+    const limited = nodes.filter(x => "limits" in x.claims);
+    for (const x of limited) checkLimits(x.claims.limits);
+    // grants are an AMEP 0.3 member. Ignored, as v0.2 ignores unknown members, they could widen authority the
+    // producer meant to narrow, so an unversioned packet that uses them is malformed instead.
+    if (!v03) for (const x of nodes)
+      check("grants" in x.claims, "unresolved", "I7", `${x.id}: grants require amep_version 0.3`, { need: "well_formed_evidence", ref: x.id });
+    if (!v03) for (const x of nodes)
+      check("audiences" in x.claims, "unresolved", "I7", `${x.id}: audiences require amep_version 0.3`, { need: "well_formed_evidence", ref: x.id });
+    if (inv.declared && typeof inv.declared === "object" && "scope" in inv.declared) {
+      // declared.scope is an AMEP 0.3 member: ignored, it would turn a departure into a match.
+      check(!v03, "unresolved", "I7", `${id}: declared.scope requires amep_version 0.3`, { need: "well_formed_evidence", ref: id });
+      check(!scopeWellFormed(inv.declared.scope), "unresolved", "I7",
+        `${id}: declared.scope must be exactly {actions, resources}, each a non-empty list of patterns`, { need: "well_formed_evidence", ref: id });
+    }
+    if (v03 && "reserve" in inv) {
+      try { checkReserve(inv.reserve); }
+      catch (e) { if (!(e instanceof Malformed)) throw e; check(true, "unresolved", "I7", `${id}: ${e.message}`, { need: "reserve", ref: id }); }
+    }
+    if (v03) for (const x of nodes) {
+      let unknown = Object.keys(x.claims).filter(k => !CLAIM_MEMBERS.has(k) && !isExtensionMember(k)).sort();
+      check(unknown.length > 0, "unresolved", "I7", `${x.id}: claim member not understood (${unknown.join(", ")})`, { need: "verifier_support", ref: x.id });
+      if ("grants" in x.claims) {
+        const g = x.claims.grants;
+        const ok = Array.isArray(g) && g.length > 0 && !("actions" in x.claims) && !("resources" in x.claims)
+          && g.every(e => e && typeof e === "object" && !Array.isArray(e) && Object.keys(e).sort().join() === "actions,resources"
+            && ["actions", "resources"].every(k => Array.isArray(e[k]) && e[k].length > 0 && e[k].every(p => typeof p === "string")));
+        check(!ok, "unresolved", "I7", `${x.id}: grants must be a non-empty list of {actions, resources}, without actions or resources beside it`,
+          { need: "well_formed_evidence", ref: x.id });
+      }
+      if ("audiences" in x.claims) {
+        const au = x.claims.audiences;
+        check(!(Array.isArray(au) && au.length > 0 && au.every(p => typeof p === "string" && p.length > 0)), "unresolved", "I7",
+          `${x.id}: audiences must be a non-empty list of audience patterns`, { need: "well_formed_evidence", ref: x.id });
+      }
+      for (const lim of x.claims.limits || []) {
+        unknown = Object.keys(lim).filter(k => !LIMIT_MEMBERS.has(k) && !isExtensionMember(k)).sort();
+        check(unknown.length > 0, "unresolved", "I7", `${x.id}: limit member not understood (${unknown.join(", ")})`, { need: "verifier_support", ref: x.id });
+      }
+    }
+    check(!interp || !["curated", "customer"].includes(interp.source), "unresolved", "I3", "no approved interpretation", { need: "interpretation", ref: inv.interpretation_ref ?? "-" });
     const pinned = pk.pinned_adapters || {};
-    check(Object.keys(pinned).length > 0 && pinned[interp.adapter] !== interp.version, "unresolved", "I3", "adapter revision not approved (pin mismatch)");
-    for (let i = 1; i < chain.length; i++) { const [ok, why] = narrower(chain[i].claims, chain[i - 1].claims); check(!ok, "violated", "I1", `${chain[i].id}: ${why}`); }
-    // liveness (spec 5.12)
-    const ids = new Set(chain.map(c => c.id));
+    check(Object.keys(pinned).length > 0 && pinned[interp.adapter] !== interp.version, "unresolved", "I3", "adapter revision not approved (pin mismatch)", { need: "interpretation_pin", ref: inv.interpretation_ref ?? "-" });
+    for (let i = 1; i < chain.length; i++) {
+      const [ok, why] = narrower(chain[i].claims, chain[i - 1].claims, v03); check(!ok, "violated", "I1", `${chain[i].id}: ${why}`, { blame: "delegator" });
+      const lw = limitsNarrower(chain[i].claims, chain[i - 1].claims); check(!!lw, "violated", "I1", `${chain[i].id}: ${lw}`, { blame: "delegator" });
+    }
+    // liveness (spec 5.12), at the invocation and at each effect's own time. A revocation still inside the revoked
+    // node's declared propagation window is unresolved, not violated (spec 5.12.1, v0.3).
+    const ids = new Set(chain.map(c => c.id)), byId = new Map(chain.map(c => [c.id, c]));
     const revs = revocations.filter(r => ids.has(r.target));
-    check(revs.some(r => verify(r) && toTime(r.t) <= tInv), "violated", "I6", "ancestor revoked before invocation");
     const sts = statuses.filter(s => ids.has(s.target) && verify(s));
-    check(sts.some(s => s.revoked_at != null && toTime(s.revoked_at) <= tInv), "violated", "I6", "status shows ancestor revoked before invocation");
-    check(revs.some(r => !verify(r)), "unresolved", "I7", "unverifiable revocation on the chain");
-    for (const c of chain) if (c.revocation && c.revocation.status_ref)
-      check(!sts.some(s => s.target === c.id && toTime(s.as_of) >= tInv), "unresolved", "I7", `no signed revocation status for ${c.id} as of the invocation`);
-    check(isGuardrail(inv.declared.resource, extraProtected), "violated", "I9", "targets guardrail/evidence store");
+    const revokedAt = [...revs.filter(r => verify(r)).map(r => [toTime(r.t), r.target, "ancestor revoked"]),
+      ...sts.filter(s => s.revoked_at != null).map(s => [toTime(s.revoked_at), s.target, "status shows ancestor revoked"])]
+      .sort((a, b) => a[0] - b[0] || (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0) || (a[2] < b[2] ? -1 : a[2] > b[2] ? 1 : 0));
+    const liveness = (t, what) => {
+      for (const [rT, target, why] of revokedAt) if (rT <= t) {
+        const w = revocationWindow(byId.get(target));
+        // spec 5.12.1 (v0.3.3), from stafordtituss/amep#35: the window is part of the signed grant, so an action inside it
+        // is within the authority as granted. Nothing is missing, so the result isn't unresolved; the revocation is
+        // noted in the reason instead.
+        if (t < rT + w) {
+          if (!notes.has(id)) notes.set(id, `preserved inside the ${fmt(w)}s propagation window: ${why} ${fmt(t - rT)}s before ${what}`);
+          continue;
+        }
+        check(true, "violated", "I6", `${why} before ${what}`, { blame: "agent" });
+      }
+    };
+    const freshStatus = (t, what) => {
+      for (const c of chain) if (c.revocation && c.revocation.status_ref)
+        check(!sts.some(s => s.target === c.id && toTime(s.as_of) >= t), "unresolved", "I7", `no signed revocation status for ${c.id} as of ${what}`, { need: "revocation_status", ref: c.id });
+    };
+    liveness(tInv, "invocation");
+    check(revs.some(r => !verify(r)), "unresolved", "I7", "unverifiable revocation on the chain", { need: "revocation_signature", ref: id, cause: firstCause(revs) });
+    freshStatus(tInv, "the invocation");
+    check(isGuardrail(inv.declared.resource, extraProtected), "violated", "I9", "targets guardrail/evidence store", { blame: "agent" });
     // influence (spec 5.11): trusted only if the finding exists, is signed and is labelled trusted
     const mine = effects.filter(e => e.invocation === id);
     const untrusted = (inv.influenced_by || []).filter(f => !(objs[f] && verify(objs[f]) && objs[f].integrity_label === "trusted"));
-    check(untrusted.length > 0 && inv.declared.effect !== "read" && !inv.principal_confirmed, mine.length ? "violated" : "unresolved", "I4", "mutation shaped by untrusted content");
-    check(!mine.length, "unresolved", "I7", "no executed-effect receipt");
+    if (untrusted.length > 0 && inv.declared.effect !== "read" && !principalConfirms(inv, untrusted)) {
+      check(!!inv.principal_confirmed, "unresolved", "I4", "mutation shaped by untrusted content; only the host says the principal confirmed it",
+        { need: "principal_confirmation", ref: id });
+      check(true, mine.length ? "violated" : "unresolved", "I4", "mutation shaped by untrusted content", { blame: "agent", need: "principal_confirmation", ref: id });
+    }
+    // call statements (spec 5.14, v0.3): the observer's signed account of the whole call. It binds the call to this
+    // exact signed invocation and to the arguments the server received, says whether anything was executed, and how
+    // many receipts to expect, so that "no receipt" is no longer ambiguous.
+    const invDigest = digest(inv);
+    const stmts = (pk.call_statements || []).filter(c => c && typeof c === "object" && c.invocation === id);
+    for (const c of stmts) {
+      check(!verify(c), "unresolved", "I7", "call statement unsigned or signer lacks the role", { need: "call_statement_signature", ref: c.id ?? "?", cause: firstCause([c]) });
+      check(!DISPOSITIONS.includes(c.disposition), "unresolved", "I7", "call statement with an unknown disposition", { need: "call_statement", ref: c.id ?? "?" });
+      check(!Number.isInteger(c.effect_count) || c.effect_count < 0, "unresolved", "I7", "call statement effect_count must be a non-negative integer", { need: "call_statement", ref: c.id ?? "?" });
+      check(c.disposition === "not_executed" && c.effect_count !== 0, "unresolved", "I7", "call statement says not executed but counts effects", { need: "call_statement", ref: c.id ?? "?" });
+      check("invocation_digest" in c && c.invocation_digest !== invDigest, "unresolved", "I7", "call statement is bound to a different invocation (invocation_digest mismatch)", { need: "call_statement_binding", ref: c.id ?? "?" });
+    }
+    const notExecuted = stmts.some(c => c.disposition === "not_executed");
+    const sentArgs = inv.args_digest;
+    const rewritten = stmts.filter(c => sentArgs !== undefined && sentArgs !== null && "args_digest" in c && c.args_digest !== sentArgs);
+    check(rewritten.length > 0 && !notExecuted, "violated", "I2", "the arguments the server received differ from those the host signed (changed in transit)", { blame: "transport" });
+    check(rewritten.length > 0, "unresolved", "I7", "the arguments were changed in transit; the server executed nothing", { need: "unaltered_call", ref: id });
+    check(notExecuted && mine.length > 0, "violated", "I11", "effect receipts contradict a signed not_executed statement", { blame: "server" });
+    // An unknown outcome holds what the call could have used: its reserve against period limits (spec 7.6 rule 6), its
+    // approval (5.10) and its operation (5.8.1), until evidence another party can check shows what happened.
+    const holdUnknown = () => {
+      const reserve = v03 ? inv.reserve : undefined, amounts = {};
+      for (const node of limited) for (const lim of node.claims.limits)
+        if ("per_period" in lim && limitApplies(lim, inv.declared))
+          amounts[periodKey(node, lim, lim.unit, inv.t)] = reserve !== undefined && reserve.unit === lim.unit ? reserve.amount : null;
+      if (Object.keys(amounts).length) newHeld[invDigest] = { invocation: id, amounts };
+      // spec 5.10, held approvals (v0.3): the call may have run under its approval, so the approval is held for it until its
+      // outcome is known (from Takao Sato's VATE case 2)
+      const ref = inv.approval_ref;
+      if (typeof ref === "string" && !Object.hasOwn(apprHeld, ref)) apprHeld[ref] = { invocation: id, digest: invDigest };
+      // spec 5.8.1 (v0.3.2): likewise the operation, so a retry under fresh authorization can't take effect unnoticed
+      if (op !== undefined && !Object.hasOwn(opsHeld, op) && !Object.hasOwn(opsDone, op)) opsHeld[op] = { invocation: id, digest: invDigest };
+    };
+    if (!mine.length && notExecuted) {
+      // provably nothing was executed; for a high-impact call the statement must come from a party other than the actor (I10).
+      // A statement that fails that test shows nothing, so the outcome stays unknown and the holds stay (v0.3.2; a release
+      // must not rest on the word of the party that benefits from it, from Brennan Zambo's review of #24).
+      const hi = CEILING.indexOf(inv.declared.effect) >= CEILING.indexOf("write_shared");
+      const selfOnly = hi && stmts.filter(c => c.disposition === "not_executed").every(c => c.observed_by === inv.actor || sameOperator(c, inv));
+      if (selfOnly) holdUnknown();
+      check(selfOnly, "unresolved", "I10", "high-impact call reported not executed only by the actor itself, or by a key of the host's own operator", { need: "independent_observer", ref: id });
+      // say why it is preserved: nothing ran, on the observer's signed word, not "within authority"
+      const who = [...new Set(stmts.filter(c => c.disposition === "not_executed").map(c => String(c.observed_by)))].sort().join(", ");
+      return `nothing executed: ${who} signed a not_executed call statement`;
+    }
+    // effect receipts. With none and no not_executed statement, the call may still have moved value: hold its reserve (or
+    // an unknown amount) against every period limit on its chain that applies to it (spec 7.6 rule 6).
+    if (!mine.length) holdUnknown();
+    check(!mine.length, "unresolved", "I7", "no executed-effect receipt", { need: "receipt", ref: id });
+    // spec 5.8.1 (v0.3.2): an earlier attempt at this operation that took effect. Recording this attempt as done is left
+    // to settle(), after this evaluation, and only on a receipt that passes its checks.
+    const opPrev = op !== undefined && Object.hasOwn(opsDone, op) ? opsDone[op] : null;
     const highImpact = CEILING.indexOf(inv.declared.effect) >= CEILING.indexOf("write_shared");
-    let claims = chain[0].claims; for (const c of chain.slice(1)) claims = meet(c.claims, claims);
-    if ("intent_ref" in inv) claims = meet(objs[inv.intent_ref].claims, claims);
+    let claims = chain[0].claims; for (const c of chain.slice(1)) claims = meet(c.claims, claims, v03);
+    if (intent) claims = meet(intent.claims, claims, v03);
     const ap = "approval_ref" in inv ? objs[inv.approval_ref] : undefined;
-    const bodies = new Map();
+    const byObserver = new Map();   // observer -> effect identity digest -> its receipts, in packet order
     for (const e of mine) {
-      check(!verify(e), "unresolved", "I7", "effect receipt unsigned or signer lacks the role");
+      check(!verify(e), "unresolved", "I7", "effect receipt unsigned or signer lacks the role", { need: "receipt_signature", ref: e.id ?? "?", cause: firstCause([e]) });
+      check(typeof e.observed_by !== "string", "unresolved", "I7", `receipt ${e.id ?? "?"} names no observer`, { need: "receipt_observer", ref: e.id ?? "?" });
+      check("invocation_digest" in e && e.invocation_digest !== invDigest, "unresolved", "I7", `receipt ${e.id ?? "?"} is bound to a different invocation (invocation_digest mismatch)`, { need: "receipt_binding", ref: e.id ?? "?" });
       if (highImpact) {
-        check(!inv.actor, "unresolved", "I10", "actor not recorded; observer independence cannot be shown");
-        check(e.observed_by === inv.actor || e.assurance === "L0", "unresolved", "I10", "high-impact effect only self-reported");
+        check(!inv.actor, "unresolved", "I10", "actor not recorded; observer independence cannot be shown", { need: "actor", ref: id });
+        if (e.observed_by === inv.actor || sameOperator(e, inv)) admission(e, inv, claims);
+        check(e.observed_by === inv.actor || e.assurance === "L0", "unresolved", "I10", "high-impact effect only self-reported", { need: "independent_observer", ref: e.id ?? "?" });
+        check(sameOperator(e, inv), "unresolved", "I10", "high-impact effect observed only by a key of the host's own operator", { need: "independent_observer", ref: e.id ?? "?" });
       }
       const x = e.executed;
-      if ("mediated" in inv) check(canon(x) !== canon(inv.mediated), "violated", "I2", "executed differs from mediated effect");
-      else check(x.action !== inv.declared.action || x.resource !== inv.declared.resource, "violated", "I2", "declared != executed");
-      check(isGuardrail(x.resource, extraProtected), "violated", "I9", "executed effect targets guardrail/evidence store");
-      const [ok, why] = effectOk(x, claims);
-      check(!ok, "violated", why.startsWith("released") ? "I5" : "I2", why);
+      // liveness at each effect's own time (spec 8 I6, v0.3): authority must still be in force when the effect occurs,
+      // not only when it was invoked. Proposed by Cliff Singletary on audit@ietf.org, 19 Nov 2026.
+      liveness(toTime(x.t), `effect ${e.id ?? "?"}`);
+      freshStatus(toTime(x.t), `effect ${e.id ?? "?"}`);
+      if ("mediated" in inv) check(canon(x) !== canon(inv.mediated), "violated", "I2", "executed differs from mediated effect", { blame: "server" });
+      else check(!withinDeclared(x, inv, v03), "violated", "I2",
+        v03 && "scope" in inv.declared ? "executed outside the call's declared scope" : "declared != executed", { blame: "server" });
+      check(isGuardrail(x.resource, extraProtected), "violated", "I9", "executed effect targets guardrail/evidence store", { blame: "agent" });
+      const [ok, why] = effectOk(x, claims, v03);
+      check(!ok, "violated", why.startsWith("released") ? "I5" : "I2", why, { blame: "agent" });
+      // spec 5.3 (v0.3.2): where the claims name audiences, the receipt must say where the effect was sent
+      check("audiences" in claims && !(typeof x.audience === "string" && x.audience.length > 0), "unresolved", "I7",
+        `receipt ${e.id ?? "?"} does not record the audience the claims are bound to`, { need: "audience", ref: e.id ?? "?" });
       // spec 5.9.1: data classes carried in through lineage (or read by this effect) reach the recipient too
       if ("recipient" in x) {
         const inherited = new Set(x.accessed || []);
         for (const j of inv.derived_from || []) for (const c of taint.get(j) || []) inherited.add(c);
         const leaked = [...inherited].map(c => `${c}->${x.recipient}`).filter(f => !(claims.data || []).includes(f)).sort();
-        check(leaked.length > 0, "violated", "I5", `derived data released: ${leaked.join(", ")}`);
+        check(leaked.length > 0, "violated", "I5", `derived data released: ${leaked.join(", ")}`, { blame: "agent" });
       }
-      const d = approvalDigest(x); if (!bodies.has(d)) bodies.set(d, x);
+      if ("value" in x) { // validate wherever present, so a malformed amount is never silently ignored
+        const v = x.value;
+        check(!v || typeof v !== "object" || Array.isArray(v), "unresolved", "I7", "value must be an object", { need: "value", ref: e.id ?? "?" });
+        unitOf(v.unit); amountUnits(v.amount, v.unit); periodSpentOf(v, v.unit);
+      }
+      const d = approvalDigest(x);
+      if (!byObserver.has(e.observed_by)) byObserver.set(e.observed_by, new Map());
+      const m = byObserver.get(e.observed_by); if (!m.has(d)) m.set(d, []); m.get(d).push(e);
+    }
+    // spec 10.2 (v0.3): the same effect recorded by several observers counts once, but within one observer every receipt
+    // is its own effect. An effect occurs as often as the most any one observer recorded it, taken from that observer's
+    // receipts. Raised by Carlos Vendrell Felici (stafordtituss/amep#10): two identical payments in one call counted as one.
+    const effectsOf = [];   // [executed body, identity digest, observer]
+    const digests = [...new Set([...byObserver.values()].flatMap(m => [...m.keys()]))];
+    for (const d of digests) {
+      const holders = [...byObserver.keys()].filter(o => byObserver.get(o).has(d)).sort();
+      let obs = holders[0];
+      for (const o of holders) if (byObserver.get(o).get(d).length > byObserver.get(obs).get(d).length) obs = o;
+      for (const e of byObserver.get(obs).get(d)) effectsOf.push([e.executed, d, obs]);
+    }
+    const bodies = new Map(effectsOf.map(([x, d]) => [d, x]));
+    // spec 5.8.1 (v0.3.2): one operation takes effect at most once, checked as soon as this call's receipts have verified and
+    // before any check that can only hold, so no hold hides the second effect (found by the model check in formal/)
+    check(opPrev !== null && opPrev.invocation !== id, "violated", "I2", `operation ${op} already took effect under ${opPrev?.invocation}: executed twice`, { blame: "agent" });
+    // every receipt a statement promises must be present, and no more (spec 5.14)
+    for (const c of stmts) {
+      const k = mine.filter(e => e.observed_by === c.observed_by).length;
+      check(k > c.effect_count, "violated", "I7", `${k} receipts from ${c.observed_by} but its call statement counts ${c.effect_count}`, { blame: "server" });
+      check(k < c.effect_count, "unresolved", "I7", `call statement promises ${c.effect_count} receipts from ${c.observed_by}, ${k} present (lost or withheld)`, { need: "receipt", ref: id });
     }
     if ("approval_ref" in inv) {
-      check(!ap || !verify(ap), "unresolved", "I7", "approval missing, unsigned or not signed by an approver");
+      check(!ap || !verify(ap), "unresolved", "I7", "approval missing, unsigned or not signed by an approver", { need: "approval", ref: inv.approval_ref ?? "-" });
+      // An operation approval (spec 5.10, v0.3) lists the digests of the effects of one call instead of one digest.
+      // From Takao Sato's VATE case 1 (openid/authzen#795): one admission covering an operation that writes two files.
+      const listed = "effect_digests" in ap ? ap.effect_digests : null;
+      let opUse = null;
+      if ("effect_digests" in ap) {
+        check("effect_digest" in ap || !Array.isArray(listed) || !listed.length || !listed.every(x => typeof x === "string" && /^[0-9a-f]{64}$/.test(x)),
+          "unresolved", "I7", "an operation approval needs a non-empty effect_digests list of digests, and no effect_digest",
+          { need: "approval", ref: ap.id ?? "?" });
+        opUse = "set:" + sha256Hex(canon([...listed].sort()));
+      } else { // neither form: malformed (spec 5.10), the same result in every verifier
+        check(!("effect_digest" in ap), "unresolved", "I7", "approval has no effect_digest or effect_digests",
+          { need: "approval", ref: ap.id ?? "?" });
+      }
       for (const [d, x] of bodies) {
-        check(ap.effect_digest !== d, "violated", "I8", "approval not bound to the executed effect");
-        check(!!ap.consumed, "violated", "I8", "approval already consumed");
-        check("expiry" in ap && toTime(ap.expiry) < Math.max(tInv, toTime(x.t)), "violated", "I8", "approval expired");
-        check("nbf" in ap && toTime(ap.nbf) > tInv, "violated", "I8", "approval not yet valid");
-        const first = approvalUse[ap.id] ??= [id, d];
-        check(first[0] !== id || first[1] !== d, "violated", "I8", `approval already used by ${first[0]}`);
+        const nExec = effectsOf.filter(([, dd]) => dd === d).length;
+        if (listed === null) {
+          check(ap.effect_digest !== d, "violated", "I8", "approval not bound to the executed effect", { blame: "agent" });
+          check(nExec > 1, "violated", "I8", `one approval, but the approved effect was executed ${nExec} times`, { blame: "agent" });
+        } else {
+          const nOk = listed.filter(y => y === d).length;
+          check(nExec > nOk, "violated", "I8", nOk === 0 ? "the operation approval does not cover the executed effect"
+            : `the operation approval covers this effect ${nOk} time(s), but it was executed ${nExec} times`, { blame: "agent" });
+        }
+        check(!!ap.consumed, "violated", "I8", "approval already consumed", { blame: "agent" });
+        check("expiry" in ap && toTime(ap.expiry) < Math.max(tInv, toTime(x.t)), "violated", "I8", "approval expired", { blame: "agent" });
+        check("nbf" in ap && toTime(ap.nbf) > tInv, "violated", "I8", "approval not yet valid", { blame: "agent" });
+      }
+      // single use first: an approval another call already used is a violation, whatever holds it (spec 5.10)
+      for (const d of bodies.keys()) {
+        const use = listed === null ? d : opUse;
+        const first = approvalUse[ap.id] ?? [id, use];
+        check(first[0] !== id || first[1] !== use, "violated", "I8", `approval already used by ${first[0]}`, { blame: "agent" });
+      }
+      // spec 5.10, held approvals: after every check that decides violated, so a hold never hides a violation (the single-use
+      // check used to come after it, so a hold placed after the approval's first use hid a double use; found by formal/)
+      // this call's receipts show it used the approval, held or not: record the use first, so a third call is a double use
+      for (const d of bodies.keys()) approvalUse[ap.id] ??= [id, listed === null ? d : opUse];
+      const holder = Object.hasOwn(apprHeld, ap.id) && bodies.size ? apprHeld[ap.id] : null;
+      check(holder !== null && holder.invocation !== id, "unresolved", "I7",
+        `approval ${ap.id} is held for ${holder?.invocation}, whose outcome is unknown`, { need: "held_outcome", ref: holder?.invocation });
+    }
+    // quantity limits (spec 7.6, v0.3), on every node of the chain and on the intent. An approval that passed I8
+    // authorizes going over a limit; the amount still counts toward the period total. Every applicable limit is checked
+    // before the result is decided, and a violation beats an unresolved check, so the verdict doesn't depend on the
+    // order the limits are listed in (amep#10, vendrell46).
+    const deferred = [];
+    const defer = f => { try { f(); } catch (e) { if (e instanceof Stop) deferred.push(e); else throw e; } };
+    for (const node of limited) {
+      const callSum = new Map();   // limit index -> amount moved by this call so far
+      for (const [x, , obs] of effectsOf) {
+        const applicable = node.claims.limits.map((lim, i) => [i, lim]).filter(([, lim]) => limitApplies(lim, x));
+        if (!applicable.length) continue;
+        let v, unit, amt, matching, ok = false;
+        defer(() => {
+          v = x.value;
+          check(v === undefined, "unresolved", "I7", `${node.id} limits this effect but the receipt records no value`, { need: "value", ref: node.id });
+          unit = v.unit; amt = amountUnits(v.amount, unit);
+          matching = applicable.filter(([, lim]) => lim.unit === unit);
+          if (!matching.length) {
+            const money = MONEY_UNITS.some(m => unit.startsWith(m)) || x.effect === "financial";
+            check(money, "violated", "I2", `${unit} is not an asset ${node.id} authorizes`, { blame: "agent" });
+            check(true, "unresolved", "I7", `${node.id} limits this effect in another unit than ${unit}`, { need: "value", ref: node.id });
+          }
+          ok = true;
+        });
+        if (!ok) continue;
+        for (const [i, lim] of matching) defer(() => checkLimit(node, i, lim, x, v, unit, amt, obs, callSum));
       }
     }
-    const c = [...bodies.values()].reduce((s, x) => s + cost(x), 0);
-    check("budget_spent" in inv && inv.budget_spent !== c, "violated", "I7", "recorded budget spend does not match receipts");
+    for (const o of ["violated", "unresolved"]) { const d = deferred.find(e => e.outcome === o); if (d) throw d; }
+    // One applicable limit of node for one effect x (spec 7.6 rules 3 to 6). Throws Stop on the first failed check.
+    function checkLimit(node, i, lim, x, v, unit, amt, obs, callSum) {
+      check("per_effect" in lim && amt > amountUnits(lim.per_effect) && !ap, "violated", "I2",
+        `amount ${v.amount} ${unit} exceeds the per-effect limit ${lim.per_effect} of ${node.id}`, { blame: "agent" });
+      callSum.set(i, (callSum.get(i) ?? 0n) + amt);
+      check("per_call" in lim && callSum.get(i) > amountUnits(lim.per_call) && !ap, "violated", "I2",
+        `this call moves ${unitsStr(callSum.get(i))} ${unit}, over the per-call limit ${lim.per_call} of ${node.id}`, { blame: "agent" });
+      if (!("per_period" in lim)) return;
+      const key = periodKey(node, lim, unit, x.t), start = windowStart(node, lim, x.t);
+      let total = (totals.get(key) ?? 0n) + amt;
+      // An observer's total is the principal's total only when that observer sees all of this node's spending in the
+      // unit (the limit names it in counted_by, amep#10), and only for this limit's own window: the figure must say the
+      // window starts where the limit's does (amep#10, vendrell46). Other figures never count.
+      const entry = lim.counted_by === obs ? periodSpentOf(v, unit).get(String(lim.period)) : undefined;
+      const counted = entry !== undefined && entry[0] !== null && entry[0] === start ? entry[1] : undefined;
+      if (counted !== undefined) {
+        check(counted < total, "violated", "I7", `${obs}'s period total ${unitsStr(counted)} ${unit} is below the payments recorded for ${node.id}`, { blame: "server" });
+        total = counted;
+      }
+      check(total > amountUnits(lim.per_period) && !ap, "violated", "I2",
+        `period total ${unitsStr(total)} ${unit} exceeds the per-period limit ${lim.per_period} of ${node.id}`, { blame: "agent" });
+      check(counted === undefined && !priorWindows.has(key), "unresolved", "I7",
+        `period total for ${node.id} cannot be established: no total from its counting observer for this window and no earlier state`, { need: "period_total", ref: node.id });
+      // holds (spec 7.6 rule 6): an earlier call with an unknown outcome may already have spent part of this window. An
+      // approval that passed I8 authorizes going over the limit for its effect, so holds don't block it.
+      const holds = Object.values(held).filter(h => key in h.amounts).map(h => [h.invocation, h.amounts[key]]);
+      if (holds.length && !ap) {
+        const unknown = holds.filter(([, a]) => a === null).map(([h]) => h);
+        check(unknown.length > 0, "unresolved", "I7",
+          `the outcome of ${unknown[0] ?? ""} is unknown, so the period total of ${node.id} cannot be bounded`,
+          { need: "held_outcome", ref: unknown[0] ?? "-" });
+        const heldSum = holds.reduce((s, [, a]) => s + amountUnits(a, unit), 0n);
+        check(total + heldSum > amountUnits(lim.per_period), "unresolved", "I7",
+          `period total ${unitsStr(total)} ${unit} plus ${unitsStr(heldSum)} held for ${holds.map(([h]) => h).join(", ")} would exceed the per-period limit ${lim.per_period} of ${node.id}`,
+          { need: "held_outcome", ref: holds[0][0] });
+      }
+      totals.set(key, total);
+    }
+    const c = effectsOf.reduce((s, [x]) => s + cost(x), 0);
+    check("budget_spent" in inv && inv.budget_spent !== c, "violated", "I7", "recorded budget spend does not match receipts", { blame: "host" });
     const over = chain.find(n => "budget" in n.claims && (spent[n.id] || 0) + c > n.claims.budget);
-    check(!!over && !ap, "violated", "I2", `risk budget of ${over && over.id} exceeded without approval`);
+    check(!!over && !ap, "violated", "I2", `risk budget of ${over && over.id} exceeded without approval`, { blame: "agent" });
     for (const n of chain) spent[n.id] = (spent[n.id] || 0) + c;
+    // spec 5.8.1 (v0.3.2), after every other check: an attempt whose operation is held for an earlier attempt with an
+    // unknown outcome is held too, whatever authorization it carries
+    const opHolder = op !== undefined && Object.hasOwn(opsHeld, op) ? opsHeld[op] : null;
+    check(opHolder !== null && opHolder.invocation !== id, "unresolved", "I7",
+      `operation ${op} is held for ${opHolder?.invocation}, whose outcome is unknown`, { need: "held_outcome", ref: opHolder?.invocation });
   }
 
   // spec 10.3 decision reconciliation: only PRE-execution decisions can be contradicted or confirm a block
@@ -365,21 +1058,46 @@ function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   for (const d of decisions) {
     if (!["deny", "hold"].includes(d.mode) || d.phase !== "pre_execution") continue;
     const en = d.enforcement || {};
-    if (effInv.has(d.invocation)) { out = out.filter(r => r.id !== d.invocation); out.push({ id: d.invocation, outcome: "violated", invariant: "I11", reason: "effect despite deny" }); }
-    else if (en.fail_mode === "closed" || en.applied === "confirmed") { out = out.filter(r => r.id !== d.invocation); out.push({ id: d.invocation, outcome: "preserved", invariant: "-", reason: "denied; no effect" }); }
+    if (effInv.has(d.invocation)) { out = out.filter(r => r.id !== d.invocation); out.push(result(d.invocation, "violated", "I11", "effect despite deny", "host")); }
+    else if (en.fail_mode === "closed" || en.applied === "confirmed") {
+      // both fields are declared by the host that signed the deny, so they never settle "nothing executed": only a
+      // not_executed statement from an observer does, which the call's own evaluation already honours. They change
+      // nothing for read and write_local; for a high-impact call, the missing independent record is named (I10).
+      const inv = (pk.invocations || []).find(i => i.id === d.invocation);
+      const low = !!inv && ["read", "write_local"].includes((inv.declared || {}).effect);
+      const cur = out.find(r => r.id === d.invocation);
+      if (inv && !low) {
+        if (cur && cur.outcome === "unresolved") {
+          out = out.filter(r => r.id !== d.invocation);
+          out.push(result(d.invocation, "unresolved", "I10", "denied, but only the host says it held; a high-impact call needs an independent not_executed statement",
+            null, [{ need: "independent_observer", ref: String(d.invocation) }]));
+        }
+      }
+    }
   }
   // spec 10.4 orphan effects
   const invIds = new Set((pk.invocations || []).map(i => i.id));
-  for (const e of effects) if (!invIds.has(e.invocation)) out.push({ id: e.id ?? "?", outcome: "violated", invariant: "I11", reason: "effect without any authorized invocation (bypass)" });
+  // spec 10.4 (v0.3.3), from stafordtituss/amep#36: an invocation missing from this packet may have been left out by
+  // whoever assembled it. AMEP can't assume the packet is complete (LIMITS.md, section A), so absence is a missing
+  // record, not proof of a bypass, and no party is blamed for it.
+  for (const e of effects) if (!invIds.has(e.invocation))
+    out.push(result(e.id ?? "?", "unresolved", "I11", `effect names invocation ${e.invocation}, which is not in this packet: a bypass, or a packet that left it out`,
+      null, [{ need: "invocation", ref: e.invocation != null ? String(e.invocation) : "-" }]));
   state.spent = spent;
   state.approvals_used = approvalUse;
+  if (totals.size) state.period_totals = Object.fromEntries([...totals].map(([k, v]) => [k, unitsStr(v)]));
+  if (Object.keys(apprHeld).length || "approvals_held" in state) state.approvals_held = apprHeld;
+  if (Object.keys(opsHeld).length || "operations_held" in state) state.operations_held = opsHeld;
+  if (Object.keys(opsDone).length || "operations_done" in state) state.operations_done = opsDone;
+  const heldOut = { ...held, ...newHeld };
+  if (Object.keys(heldOut).length || "held" in state) state.held = heldOut;
   return out;
 }
 
 // spec 10.5
 function verdict(results) {
   for (const o of ["violated", "unresolved"]) { const r = results.find(x => x.outcome === o); if (r) return r; }
-  return results[0] || { id: "-", outcome: "unresolved", invariant: "I7", reason: "empty packet" };
+  return results[0] || result("-", "unresolved", "I7", "empty packet", null, [{ need: "invocation", ref: "-" }]);
 }
 
 const DATA = JSON.parse(document.getElementById("amep-data").textContent);
@@ -395,7 +1113,7 @@ async function precompute(packet, keys) {
     if (!k || k.alg !== "Ed25519" || o.proof.alg !== "Ed25519") { cache.set(o, false); continue; }
     try {
       imported[k.kid] ??= await crypto.subtle.importKey("raw", hex(k.x), { name: "Ed25519" }, false, ["verify"]);
-      cache.set(o, await crypto.subtle.verify({ name: "Ed25519" }, imported[k.kid], hex(o.proof.sig), enc.encode(canon(stripProof(o)))));
+      cache.set(o, await crypto.subtle.verify({ name: "Ed25519" }, imported[k.kid], hex(o.proof.sig), enc.encode(signingInput(o))));
     } catch { cache.set(o, false); }
   }
   return (o) => cache.get(o) === true;
@@ -411,7 +1129,9 @@ async function ed25519Supported() {
 document.getElementById("run-suite").onclick = async () => {
   const body = document.querySelector("#suite-table tbody"); body.innerHTML = ""; let ok = 0;
   for (const v of DATA.suite) {
-    const r = verdict(await run(v.packet, DATA.keys, v.state));
+    let pk = v.packet, r;
+    if (v.packet_text !== undefined) { try { pk = parseStrict(v.packet_text); } catch (e) { r = { outcome: "unresolved", invariant: "I7", reason: "malformed packet text: " + e.message }; } }
+    r ??= verdict(await run(pk, DATA.keys, v.state));
     const pass = r.outcome === v.expect.outcome && r.invariant === v.expect.invariant; ok += pass;
     body.insertAdjacentHTML("beforeend", "<tr><td><code>" + esc(v.file) + "</code></td><td>" + pill(v.expect.outcome) + " " + esc(v.expect.invariant) +
       "</td><td>" + pill(r.outcome) + " " + esc(r.invariant) + (pass ? "" : " ✗") + "</td><td>" + esc(r.reason) + "</td></tr>");
@@ -421,7 +1141,7 @@ document.getElementById("run-suite").onclick = async () => {
 };
 
 document.getElementById("load-example").onclick = () => {
-  const v = DATA.suite.find(v => v.file.includes("revoked-root-with-live-child") || v.file.includes("root-revoked-before-action")) || DATA.suite[0];
+  const v = DATA.suite.find(v => v.file.includes("revoked-root-with-live-child") || v.file.includes("root-revoked-before-action")) || DATA.suite.find(v => v.packet);
   document.getElementById("packet").value = JSON.stringify(v.packet, null, 2);
   document.getElementById("keys").value = JSON.stringify(DATA.keys, null, 2);
 };
@@ -429,8 +1149,11 @@ document.getElementById("load-example").onclick = () => {
 document.getElementById("run-packet").onclick = async () => {
   const summary = document.getElementById("packet-summary"), table = document.getElementById("packet-table");
   let packet, keys;
-  try { packet = JSON.parse(document.getElementById("packet").value); keys = JSON.parse(document.getElementById("keys").value); }
-  catch (e) { summary.textContent = "Not valid JSON: " + e.message; table.hidden = true; return; }
+  try { keys = JSON.parse(document.getElementById("keys").value); }
+  catch (e) { summary.textContent = "Keys are not valid JSON: " + e.message; table.hidden = true; return; }
+  // the packet is parsed strictly (spec 12.1): duplicate member names and inexact number literals are malformed
+  try { packet = parseStrict(document.getElementById("packet").value); }
+  catch (e) { summary.innerHTML = "Packet verdict: " + pill("unresolved") + " I7 (malformed packet text: " + esc(e.message) + ")"; table.hidden = true; return; }
   const res = await run(packet, keys), v = verdict(res);
   table.querySelector("tbody").innerHTML = res.map(r => "<tr><td><code>" + esc(r.id) + "</code></td><td>" + pill(r.outcome) + "</td><td>" + esc(r.invariant) + "</td><td>" + esc(r.reason) + "</td></tr>").join("");
   table.hidden = false;

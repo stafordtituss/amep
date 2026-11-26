@@ -147,14 +147,30 @@ def vectors():
     add("two-hop chain within bounds", ("preserved", "-"), lambda p, I, H, O, X: (
         p["delegations"].append(I.sign({"id": "d-2", "kind": "delegation", "parent": "d-1", "claims": {"actions": ["fs.write"], "resources": ["repo:app/src/*"], "data": ["source->internal"], "ceiling": "write_local", "exp": 80, "depth": 0}})),
         p.update(invocations=[H.sign({**p["invocations"][0], "authority_ref": "d-2"})])))
-    add("influence confirmed by principal", ("preserved", "-"), lambda p, I, H, O, X: p.update(invocations=[H.sign({**p["invocations"][0], "influenced_by": ["f-1"], "principal_confirmed": True})]))
+    # Principal confirmation (spec 5.11, v0.3.3), from tclancy's review (stafordtituss/amep#34): the confirmation is an
+    # approval signed by the principal's approver key that names the findings shown, bound to the executed effect.
+    # A host-signed principal_confirmed: true on its own leaves the call unresolved, never cleared.
+    def influenced(p, H, **kw):
+        p.update(invocations=[H.sign({**p["invocations"][0], "influenced_by": ["f-1"], **kw})])
+    def confirmed(p, I, H, signer=None, findings=("f-1",)):
+        influenced(p, H, principal_confirmed=True)
+        ap = {"id": "ap-c", "kind": "approval", "effect_digest": approval_digest(p["effects"][0]["executed"]),
+              "presence": "webauthn", "findings": list(findings)}
+        p.update(approvals=[(signer or I).sign(ap)],
+                 invocations=[H.sign({**{k: v for k, v in p["invocations"][0].items() if k != "proof"}, "approval_ref": "ap-c"})])
+    add("influence confirmed by principal", ("preserved", "-"), lambda p, I, H, O, X: confirmed(p, I, H))
+    add("influence confirmed only by the host's flag", ("unresolved", "I4"), lambda p, I, H, O, X: influenced(p, H, principal_confirmed=True))
+    add("principal confirmation that does not name the finding", ("unresolved", "I4"), lambda p, I, H, O, X: confirmed(p, I, H, findings=("f-2",)))
+    add("principal confirmation signed by a host key", ("unresolved", "I4"), lambda p, I, H, O, X: confirmed(p, I, H, signer=H))
     add("influenced read-only action", ("preserved", "-"), lambda p, I, H, O, X: (
         p.update(invocations=[H.sign({**p["invocations"][0], "influenced_by": ["f-1"], "declared": {"action": "fs.read", "resource": "repo:app/src/auth.ts", "effect": "read"}})]),
         p.update(delegations=[I.sign({**p["delegations"][0], "claims": claims_of(p, "delegations", actions=["fs.write", "fs.read"])})]),
         p.update(effects=[O.sign({**p["effects"][0], "executed": {**p["effects"][0]["executed"], "action": "fs.read", "effect": "read"}})])))
     add("mediated effect not honored", ("violated", "I2"), lambda p, I, H, O, X: p.update(invocations=[H.sign({**p["invocations"][0], "mediated": {**p["effects"][0]["executed"], "resource": "repo:app/src/build/x"}})]))
     add("self-reported high-impact effect", ("unresolved", "I10"), lambda p, *a: high_impact(p, observed_by="agent:assistant-1", assurance="L0"))
-    add("bypass: effect without invocation", ("violated", "I11"), lambda p, I, H, O, X: p["effects"].append(O.sign({"id": "e-9", "kind": "effect", "invocation": "i-404", "observed_by": "provider:github", "assurance": "L3",
+    # From tclancy's review (stafordtituss/amep#36): an invocation missing from the packet may have been left out by its
+    # assembler, so the effect is unresolved (need invocation), with no one blamed (spec 10.4, v0.3.3).
+    add("bypass: effect without invocation", ("unresolved", "I11"), lambda p, I, H, O, X: p["effects"].append(O.sign({"id": "e-9", "kind": "effect", "invocation": "i-404", "observed_by": "provider:github", "assurance": "L3",
         "executed": {"action": "fs.delete", "resource": "repo:app/main", "effect": "destructive", "released": [], "t": 12}})))
 
     # risk budget; base effect = write_local, not reversible -> 3 points
@@ -271,7 +287,7 @@ def vectors():
     add("simulated deny is not enforcement", ("preserved", "-"), lambda p, I, H, O, X:
         p.update(decisions=[decision(H, "cd-5", phase="simulation")]))
     # A6: an audit log reveals an unknown agent's read; detection must not read as mediation
-    add("audit-only discovery of an unknown agent (A6)", ("violated", "I11"), lambda p, I, H, O, X: (
+    add("audit-only discovery of an unknown agent (A6)", ("unresolved", "I11"), lambda p, I, H, O, X: (
         p["effects"].append(O.sign({"id": "e-6", "kind": "effect", "invocation": "unknown:audit-7731", "observed_by": "provider:ehr", "assurance": "L3",
             "executed": {"action": "saas.read", "resource": "ehr:patient/991", "effect": "read", "released": ["phi->internal"], "t": 30}})),
         p.update(decisions=[decision(H, "cd-6", mode="observe", phase="post_execution", inv="unknown:audit-7731", reason="detected after execution from provider audit log")])))
@@ -285,13 +301,20 @@ def vectors():
         later = {**p["invocations"][0], "id": "i-2", "t": 20, "influenced_by": ["f-1"],
                  "declared": {"action": "fs.read", "resource": "repo:app/src/auth.ts", "effect": "read"}}
         if confirmed: later["principal_confirmed"] = True
+        approvals = []
+        if confirmed == "signed":   # the principal's own confirmation, bound to the effect of i-2 (spec 5.11, v0.3.3)
+            later["approval_ref"] = "ap-q"
+            approvals = [I.sign({"id": "ap-q", "kind": "approval", "presence": "webauthn", "findings": ["f-1"],
+                                 "effect_digest": approval_digest({"action": "fs.read", "resource": "repo:app/src/auth.ts", "effect": "read", "released": [], "t": 21})})]
+        if approvals: p["approvals"] = approvals
         p.update(findings=[untrusted(H)], invocations=[read, H.sign(later)],
                  effects=[O.sign({**p["effects"][0], "executed": {"action": "fs.read", "resource": "repo:app/src/README.md", "effect": "read", "released": [], "t": 11}}),
                           O.sign({**p["effects"][0], "id": "e-2", "invocation": "i-2", "executed": {"action": "fs.read", "resource": "repo:app/src/auth.ts", "effect": "read", "released": [], "t": 21}})],
                  decisions=[decision(H, "cd-7", mode="quarantine", outcome="preserved", quarantined=["f-1"],
                                      enforcement={"pep": "host-hook/2.0", "fail_mode": "closed", "host_supports": ["replace_output"]})])
     add("quarantined content reached the agent (A1)", ("violated", "I4"), lambda p, I, H, O, X: quarantine(p, I, H, O))
-    add("quarantined content promoted by the principal", ("preserved", "-"), lambda p, I, H, O, X: quarantine(p, I, H, O, confirmed=True))
+    add("quarantined content promoted by the principal", ("preserved", "-"), lambda p, I, H, O, X: quarantine(p, I, H, O, confirmed="signed"))
+    add("quarantined content promoted only by the host's flag", ("unresolved", "I4"), lambda p, I, H, O, X: quarantine(p, I, H, O, confirmed=True))
     # deny lists (spec 5.3, 7)
     def denies(p, I, mandate_deny, delegation_deny):
         p.update(mandates=[I.sign({**p["mandates"][0], "claims": claims_of(p, "mandates", **mandate_deny)})])
@@ -532,8 +555,14 @@ def vectors():
     add("status current at the invocation but stale at the effect", ("unresolved", "I7"), lambda p, I, *a: (
         revocable(p, I), p.update(statuses=[I.sign({"kind": "status", "target": "m-1", "as_of": 10})])))
     window = lambda p, I, w: p.update(mandates=[I.sign({**p["mandates"][0], "revocation": {"window": w}})])  # noqa: E731
-    add("revoked mid-action, inside the declared propagation window", ("unresolved", "I6"), lambda p, I, H, O, X: (
+    # From tclancy's review (stafordtituss/amep#35): the window is part of the signed grant, so an effect inside it is
+    # within the authority as granted, and nothing is missing (spec 5.12.1, v0.3.3). The window is bounded at an hour.
+    add("revoked mid-action, inside the declared propagation window", ("preserved", "-"), lambda p, I, H, O, X: (
         window(p, I, 10), times(p, H, O, eff_t=20), rev(p, I, 15)))
+    add("propagation window longer than an hour", ("unresolved", "I7"), lambda p, I, H, O, X: (
+        window(p, I, 3601), times(p, H, O, eff_t=20), rev(p, I, 15)))
+    add("propagation window of exactly an hour", ("preserved", "-"), lambda p, I, H, O, X: (
+        window(p, I, 3600), times(p, H, O, eff_t=20), rev(p, I, 15)))
     add("revoked mid-action, after the propagation window", ("violated", "I6"), lambda p, I, H, O, X: (
         window(p, I, 3), times(p, H, O, eff_t=20), rev(p, I, 15)))
 
@@ -982,6 +1011,32 @@ def vectors():
         grants(p, I, H, O, mandate={"grants": []}))
     add("unversioned packet with grants", ("unresolved", "I7"), lambda p, I, H, O, X:
         grants(p, I, H, O, mandate={"grants": [{"actions": ["fs.read"], "resources": ["repo:app/docs/*"]}], "keep": True}, versioned=False))
+
+    # 8b. A call whose effects aren't known in advance (spec 5.8, declared.scope, v0.3.3). Found while importing Kilo Code
+    # sessions (interop/kilo): an allowed `npm install` writes files the call never named, so with an exact declaration
+    # every write read as a departure blamed on the server, whether or not it was within the grant.
+    def command(p, I, H, O, writes, scope=None, versioned=True, effect="write_local"):
+        inv = {**p["invocations"][0], "declared": {"action": "process.exec", "resource": "cmd:npm install", "effect": "write_local",
+               "scope": scope if scope is not None else {"actions": ["fs.write"], "resources": ["repo:app/*"]}}}
+        effs = [{**p["effects"][0], "id": f"e-{n + 1}", "executed": {"action": "fs.write", "resource": r, "effect": effect, "released": [], "t": 11 + n}}
+                for n, r in enumerate(writes)]
+        if versioned:
+            p["invocations"], p["effects"] = [inv], effs
+            v03(p, I, H, O)
+        else:
+            p["invocations"], p["effects"] = [H.sign(inv)], [O.sign(e) for e in effs]
+    add("command writes within its declared scope and the grant", ("preserved", "-"), lambda p, I, H, O, X:
+        command(p, I, H, O, ["repo:app/src/a.ts", "repo:app/src/b.ts"]))
+    add("command write within its declared scope but outside the grant", ("violated", "I2"), lambda p, I, H, O, X:
+        command(p, I, H, O, ["repo:app/src/a.ts", "repo:app/Makefile"]))
+    add("command write outside its declared scope", ("violated", "I2"), lambda p, I, H, O, X:
+        command(p, I, H, O, ["repo:app/src/a.ts", "repo:app/Makefile"], scope={"actions": ["fs.write"], "resources": ["repo:app/src/*"]}))
+    add("command effect above its declared class", ("violated", "I2"), lambda p, I, H, O, X:
+        command(p, I, H, O, ["repo:app/src/a.ts"], effect="write_shared"))
+    add("declared scope in an unversioned packet", ("unresolved", "I7"), lambda p, I, H, O, X:
+        command(p, I, H, O, ["repo:app/src/a.ts"], versioned=False))
+    add("declared scope with an empty list", ("unresolved", "I7"), lambda p, I, H, O, X:
+        command(p, I, H, O, ["repo:app/src/a.ts"], scope={"actions": ["fs.write"], "resources": []}))
 
     # 9. Holds for unknown outcomes (spec 7.6 rule 6, v0.3). From the cross-institution example of
     # finos/ai-governance-framework#421: "a slice with an unknown outcome stays counted until reconciliation shows it was

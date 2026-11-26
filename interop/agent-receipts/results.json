@@ -473,6 +473,7 @@
   {
    "case": "two successes under one idempotency_key (constructed: the chain above plus a second success)",
    "mode": "daemon run by another operator",
+   "rule": "AMEP's rule: in Agent Receipts a duplicate key is an auditor's warning (spec 7.3.6)",
    "chain_valid": true,
    "verdict": {
     "id": "i-1",
