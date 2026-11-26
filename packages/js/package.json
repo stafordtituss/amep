@@ -1,6 +1,6 @@
 {
   "name": "@stafordtituss/amep",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Verify and produce AMEP (Agentic Mandate Evidence Protocol) evidence: proof that AI agent actions stayed within delegated authority.",
   "type": "module",
   "exports": {
