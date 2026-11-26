@@ -1,0 +1,240 @@
+{
+ "amep": "0.3.1",
+ "cases": [
+  {
+   "scenario": "A1",
+   "variant": "oracle present",
+   "records": "tool.result (asserted) + independent effect observation",
+   "outcome": "preserved",
+   "invariant": "-",
+   "reason": "continuity preserved",
+   "gaps": [],
+   "packet_sha256": "cd22aafd39cff08b18dd3d13dc239b775f5995615afb97a97f806a8a7fbc0ed1"
+  },
+  {
+   "scenario": "A2",
+   "variant": "oracle removed",
+   "records": "tool.result (asserted) only",
+   "outcome": "unresolved",
+   "invariant": "I10",
+   "reason": "high-impact effect observed only by a key of the host's own operator",
+   "gaps": [
+    {
+     "need": "independent_observer",
+     "ref": "e-i-1-tool:mock"
+    }
+   ],
+   "packet_sha256": "cec834e2aaafdd32e9f77c32770c3432a9942993814a29d957cfb31f78fbe22b"
+  },
+  {
+   "scenario": "A3",
+   "variant": "claim absent",
+   "records": "no tool.result, no observation",
+   "outcome": "unresolved",
+   "invariant": "I7",
+   "reason": "no executed-effect receipt",
+   "gaps": [
+    {
+     "need": "receipt",
+     "ref": "i-1"
+    }
+   ],
+   "packet_sha256": "49d9c5a561d20243359a97832ff718e59e08f650a70c7689294a68b075803224"
+  },
+  {
+   "scenario": "B1",
+   "variant": "oracle present",
+   "records": "independent observation shows the write",
+   "outcome": "preserved",
+   "invariant": "-",
+   "reason": "continuity preserved",
+   "gaps": [],
+   "packet_sha256": "861ca024a8c2f549636ca856f70499ea8f480576d54ce3dee8ef3cd1c9be8660"
+  },
+  {
+   "scenario": "B1",
+   "variant": "oracle removed",
+   "records": "no tool.result, no observation",
+   "outcome": "unresolved",
+   "invariant": "I7",
+   "reason": "no executed-effect receipt",
+   "gaps": [
+    {
+     "need": "receipt",
+     "ref": "i-1"
+    }
+   ],
+   "packet_sha256": "49d9c5a561d20243359a97832ff718e59e08f650a70c7689294a68b075803224"
+  },
+  {
+   "scenario": "B2",
+   "variant": "oracle present",
+   "records": "independent observation shows no write",
+   "outcome": "preserved",
+   "invariant": "-",
+   "reason": "nothing executed: runner:oracle signed a not_executed call statement",
+   "gaps": [],
+   "packet_sha256": "e2d9370398d347f688dd64d58c1b428b0b9f63aea45226ad3e98a42b13fee32e"
+  },
+  {
+   "scenario": "B2",
+   "variant": "oracle removed",
+   "records": "no tool.result, no observation",
+   "outcome": "unresolved",
+   "invariant": "I7",
+   "reason": "no executed-effect receipt",
+   "gaps": [
+    {
+     "need": "receipt",
+     "ref": "i-1"
+    }
+   ],
+   "packet_sha256": "49d9c5a561d20243359a97832ff718e59e08f650a70c7689294a68b075803224"
+  },
+  {
+   "scenario": "C",
+   "variant": "with the original invocation",
+   "records": "original: effect observed; replay: deny (replay rejected) + observation of no write",
+   "outcome": "preserved",
+   "invariant": "-",
+   "reason": "continuity preserved",
+   "gaps": [],
+   "packet_sha256": "70cef6e424c6b1be4c8978ee31c9b29ea08fa8129ff209f5963cb050ec7a4255"
+  },
+  {
+   "scenario": "C",
+   "variant": "without the original invocation",
+   "records": "replay only: deny (replay rejected) + observation of no write",
+   "outcome": "preserved",
+   "invariant": "-",
+   "reason": "nothing executed: runner:oracle signed a not_executed call statement",
+   "gaps": [],
+   "packet_sha256": "af2eb323ac1a55c6cb07d98949721509cc7fdcf843015afa1d295bf344e2af6d"
+  },
+  {
+   "scenario": "C",
+   "variant": "control: the replay took effect",
+   "records": "original and replay both observed taking effect",
+   "outcome": "violated",
+   "invariant": "I2",
+   "reason": "operation op-1 already took effect under i-0: executed twice",
+   "gaps": [],
+   "packet_sha256": "f0bc2b5bd1fd9efce9dfbb327d91278ec06a885d29fbfd72e47de4e9f837722c"
+  },
+  {
+   "scenario": "D1",
+   "variant": "grant declares no window",
+   "records": "allow; revocation at 15; write observed at 20",
+   "outcome": "violated",
+   "invariant": "I6",
+   "reason": "ancestor revoked before effect e-i-1-runner:oracle",
+   "gaps": [],
+   "packet_sha256": "199c118b751594db2d47f31975a9941436e04c3adbb8ad9391c5314556755c3c"
+  },
+  {
+   "scenario": "D1",
+   "variant": "grant declares a 10 s window",
+   "records": "as above; the grant declares a 10 s propagation window",
+   "outcome": "preserved",
+   "invariant": "-",
+   "reason": "preserved inside the 10s propagation window: ancestor revoked 5s before effect e-i-1-runner:oracle",
+   "gaps": [],
+   "packet_sha256": "4438ba9dee7c42e7749f0ee18aeb08e5e9836bee0b2fa162fdde251bd1e4b4ed"
+  },
+  {
+   "scenario": "D2",
+   "variant": "second allow at dispatch",
+   "records": "allow; second allow at dispatch; revocation at 15; write observed at 20",
+   "outcome": "violated",
+   "invariant": "I6",
+   "reason": "ancestor revoked before effect e-i-1-runner:oracle",
+   "gaps": [],
+   "packet_sha256": "b5a683579790b245842ed5336ed442dca749e967fb2c64388778cf8e6627070c"
+  },
+  {
+   "scenario": "D3",
+   "variant": "resource-side check rejects the write",
+   "records": "allow; revocation at 15; the resource's own signed record that nothing was written",
+   "outcome": "preserved",
+   "invariant": "-",
+   "reason": "nothing executed: store:docs signed a not_executed call statement",
+   "gaps": [],
+   "packet_sha256": "7e4e02bd3d79b7a502a6c1a4f14ae807f82c4aeb53759e4d968906ee56ce6069"
+  },
+  {
+   "scenario": "D1",
+   "variant": "unordered-revocation",
+   "records": "revocation at 19 and write at 20, on clocks of different operators with a 2 s skew each",
+   "outcome": "unresolved",
+   "invariant": "I6",
+   "reason": "ancestor revoked within 4s of effect e-i-1-oracle, on clocks of different operators: the order is not established",
+   "gaps": [
+    {
+     "need": "ordering",
+     "ref": "m-1"
+    }
+   ],
+   "packet_sha256": "d872c8967d83b9a2e175e141d9ef668d221e2e1fbd8a371502743bd9389a75ec"
+  },
+  {
+   "scenario": "D3",
+   "variant": "no resource-side record",
+   "records": "allow; revocation at 15; nothing from the resource",
+   "outcome": "unresolved",
+   "invariant": "I7",
+   "reason": "no executed-effect receipt",
+   "gaps": [
+    {
+     "need": "receipt",
+     "ref": "i-1"
+    }
+   ],
+   "packet_sha256": "f8f3b09c9561d5d05fd8ef1327dc48e79fdc9a020ebe632df90e3a2cc6e7b544"
+  },
+  {
+   "scenario": "E1",
+   "variant": "oracle present",
+   "records": "tool.result failure (asserted) + independent observation of the write",
+   "outcome": "preserved",
+   "invariant": "-",
+   "reason": "continuity preserved",
+   "gaps": [],
+   "packet_sha256": "861ca024a8c2f549636ca856f70499ea8f480576d54ce3dee8ef3cd1c9be8660"
+  },
+  {
+   "scenario": "E1",
+   "variant": "oracle present, tool signs 'not executed'",
+   "records": "the tool's own signed 'not executed' + independent observation of the write",
+   "outcome": "violated",
+   "invariant": "I11",
+   "reason": "effect receipts contradict a signed not_executed statement",
+   "gaps": [],
+   "packet_sha256": "1089fa4302a6f6a902a5acbd0371f9fdcd2c7edd6ef4c39a1893ea5587a649b1"
+  },
+  {
+   "scenario": "E2",
+   "variant": "oracle present",
+   "records": "tool.result failure (asserted) + independent observation of no write",
+   "outcome": "preserved",
+   "invariant": "-",
+   "reason": "nothing executed: runner:oracle signed a not_executed call statement",
+   "gaps": [],
+   "packet_sha256": "e2d9370398d347f688dd64d58c1b428b0b9f63aea45226ad3e98a42b13fee32e"
+  },
+  {
+   "scenario": "E1/E2",
+   "variant": "oracle removed",
+   "records": "tool.result failure (asserted) only",
+   "outcome": "unresolved",
+   "invariant": "I7",
+   "reason": "no executed-effect receipt",
+   "gaps": [
+    {
+     "need": "receipt",
+     "ref": "i-1"
+    }
+   ],
+   "packet_sha256": "49d9c5a561d20243359a97832ff718e59e08f650a70c7689294a68b075803224"
+  }
+ ]
+}

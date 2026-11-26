@@ -3,6 +3,17 @@
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
 
+## A corroborated receipt is not a self-report (I10), clocks of different operators (I6), and the OWASP Agentic Evidence scenarios (unreleased, 2026-11-26)
+
+- **The gap, found while mapping the OWASP Agentic Evidence authorization-to-outcome scenarios** (OWASP/Agentic-Evidence#2, #21). For a high-impact call, an asserted `tool.result` from the executing side, beside an independent observation of the same write, came out `unresolved` (I10). Each receipt was judged on its own, so adding corroborating evidence weakened the verdict. That contradicts spec 10.2, under which the same effect recorded by several observers is one effect.
+- **Now (I10):** a receipt from the actor's side is corroborated when observers independent of the actor recorded the same executed body, ignoring `t`, at least as many times. A self-report of more executions than were independently observed stays `unresolved`.
+- **Clocks of different operators (spec 5.12.2, #43),** from the same mapping, its `unordered-revocation` variant. AMEP compared a revocation's time and an effect's time as if one clock had produced both.
+  - A key may now declare `clock_skew` (0 to 3600 seconds) in the key set.
+  - Where a revocation and an action signed under different operators fall within their combined skew of the boundary that decides the verdict, the result is `unresolved` (I6), gap `ordering`.
+  - With no skew declared, nothing changes.
+- **Suite v0.3.4:** 6 more core vectors (2 positive, 4 must-reject), 297 in all. No existing vector's outcome changes; `keys.json` gains three keys. The JSON Schemas and CDDL gain `clock_skew`.
+- **`interop/owasp-agentic-evidence/`:** each evidence variant of scenarios A1 to A3, B1, B2, C, D1 to D3 and E1, E2 as an AMEP packet, with AMEP's verdict.
+
 ## 0.3.1 (2026-11-26)
 
 `amep-protocol` 0.3.1 on PyPI and `@stafordtituss/amep` 0.3.1 on npm, with suite v0.3.3: 291 core vectors (76 positive, 215 must-reject), 16 approval-path vectors and 20 delegation-continuity vectors, 327 in all, plus seven cross-packet sequences. The sections below marked "shipped in 0.3.1" are what it contains. In brief:
