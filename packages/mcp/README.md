@@ -18,7 +18,7 @@ Evaluation runs locally with the reference verifier from [`amep-protocol`](https
 |---|---|
 | `verify_packet` | Evaluates a packet against a key set. Give the packet as `packet_text`, its exact JSON text, which is parsed strictly so that duplicate member names are caught, or as `packet`, an object. Returns the verdict, a result per invocation with blame and gaps, `parsed_strictly`, and the verifier state to pass along with the next packet in a stream. |
 | `explain_invariant` | Explains I1 to I11, the outcome when each is broken, and which conformance vectors exercise it. |
-| `list_vectors` | Lists the bundled conformance vectors: the 303-vector AMEP suite v0.3.6 (`core`), the 20-vector W3C delegation-continuity suite (`delegation`), and the 16-vector approval-path attacks suite (`approval-path`, a draft). |
+| `list_vectors` | Lists the bundled conformance vectors: the 306-vector AMEP suite v0.3.6 (`core`), the 20-vector W3C delegation-continuity suite (`delegation`), and the 16-vector approval-path attacks suite (`approval-path`, a draft). |
 | `get_vector` | Returns one vector, with its packet (or exact `packet_text`) and test keys, ready for `verify_packet`. |
 | `check_suite` | Runs a bundled suite through the verifier and reports agreement, vector by vector. |
 

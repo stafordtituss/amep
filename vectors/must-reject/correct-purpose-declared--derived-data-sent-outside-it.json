@@ -1,0 +1,175 @@
+{
+ "name": "correct purpose declared, derived data sent outside it",
+ "expect": {
+  "outcome": "violated",
+  "invariant": "I5"
+ },
+ "packet": {
+  "mandates": [
+   {
+    "id": "m-1",
+    "kind": "mandate",
+    "principal": "user:alice",
+    "claims": {
+     "actions": [
+      "fs.read",
+      "http.post"
+     ],
+     "resources": [
+      "repo:app/*",
+      "https://api.example/*"
+     ],
+     "data": [
+      "confidential->internal"
+     ],
+     "ceiling": "external_send",
+     "exp": 100,
+     "depth": 2,
+     "purpose": "summarization"
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "c3d79bc5c66fce49ed14b97d2aaea1480c6c17b32f65ea7109c5a195f916dcd06b0ae444a4bb1aa446a5404cff1393fe07da0ab656bd86077fed2448a644e105"
+    }
+   }
+  ],
+  "delegations": [
+   {
+    "id": "d-1",
+    "kind": "delegation",
+    "parent": "m-1",
+    "claims": {
+     "actions": [
+      "fs.read",
+      "http.post"
+     ],
+     "resources": [
+      "repo:app/*",
+      "https://api.example/*"
+     ],
+     "data": [
+      "confidential->internal"
+     ],
+     "ceiling": "external_send",
+     "exp": 90,
+     "depth": 1,
+     "purpose": "summarization"
+    },
+    "proof": {
+     "kid": "issuer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "c766113e571aa64bb245b963891a51742fa0be2e787b4c18807e4befcf78ea09f81262ef0f12c6f697569d64ce88d274d0b41e944aef8fb2d9acad7856730b00"
+    }
+   }
+  ],
+  "interpretations": [
+   {
+    "id": "a-1",
+    "kind": "interpretation",
+    "source": "curated",
+    "adapter": "host_shell",
+    "version": "r9",
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "39a6a8663dcd45b7c212805d517d108e3864048bd5b8146837d1d638a4138dca2ed75e828946f9e33e507e9c2efc26a71c216a2e698d868963db309d5523380c"
+    }
+   }
+  ],
+  "invocations": [
+   {
+    "id": "i-1",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 10,
+    "declared": {
+     "action": "fs.read",
+     "resource": "repo:app/docs/plan.md",
+     "effect": "read",
+     "purpose": "summarization"
+    },
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "a7d9a78c2de40bcedc7fa3b01ec6d5519ccab7a4f1ad30624c5dbea66607ce6a527865b9bcb2b10924a96c22d446e6f3dceb31c91b3f9ac0295df604ab29df04"
+    }
+   },
+   {
+    "id": "i-2",
+    "kind": "invocation",
+    "authority_ref": "d-1",
+    "interpretation_ref": "a-1",
+    "t": 20,
+    "declared": {
+     "action": "http.post",
+     "resource": "https://api.example/upload",
+     "effect": "external_send",
+     "purpose": "summarization"
+    },
+    "actor": "agent:assistant-1",
+    "derived_from": [
+     "i-1"
+    ],
+    "proof": {
+     "kid": "host-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "f2dc19dd9bc594229f8ef31748b985c744f093ef6a7ee5bcba00db9975dcdb3b208719f860e3dbeb5e5e32223166192c10a31c978a09c81889a646fa421e6e08"
+    }
+   }
+  ],
+  "effects": [
+   {
+    "id": "e-1",
+    "kind": "effect",
+    "invocation": "i-1",
+    "observed_by": "hook:host",
+    "assurance": "L1",
+    "executed": {
+     "action": "fs.read",
+     "resource": "repo:app/docs/plan.md",
+     "effect": "read",
+     "released": [],
+     "accessed": [
+      "confidential"
+     ],
+     "t": 11
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "f3c994b3e7e3c030fbbb01629ff9ec6c2b1ef542238e9c77381cb9b1ced4bf7f5d3d46fb2ca3feda8e848ac9009405d60e35dd429dc6b8bfe529b0863714370f"
+    }
+   },
+   {
+    "id": "e-2",
+    "kind": "effect",
+    "invocation": "i-2",
+    "observed_by": "proxy:egress",
+    "assurance": "L2",
+    "executed": {
+     "action": "http.post",
+     "resource": "https://api.example/upload",
+     "effect": "external_send",
+     "released": [],
+     "recipient": "external",
+     "t": 21
+    },
+    "proof": {
+     "kid": "observer-1",
+     "alg": "Ed25519",
+     "v": 2,
+     "sig": "f9cceb95912b6284dee5e56fcbd0e9bde3ad71e26b8994a59d6d06dbcf53ddab41d47bba740728d9a6f23553cb43ee1b005c9ca53523f776789c04592350f104"
+    }
+   }
+  ],
+  "amep_version": "0.3"
+ }
+}

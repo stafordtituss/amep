@@ -1098,6 +1098,27 @@ def vectors():
     add("purpose not declared is not checked", ("preserved", "-"), lambda p, I, H, O, X: purpose(p, I, H, O))
     add("declared purpose in an unversioned packet", ("unresolved", "I7"), lambda p, I, H, O, X:
         purpose(p, I, H, O, "release", versioned=False))
+    # Purpose made checkable without trusting the agent's word (spec 5.8.3): by its consequences, through data rules
+    # and lineage, and by taking the purpose from the principal's own intent rather than from the agent.
+    def purpose_downstream(p, I, H, O):
+        read_then_send(p, I, H, O)    # reads confidential plan.md, then posts derived data to an external recipient
+        for kind in ("mandates", "delegations"):
+            p[kind] = [{**p[kind][0], "claims": {**p[kind][0]["claims"], "purpose": "summarization"}}]
+        p["invocations"] = [{**i, "declared": {**i["declared"], "purpose": "summarization"}} for i in p["invocations"]]
+        v03(p, I, H, O)
+    add("correct purpose declared, derived data sent outside it", ("violated", "I5"), lambda p, I, H, O, X: purpose_downstream(p, I, H, O))
+
+    def purpose_from_intent(p, I, H, O, declared):
+        p["intents"] = [I.sign({"id": "n-p", "kind": "intent", "claims": {
+            "actions": ["fs.write"], "resources": ["repo:app/src/*"], "data": ["source->internal"], "ceiling": "write_local",
+            "exp": 90, "purpose": "bugfix"}}, v=2)]
+        p["invocations"] = [{**p["invocations"][0], "intent_ref": "n-p",
+                             "declared": {**p["invocations"][0]["declared"], "purpose": declared}}]
+        v03(p, I, H, O)
+    add("purpose from the principal's intent, call within it", ("preserved", "-"), lambda p, I, H, O, X:
+        purpose_from_intent(p, I, H, O, "bugfix"))
+    add("purpose from the principal's intent, call outside it", ("violated", "I2"), lambda p, I, H, O, X:
+        purpose_from_intent(p, I, H, O, "release"))
 
     # 9. Holds for unknown outcomes (spec 7.6 rule 6, v0.3). From the cross-institution example of
     # finos/ai-governance-framework#421: "a slice with an unknown outcome stays counted until reconciliation shows it was

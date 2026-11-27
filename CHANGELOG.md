@@ -12,8 +12,11 @@ Specification drafts, conformance-suite versions and package versions are listed
   - A receipt whose purpose differs from the call's is a departure from `declared` (I2), charged to the server.
   - With no purpose stated, nothing changes.
   - `declared.purpose` in an unversioned packet is malformed (I7).
-- **The limit, stated in the spec:** AMEP checks a purpose that's stated, never an intention nobody recorded. An agent that declares the right purpose and acts for another isn't caught by this rule.
-- **Suite v0.3.6:** 5 new core vectors (2 positive, 3 must-reject), 303 in all. No existing outcome changes. The JSON Schemas and CDDL gain `purpose` on `declared` and on the executed body.
+- **Making a purpose checkable without trusting the agent (spec 5.8.3):**
+  - **by its consequences:** a purpose's limits written as data-flow rules, with lineage, make the misuse `violated` (I5) when the data leaves, whatever purpose the agent declared;
+  - **from the principal:** a purpose in the principal's signed intent is part of the effective claims, so the agent doesn't choose it.
+- **What remains:** where nothing recorded differs between the declared purpose and the real one, no record-based verifier can tell. The spec says so.
+- **Suite v0.3.6:** 8 new core vectors (3 positive, 5 must-reject), 306 in all. No existing outcome changes. The JSON Schemas and CDDL gain `purpose` on `declared` and on the executed body.
 - **`interop/verdict-record/`:** regenerated for the new verifier build; 7 of 7 still as expected.
 
 ## Benign variations in the AgentDojo experiment, and "not executed" for refused calls in amep-agents (unreleased)
