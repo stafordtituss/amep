@@ -3,6 +3,22 @@
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
 
+## Purpose at the effect (unreleased)
+
+- **The gap (#14), found by delegation-control-bench (scenario DEL-04):** a mandate's `purpose` was enforced along a delegation chain but not on what ran. An effect in scope on action and resource, done for another purpose, was `preserved`.
+- **Now (spec 5.8.3, suite v0.3.6):**
+  - An invocation may declare `declared.purpose`, and a receipt may state `executed.purpose`.
+  - In a v0.3 packet, an effect whose purpose differs from the claims' purpose is `violated` (I2), charged to the agent.
+  - A receipt whose purpose differs from the call's is a departure from `declared` (I2), charged to the server.
+  - With no purpose stated, nothing changes.
+  - `declared.purpose` in an unversioned packet is malformed (I7).
+- **Making a purpose checkable without trusting the agent (spec 5.8.3):**
+  - **by its consequences:** a purpose's limits written as data-flow rules, with lineage, make the misuse `violated` (I5) when the data leaves, whatever purpose the agent declared;
+  - **from the principal:** a purpose in the principal's signed intent is part of the effective claims, so the agent doesn't choose it.
+- **What remains:** where nothing recorded differs between the declared purpose and the real one, no record-based verifier can tell. The spec says so.
+- **Suite v0.3.6:** 8 new core vectors (3 positive, 5 must-reject), 306 in all. No existing outcome changes. The JSON Schemas and CDDL gain `purpose` on `declared` and on the executed body.
+- **`interop/verdict-record/`:** regenerated for the new verifier build; 7 of 7 still as expected.
+
 ## Benign variations in the AgentDojo experiment, and "not executed" for refused calls in amep-agents (unreleased)
 
 - **The false-positive measurement the AgentDojo experiment lacked** (`experiments/agentdojo/benign_variants.py`). The honest traces were the very calls the mandates came from, so they couldn't show a false-positive rate. Five classes of benign variation (reorder, extra reads, scratch write, alternate arguments, retry) now give one per mandate scope. Raised by a reader on the AARM Slack.

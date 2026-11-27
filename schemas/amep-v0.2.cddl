@@ -69,6 +69,7 @@ claims = {
 declared-effect = {
   action: tstr, resource: tstr, effect: effect-class
   ? scope: grant                               ; v0.3.3: a call whose effects are not known in advance (spec 5.8)
+  ? purpose: tstr .size (1..256)               ; v0.3.6: the purpose the call acts for (spec 5.8.3)
 }
 
 ; source token of a mandate or delegation (spec/profiles/); value only for expired or holder-bound tokens
@@ -88,6 +89,7 @@ executed-body = {
   ? accessed: [* tstr .regexp "[a-z_]+"]       ; data classes this effect read (spec 5.9.1)
   ? recipient: tstr .regexp "[a-z_]+"          ; recipient class of what this effect sent or wrote
   ? value: value                               ; quantity moved or touched (spec 5.9.2)
+  ? purpose: tstr .size (1..256)               ; v0.3.6: the purpose the effect was carried out for (spec 5.8.3)
   ? audience: tstr .size (1..256)              ; the service the effect was sent to (spec 5.3; v0.3.2)
   t: amep-time
   * extension-key => any
