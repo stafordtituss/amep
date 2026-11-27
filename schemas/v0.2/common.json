@@ -345,6 +345,11 @@
        }
       }
      }
+    },
+    "purpose": {
+     "description": "The purpose the call acts for, checked against the claims' purpose (spec 5.8.3, v0.3.6).",
+     "type": "string",
+     "minLength": 1
     }
    }
   },
@@ -399,6 +404,11 @@
     },
     "audience": {
      "description": "The service the effect was sent to (spec 5.3, v0.3.2).",
+     "type": "string",
+     "minLength": 1
+    },
+    "purpose": {
+     "description": "The purpose the effect was carried out for, where the receipt knows it (spec 5.8.3, v0.3.6).",
      "type": "string",
      "minLength": 1
     }

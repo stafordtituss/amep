@@ -283,6 +283,8 @@ function meet(a, b, v03 = false) {
 // when its action and resource fall within the scope and its class is at most the declared class.
 export function withinDeclared(x, inv, v03 = false) {
   const d = inv.declared, sc = v03 ? d.scope : undefined;
+  // spec 5.8 (v0.3.6), stafordtituss/amep#14: where both the call and its receipt state a purpose, they must agree
+  if (v03 && typeof d.purpose === "string" && typeof x.purpose === "string" && x.purpose !== d.purpose) return false;
   if (sc === undefined) return x.action === d.action && x.resource === d.resource;
   return sc.actions.some(p => patMatch(x.action, p)) && sc.resources.some(p => patMatch(x.resource, p))
     && CEILING.indexOf(x.effect) <= CEILING.indexOf(d.effect);
@@ -290,7 +292,12 @@ export function withinDeclared(x, inv, v03 = false) {
 const scopeWellFormed = sc => !!sc && typeof sc === "object" && !Array.isArray(sc)
   && Object.keys(sc).length === 2 && ["actions", "resources"].every(k => Array.isArray(sc[k]) && sc[k].length > 0
   && sc[k].every(v => typeof v === "string" && v.length > 0));
-function effectOk(x, c, v03 = false) {
+// spec 5.8 (v0.3.6), stafordtituss/amep#14: the purpose an effect was carried out for is the one its receipt states,
+// else the one its call declared. Undeclared, it is unknown, and the claims' purpose isn't checked: AMEP can check a
+// stated purpose, never an intention nobody recorded.
+export const purposeOf = (x, inv, v03 = false) =>
+  !v03 ? undefined : typeof x.purpose === "string" ? x.purpose : typeof inv.declared.purpose === "string" ? inv.declared.purpose : undefined;
+function effectOk(x, c, v03 = false, purpose = undefined) {
   const act = grantsOf(c, v03).filter(g => g.actions.some(p => patMatch(x.action, p)));
   if (!act.length) return [false, "action outside claims"];
   if ((c.deny_actions || []).some(p => patMatch(x.action, p))) return [false, "action denied"];
@@ -298,6 +305,7 @@ function effectOk(x, c, v03 = false) {
   if (!act.some(g => g.resources.some(p => patMatch(x.resource, p)))) return [false, "resource outside claims"];
   if ((c.deny_resources || []).some(p => patMatch(x.resource, p))) return [false, "resource denied"];
   if (CEILING.indexOf(x.effect) > CEILING.indexOf(c.ceiling)) return [false, "effect above ceiling"];
+  if (purpose !== undefined && "purpose" in c && purpose !== c.purpose) return [false, "purpose outside claims"];
   // spec 5.3 (v0.3.2), from stafordtituss/amep#16: an effect sent to a service the principal never named is outside authority
   if ("audiences" in c && typeof x.audience === "string" && !c.audiences.some(p => patMatch(x.audience, p))) return [false, "audience outside claims"];
   for (const d of x.released || []) if (!(c.data || []).includes(d)) return [false, `released ${d} not allowed`];
@@ -633,7 +641,7 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
     try {
       if (!x || typeof x !== "object" || !withinDeclared(x, inv, v03)) return;
       check(isGuardrail(x.resource, extraProtected), "violated", "I9", "executed effect targets guardrail/evidence store" + note, { blame: "agent" });
-      [ok, why] = effectOk(x, claims, v03);
+      [ok, why] = effectOk(x, claims, v03, purposeOf(x, inv, v03));
     } catch (err) {
       if (err instanceof Stop) throw err;
       return;
@@ -675,6 +683,12 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       check(!v03, "unresolved", "I7", `${id}: declared.scope requires amep_version 0.3`, { need: "well_formed_evidence", ref: id });
       check(!scopeWellFormed(inv.declared.scope), "unresolved", "I7",
         `${id}: declared.scope must be exactly {actions, resources}, each a non-empty list of patterns`, { need: "well_formed_evidence", ref: id });
+    }
+    if (inv.declared && typeof inv.declared === "object" && "purpose" in inv.declared) {
+      // declared.purpose (spec 5.8, v0.3.6) is an AMEP 0.3 member: ignored, a purpose outside the claims would pass.
+      check(!v03, "unresolved", "I7", `${id}: declared.purpose requires amep_version 0.3`, { need: "well_formed_evidence", ref: id });
+      check(typeof inv.declared.purpose !== "string" || !inv.declared.purpose, "unresolved", "I7",
+        `${id}: declared.purpose must be a non-empty string`, { need: "well_formed_evidence", ref: id });
     }
     if (v03 && "reserve" in inv) {
       try { checkReserve(inv.reserve); }
@@ -847,7 +861,7 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
       else check(!withinDeclared(x, inv, v03), "violated", "I2",
         v03 && "scope" in inv.declared ? "executed outside the call's declared scope" : "declared != executed", { blame: "server" });
       check(isGuardrail(x.resource, extraProtected), "violated", "I9", "executed effect targets guardrail/evidence store", { blame: "agent" });
-      const [ok, why] = effectOk(x, claims, v03);
+      const [ok, why] = effectOk(x, claims, v03, purposeOf(x, inv, v03));
       check(!ok, "violated", why.startsWith("released") ? "I5" : "I2", why, { blame: "agent" });
       // spec 5.3 (v0.3.2): where the claims name audiences, the receipt must say where the effect was sent
       check("audiences" in claims && !(typeof x.audience === "string" && x.audience.length > 0), "unresolved", "I7",

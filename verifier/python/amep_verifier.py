@@ -1077,6 +1077,49 @@ def vectors():
     add("declared scope with an empty list", ("unresolved", "I7"), lambda p, I, H, O, X:
         command(p, I, H, O, ["repo:app/src/a.ts"], scope={"actions": ["fs.write"], "resources": []}))
 
+    # 8c. Purpose at the effect (spec 5.8, v0.3.6), stafordtituss/amep#14, found by delegation-control-bench (DEL-04):
+    # purpose was checked along the chain but not on what ran. A call may now declare the purpose it acts for, and a
+    # receipt may state it. AMEP checks a stated purpose; an undeclared one stays unchecked, as before.
+    def purpose(p, I, H, O, declared=None, executed=None, versioned=True):
+        p.update(mandates=[{**p["mandates"][0], "claims": claims_of(p, "mandates", purpose="bugfix")}],
+                 delegations=[{**p["delegations"][0], "claims": claims_of(p, "delegations", purpose="bugfix")}])
+        inv = {**p["invocations"][0], "declared": {**p["invocations"][0]["declared"], **({"purpose": declared} if declared is not None else {})}}
+        eff = {**p["effects"][0], "executed": {**p["effects"][0]["executed"], **({"purpose": executed} if executed is not None else {})}}
+        p["invocations"], p["effects"] = [inv], [eff]
+        if versioned:
+            v03(p, I, H, O)
+        else:
+            p.update(mandates=[I.sign(p["mandates"][0])], delegations=[I.sign(p["delegations"][0])],
+                     invocations=[H.sign(inv)], effects=[O.sign(eff)])
+    add("effect for the purpose the mandate states", ("preserved", "-"), lambda p, I, H, O, X: purpose(p, I, H, O, "bugfix"))
+    add("effect for a purpose the mandate doesn't state", ("violated", "I2"), lambda p, I, H, O, X: purpose(p, I, H, O, "release"))
+    add("receipt states another purpose than the call declared", ("violated", "I2"), lambda p, I, H, O, X:
+        purpose(p, I, H, O, "bugfix", executed="release"))
+    add("purpose not declared is not checked", ("preserved", "-"), lambda p, I, H, O, X: purpose(p, I, H, O))
+    add("declared purpose in an unversioned packet", ("unresolved", "I7"), lambda p, I, H, O, X:
+        purpose(p, I, H, O, "release", versioned=False))
+    # Purpose made checkable without trusting the agent's word (spec 5.8.3): by its consequences, through data rules
+    # and lineage, and by taking the purpose from the principal's own intent rather than from the agent.
+    def purpose_downstream(p, I, H, O):
+        read_then_send(p, I, H, O)    # reads confidential plan.md, then posts derived data to an external recipient
+        for kind in ("mandates", "delegations"):
+            p[kind] = [{**p[kind][0], "claims": {**p[kind][0]["claims"], "purpose": "summarization"}}]
+        p["invocations"] = [{**i, "declared": {**i["declared"], "purpose": "summarization"}} for i in p["invocations"]]
+        v03(p, I, H, O)
+    add("correct purpose declared, derived data sent outside it", ("violated", "I5"), lambda p, I, H, O, X: purpose_downstream(p, I, H, O))
+
+    def purpose_from_intent(p, I, H, O, declared):
+        p["intents"] = [I.sign({"id": "n-p", "kind": "intent", "claims": {
+            "actions": ["fs.write"], "resources": ["repo:app/src/*"], "data": ["source->internal"], "ceiling": "write_local",
+            "exp": 90, "purpose": "bugfix"}}, v=2)]
+        p["invocations"] = [{**p["invocations"][0], "intent_ref": "n-p",
+                             "declared": {**p["invocations"][0]["declared"], "purpose": declared}}]
+        v03(p, I, H, O)
+    add("purpose from the principal's intent, call within it", ("preserved", "-"), lambda p, I, H, O, X:
+        purpose_from_intent(p, I, H, O, "bugfix"))
+    add("purpose from the principal's intent, call outside it", ("violated", "I2"), lambda p, I, H, O, X:
+        purpose_from_intent(p, I, H, O, "release"))
+
     # 9. Holds for unknown outcomes (spec 7.6 rule 6, v0.3). From the cross-institution example of
     # finos/ai-governance-framework#421: "a slice with an unknown outcome stays counted until reconciliation shows it was
     # booked or not booked". An earlier call (i-0, reserve 250.00 EUR) had no outcome; verifier state holds it.
