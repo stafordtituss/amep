@@ -575,7 +575,8 @@ def vectors():
     # stafordtituss/amep#41, from tclancy and OWASP/Agentic-Evidence#21), so these can be counted without parsing text.
     add("revoked mid-action, inside the declared propagation window", ("preserved", "-", {"ref": "m-1", "revoked_at": 15, "window": 10}), lambda p, I, H, O, X: (
         window(p, I, 10), times(p, H, O, eff_t=20), rev(p, I, 15)))
-    add("propagation window longer than an hour", ("unresolved", "I7"), lambda p, I, H, O, X: (
+    # Named for what it is, a malformed grant, not missing evidence (Jon Odalen, Weaveframe, OWASP/Agentic-Evidence#21).
+    add("grant declaring a propagation window over the one-hour maximum (malformed)", ("unresolved", "I7"), lambda p, I, H, O, X: (
         window(p, I, 3601), times(p, H, O, eff_t=20), rev(p, I, 15)))
     add("propagation window of exactly an hour", ("preserved", "-", {"ref": "m-1", "revoked_at": 15, "window": 3600}), lambda p, I, H, O, X: (
         window(p, I, 3600), times(p, H, O, eff_t=20), rev(p, I, 15)))

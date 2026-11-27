@@ -5,10 +5,11 @@ Specification drafts, conformance-suite versions and package versions are listed
 
 ## A structured member for results inside a propagation window (unreleased)
 
-- **The gap, from tclancy's review (#41) and OWASP/Agentic-Evidence#21:** a result `preserved` inside a declared propagation window said so only in `reason`, which is free text. A consumer counting across runs couldn't tell those results from results before any revocation without parsing it.
+- **The gap, from tclancy's review (#41) and Jon Odalen, Weaveframe (@jonodalen), on OWASP/Agentic-Evidence#21:** a result `preserved` inside a declared propagation window said so only in `reason`, which is free text. A consumer counting across runs couldn't tell those results from results before any revocation without parsing it.
 - **Now (spec 5.12.1, v0.3.5):** such a result carries `within_window`: `{ref, revoked_at, window}`, naming the revoked node, the revocation's time and the window. It's present exactly when an invocation or effect fell inside a window, and the verdict doesn't change. The reason code for the case is `preserved_within_declared_window`.
 - **Verdict records** (`interop/in-toto/PREDICATE.md`) carry it on the result. Consumers already had to ignore unknown members, and the two reference verifiers still produce byte-identical records on every vector.
-- **A lower window maximum (spec 5.12.1):** a profile may set a maximum below 3600 seconds, and treat a grant that declares more as malformed under that profile.
+- **A lower window maximum (spec 5.12.1):** a profile may set a maximum below 3600 seconds. A grant over it gets the same result as one over 3600 (`unresolved`, I7, gap `well_formed_evidence`), so results stay comparable across profiles (Jon Odalen).
+- **A clearer vector name:** `propagation-window-longer-than-an-hour` is now `grant-declaring-a-propagation-window-over-the-one-hour-maximum--malformed-`, since the grant is malformed and nothing is missing (Jon Odalen).
 - **Suite v0.3.5:** 298 core vectors (79 positive, 219 must-reject). The two vectors inside a window now pin `within_window` in `expect`, and a new vector, a revocation after the effect with a window declared, must carry none. No outcome changes.
 - **`interop/owasp-agentic-evidence/`:** the D1 result with a 10 s window records `within_window`.
 

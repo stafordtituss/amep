@@ -1,5 +1,5 @@
 {
- "name": "propagation window longer than an hour",
+ "name": "grant declaring a propagation window over the one-hour maximum (malformed)",
  "expect": {
   "outcome": "unresolved",
   "invariant": "I7"
