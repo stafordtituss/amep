@@ -14,7 +14,7 @@ import os
 import sys
 from pathlib import Path
 
-CORE_SHA256 = "d9bb21799d0982119a8cb5e17b109dc01d36a316ca0ad75471e36ba27096ee2a"
+CORE_SHA256 = "ae22d4ff202d7e7df717bc3b396d63e720eb684970532f54d232d525c6ff5044"
 RULE_NAME = "urn:amep:rule:evaluate:core-sha256:" + CORE_SHA256
 VECTOR_FORMAT = "urn:amep:format:conformance-vector"
 KEYSET_FORMAT = "urn:amep:format:keyset"
