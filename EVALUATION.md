@@ -72,6 +72,35 @@ These check whether an AMEP import profile reads the other project's records cor
 | The offline browser page (the JavaScript core with WebCrypto) | 297 of 297 |
 | The vector index, JSON Schemas and CDDL | Every vector as expected (23 deliberately invalid) |
 
+## 6. AMEP's rules adopted in another specification
+
+### Agent Receipts (obsigna): grant validity and scope in the grounded tier
+
+Agent Receipts is an open format for signed receipts of agent actions, with SDKs in Go, TypeScript and Python. Its maintainer, Otto Jongerius, made each decision below and wrote each document cited; this records the sequence and what it changed.
+
+1. **The question (#1204, 24 to 26 November).** AMEP's profile was run over Agent Receipts' own test receipts, as an independent coverage report: what a receipt establishes about authority. The maintainers reviewed AMEP's reading against their spec and closed the issue as done.
+2. **The gap their maintainer found (#1207, 25 November).** The grounded-principal tier resolved a receipt's grant and checked only that its subject matched. It didn't compare the grant's scopes or validity window with the receipt. So a high or critical receipt could pass while claiming scopes the grant never conferred, or describing an action dated before the grant was issued or after it expired. The issue also asked when authority should be judged: at verification, when a grant may since have expired, or at the action.
+3. **AMEP's input (#1207, 26 November).** How AMEP settled that question, with the test vectors for each case:
+   - validity at the action's own time;
+   - revocation as a signed record with its own time, ordered against the action;
+   - "never valid" as a different outcome from "expired since";
+   - an ordering that can't be settled within declared clock skew left unresolved.
+4. **The decision ([ADR-0041](https://github.com/agent-receipts/obsigna/blob/main/docs/adr/0041-grant-validity-and-scope-in-grounded-tier.md), [#1219](https://github.com/agent-receipts/obsigna/pull/1219)).**
+   - It cites AMEP as prior art and adopts those time semantics, and says the citation is not an endorsement.
+   - It does not adopt AMEP's carrier, the grant inside the signed record. The grant stays behind `grant_ref` and a resolver, which now returns historical grant state.
+   - It adds three-valued revocation (`not_revoked`, `revoked`, `unknown`) and reports results "at the issuer-asserted action time".
+5. **In their specification ([#1221](https://github.com/agent-receipts/obsigna/pull/1221), merged 27 November).** ADR-0041 is Accepted, and draft spec 0.7.0 §7.9 now states the checks:
+   - validity at the action's time, with a clock-skew bound;
+   - scope containment;
+   - the outcomes `GRANT_NOT_VALID_AT_ACTION_TIME`, `GRANT_VALIDITY_UNRESOLVED` and `GRANT_SCOPE_EXCEEDED`.
+
+**Before:** a grounded-tier receipt showed that a real grant existed for the named principal. **After:** it shows that the action fell inside that grant's scopes and validity window, or says why that can't be established.
+
+**What this does and doesn't show:**
+- The change is in Agent Receipts' draft specification (0.7.0, untagged). Their SDKs implement it in a follow-up, which hasn't landed.
+- AMEP contributed the time semantics. The scope check, the resolver contract and the carrier decision are the maintainer's own.
+- **Next:** the maintainer plans a test corpus, generated from their resolver contract, in `cross-sdk-tests/`, and has invited an AMEP profile run against it, on the terms of #1204.
+
 ## What has not been checked yet
 
 - **The current suite:** no independent implementation has run suite v0.3.3 or v0.3.4. Brennan Zambo's results are against the core suite as of 24 November.
