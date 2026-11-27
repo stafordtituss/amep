@@ -3,6 +3,14 @@
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
 
+## Benign variations in the AgentDojo experiment, and "not executed" for refused calls in amep-agents (unreleased)
+
+- **The false-positive measurement the AgentDojo experiment lacked** (`experiments/agentdojo/benign_variants.py`). The honest traces were the very calls the mandates came from, so they couldn't show a false-positive rate. Five classes of benign variation (reorder, extra reads, scratch write, alternate arguments, retry) now give one per mandate scope. Raised by a reader on the AARM Slack.
+- **Found and fixed:**
+  - the experiment's interpretation treated the same address written as "Name <address>" as another resource (19 of 24 alternate-argument traces flagged);
+  - `amep_agents.EvidenceRecorder` couldn't state that a refused call changed nothing, so 6 retries stayed `unresolved`. `observe(..., not_executed=True)` now signs a `not_executed` call statement (spec 5.14).
+- **What stays flagged:** under precise mandates, a harmless scratch write is flagged, by design. Attack detection is unchanged.
+
 ## 0.3.3 (2026-11-27)
 
 `amep-protocol` 0.3.3 on PyPI and `@stafordtituss/amep` 0.3.3 on npm, with suite v0.3.5: 298 core vectors (79 positive, 219 must-reject), 16 approval-path vectors and 20 delegation-continuity vectors, 334 in all, plus seven cross-packet sequences. In brief:

@@ -6,7 +6,9 @@ For each tool call an agent framework makes, the recorder emits
   - an ExecutedEffectReceipt (signed by the observer key): what the tool reports it actually did, mapped from its
     output by your optional `executed` function (default: the declared effect).
 A failed tool call gets no receipt: the effect is unknown, so the invocation evaluates to `unresolved`, never to
-`preserved`. Tools you do not map (`interpret` returns None) are not governed and produce no evidence.
+`preserved`. Where the tool runtime knows the call was refused before anything ran (a precondition failed and nothing
+changed), it can say so: `observe(..., error=e, not_executed=True)` has the observer key sign a call statement with
+disposition `not_executed` (spec 5.14), which settles that the call did not run. Tools you do not map (`interpret` returns None) are not governed and produce no evidence.
 
 The framework adapters (amep_agents.openai_agents, amep_agents.langchain) only call `declare` and `observe`.
 """
@@ -19,7 +21,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable
 
 from amep_protocol import sdk
-from amep_protocol.core import evaluate, verdict
+from amep_protocol.core import digest, evaluate, verdict
 
 from . import otel
 
@@ -75,6 +77,7 @@ class EvidenceRecorder:
     _calls: dict[str, _Call] = field(default_factory=dict, init=False, repr=False)
     _invocations: list[dict] = field(default_factory=list, init=False, repr=False)
     _effects: list[dict] = field(default_factory=list, init=False, repr=False)
+    _statements: list[dict] = field(default_factory=list, init=False, repr=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
     _seq: Any = field(default_factory=lambda: itertools.count(1), init=False, repr=False)
 
@@ -101,12 +104,26 @@ class EvidenceRecorder:
             otel.mark_invocation(inv)
         return inv
 
-    def observe(self, call_id: str, output: Any = None, *, error: BaseException | str | None = None) -> dict | None:
-        """Record the end of a tool call. Returns the signed receipt, or None (no receipt for failed calls)."""
+    def observe(self, call_id: str, output: Any = None, *, error: BaseException | str | None = None,
+                not_executed: bool = False) -> dict | None:
+        """Record the end of a tool call. Returns the signed receipt, or None (no receipt for failed calls).
+
+        not_executed: the tool runtime knows a failed call changed nothing (it was refused before acting). The
+        observer then signs a `not_executed` call statement (spec 5.14), returned in place of a receipt. Pass it only
+        when the runtime itself can tell; an error alone doesn't show that nothing ran."""
         with self._lock:
             call = self._calls.pop(call_id, None)
-        if call is None or error is not None:
+        if call is None:
             return None
+        if error is not None:
+            if not not_executed:
+                return None
+            stmt = self.observer_key.sign(sdk.call_statement(
+                "s-" + call.invocation["id"][2:], call.invocation["id"], self.observed_by, "not_executed", 0,
+                self._now(), invocation_digest=digest(call.invocation)))
+            with self._lock:
+                self._statements.append(stmt)
+            return stmt
         eff = self.executed(call.tool, call.args, output) if self.executed else call.declared
         if eff is None:
             return None
@@ -123,7 +140,7 @@ class EvidenceRecorder:
     def packet(self) -> dict:
         """All evidence so far, as an AMEP packet."""
         with self._lock:
-            return sdk.packet(*self.chain, self._interp, *self._invocations, *self._effects)
+            return sdk.packet(*self.chain, self._interp, *self._invocations, *self._effects, *self._statements)
 
     def evaluate(self, keys: dict, state: dict | None = None):
         """Evaluate the packet. Returns (packet verdict, per-invocation results)."""
