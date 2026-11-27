@@ -1,0 +1,166 @@
+{
+ "checker": "vrcheck.py",
+ "checker_commit": "ba9ea217610b3960fc5c7d1dfe692e581aeb43e2",
+ "agree": "7 of 7",
+ "vectors": [
+  {
+   "vector": "an01-verdict-not-reproduced",
+   "source": "vectors/must-reject/effect-outside-delegated-scope.json",
+   "expected": {
+    "state": "refused",
+    "named": "FAIL at step 3"
+   },
+   "state": "refused",
+   "steps": {
+    "1": "PASS",
+    "2": "PASS",
+    "3": "FAIL"
+   },
+   "named": "FAIL at step 3",
+   "re_run_result": {
+    "outcome": "violated",
+    "invariant": "I2",
+    "blame": "agent",
+    "gaps": []
+   },
+   "agrees": true
+  },
+  {
+   "vector": "an02-verifier-build-not-held",
+   "source": "vectors/positive/valid-preserved-flow.json",
+   "expected": {
+    "state": "held",
+    "named": "NOT RUN at step 3"
+   },
+   "state": "held",
+   "steps": {
+    "1": "PASS",
+    "2": "PASS",
+    "3": "NOT RUN"
+   },
+   "named": "NOT RUN at step 3",
+   "re_run_result": null,
+   "agrees": true
+  },
+  {
+   "vector": "av01-valid-preserved-flow",
+   "source": "vectors/positive/valid-preserved-flow.json",
+   "expected": {
+    "state": "released",
+    "named": "PASS"
+   },
+   "state": "released",
+   "steps": {
+    "1": "PASS",
+    "2": "PASS",
+    "3": "PASS"
+   },
+   "named": "PASS",
+   "re_run_result": {
+    "outcome": "preserved",
+    "invariant": "-",
+    "blame": null,
+    "gaps": []
+   },
+   "agrees": true
+  },
+  {
+   "vector": "av02-effect-outside-delegated-scope",
+   "source": "vectors/must-reject/effect-outside-delegated-scope.json",
+   "expected": {
+    "state": "released",
+    "named": "PASS"
+   },
+   "state": "released",
+   "steps": {
+    "1": "PASS",
+    "2": "PASS",
+    "3": "PASS"
+   },
+   "named": "PASS",
+   "re_run_result": {
+    "outcome": "violated",
+    "invariant": "I2",
+    "blame": "agent",
+    "gaps": []
+   },
+   "agrees": true
+  },
+  {
+   "vector": "av03-self-reported-high-impact-effect",
+   "source": "vectors/must-reject/self-reported-high-impact-effect.json",
+   "expected": {
+    "state": "released",
+    "named": "PASS"
+   },
+   "state": "released",
+   "steps": {
+    "1": "PASS",
+    "2": "PASS",
+    "3": "PASS"
+   },
+   "named": "PASS",
+   "re_run_result": {
+    "outcome": "unresolved",
+    "invariant": "I10",
+    "blame": null,
+    "gaps": [
+     {
+      "need": "independent_observer",
+      "ref": "e-1"
+     }
+    ]
+   },
+   "agrees": true
+  },
+  {
+   "vector": "av04-revoked-between-invocation-and-effect--singletary-case-",
+   "source": "vectors/must-reject/revoked-between-invocation-and-effect--singletary-case-1.json",
+   "expected": {
+    "state": "released",
+    "named": "PASS"
+   },
+   "state": "released",
+   "steps": {
+    "1": "PASS",
+    "2": "PASS",
+    "3": "PASS"
+   },
+   "named": "PASS",
+   "re_run_result": {
+    "outcome": "violated",
+    "invariant": "I6",
+    "blame": "agent",
+    "gaps": []
+   },
+   "agrees": true
+  },
+  {
+   "vector": "av05-revoked-mid-action--inside-the-declared-propagation-win",
+   "source": "vectors/positive/revoked-mid-action--inside-the-declared-propagation-window.json",
+   "expected": {
+    "state": "released",
+    "named": "PASS"
+   },
+   "state": "released",
+   "steps": {
+    "1": "PASS",
+    "2": "PASS",
+    "3": "PASS"
+   },
+   "named": "PASS",
+   "re_run_result": {
+    "outcome": "preserved",
+    "invariant": "-",
+    "blame": null,
+    "gaps": [],
+    "within_window": {
+     "ref": "m-1",
+     "revoked_at": 15,
+     "window": 10
+    }
+   },
+   "agrees": true
+  }
+ ]
+}
