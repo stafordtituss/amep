@@ -1,0 +1,87 @@
+{
+ "amep_version": "0.3",
+ "mandates": [
+  {
+   "id": "m-1",
+   "kind": "mandate",
+   "principal": "user:quickstart",
+   "claims": {
+    "actions": [
+     "repo.read"
+    ],
+    "resources": [
+     "repo:file/*"
+    ],
+    "ceiling": "read",
+    "exp": "2026-12-31T00:00:00Z"
+   },
+   "proof": {
+    "kid": "principal-1",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "4b5423b3cd4409e64a663e0d3288bbe3c3de01c0d18c2146876cf49eac0aa4583489843ca5fc9df405468c979528b728e5978efa260832cb8c964eeda94a9e00"
+   }
+  }
+ ],
+ "interpretations": [
+  {
+   "id": "a-1",
+   "kind": "interpretation",
+   "source": "curated",
+   "adapter": "protect-mcp",
+   "version": "0.32.5",
+   "proof": {
+    "kid": "agent-host-1",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "62ee51919e8c1d33746fad5b7b118db8b29f77032d8705436673436c9b7bc1869bf885110e8d1c962c1dfc1a307580f7db9cd4a398457a8f8a144182fca3410c"
+   }
+  }
+ ],
+ "invocations": [
+  {
+   "id": "i-1",
+   "kind": "invocation",
+   "authority_ref": "m-1",
+   "interpretation_ref": "a-1",
+   "t": "2026-11-24T15:42:59Z",
+   "declared": {
+    "action": "repo.read",
+    "resource": "repo:file/README.md",
+    "effect": "read"
+   },
+   "correlation": {
+    "tool_use_ref": "tu-1795534979661-f1ea"
+   },
+   "args_digest": "7d6441497d2a000b8143602a7817c90abe7db88e139f89c062a1c36cfe0ad9d6",
+   "proof": {
+    "kid": "agent-host-1",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "0bd9090c9a0379697a07d3955a1a1025c990514c89d997f7018d4baab6cb1e90620599dbb6f604be8bbe13e1c9b0f105a02a00db41f905f21514c7631ddd4e06"
+   }
+  },
+  {
+   "id": "i-1b",
+   "kind": "invocation",
+   "authority_ref": "m-1",
+   "interpretation_ref": "a-1",
+   "t": "2026-11-24T15:43:30Z",
+   "declared": {
+    "action": "repo.read",
+    "resource": "repo:file/README.md",
+    "effect": "read"
+   },
+   "correlation": {
+    "tool_use_ref": "tu-other"
+   },
+   "args_digest": "7d6441497d2a000b8143602a7817c90abe7db88e139f89c062a1c36cfe0ad9d6",
+   "proof": {
+    "kid": "agent-host-1",
+    "alg": "Ed25519",
+    "v": 2,
+    "sig": "b059505a855c9f176557ece618b34101200ab2b64becf4b8fac16babb9f7b58b46337c336531a1e4f3c90c29e61481c0347822803ffe3efc7c5fffef1903dc0b"
+   }
+  }
+ ]
+}

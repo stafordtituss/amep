@@ -1,0 +1,4 @@
+{ "tools": {
+  "Read": { "action": "repo.read", "resource": "repo:file/{path}", "effect": "read" },
+  "Bash": { "action": "repo.push", "resource": "repo:git/origin/{branch}", "effect": "external_send", "released": ["repo:git/origin"] }
+} }

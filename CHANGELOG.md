@@ -102,6 +102,23 @@ tclancy found AMEP through the OpenSSF agenda request (ossf/ai-ml-security#61) a
   - A denied deploy is `unresolved` until the deployment target signs that nothing arrived.
 - **Fix to a stale test:** Provared line 8 has been `violated` (I2) since the admissions rule, matching Provared's own finding.
 
+
+## protect-mcp import profile (unreleased, 2026-11-24)
+
+- **Revised after Tom Farley's review (#20, 26 November):**
+  - binding needs the signed `payload_digest.canonical: "jcs"` marker, a tool that maps to the invocation's action, and a single candidate;
+  - two calls with the same arguments stay unbound unless `correlation.tool_use_ref` equals the receipt's `request_id`;
+  - a pre-execution decision is derived only where the reason establishes the phase, so `post_execution_receipt` yields none.
+
+  Five constructed fixtures and six tests pin these rules.
+
+- **`amep-conformance import --profile protect-mcp`** reads protect-mcp decision receipts (`protectmcp:decision` ACTA envelopes). It:
+  - authenticates them against an issuer key given separately (`--issuer-key`);
+  - binds them to an AMEP invocation when `payload_digest.input_hash` equals `args_digest`;
+  - re-expresses them as AMEP pre-execution decisions.
+
+  It never produces an effect: a decision made before execution shows neither that the tool ran nor that it didn't (spec 10.3). Run over the three fixtures of ScopeBlind's pinned quickstart (`95ecaa3`, `protect-mcp@0.32.5`): allow, `unresolved` (I7, `receipt`); deny, `unresolved` (I10, `independent_observer`); the altered copy, `invalid_signature`. See `interop/protect-mcp/` and ScopeBlind/scopeblind-gateway#31.
+- **Fix, JS core:** for a high-impact call denied with only the host's own enforcement claim, the I10 result now names its gap, `independent_observer`, with `blame` null, as the Python core already did. Outcome and invariant are unchanged, so no vector changes. The browser verifier is rebuilt.
 ## 0.3.0 (2026-11-25)
 
 The packages leave alpha: `amep-protocol` 0.3.0 on PyPI and `@stafordtituss/amep` 0.3.0 on npm. With them, Internet-Draft -02 and suite v0.3.2. The sections below, back to 0.3.0a4, are what this release contains. In brief:

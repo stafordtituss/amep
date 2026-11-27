@@ -562,6 +562,53 @@ describe("profile: AP2 checkout binding (payment.reference), on SDK bundles with
   });
 });
 
+// ---- protect-mcp: binding and phase (review on stafordtituss/amep#20) ----
+describe("protect-mcp binding and phase", () => {
+  const R = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "interop", "protect-mcp");
+  const J = p => JSON.parse(readFileSync(join(R, p), "utf8"));
+  const map = J("toolmap.json"), packet = J("packet.json");
+  const K = "deb516bdd67886e150fea0da92946ec1caa9f19d168e349879f02e9695bae78c";
+  const C = readFileSync(join(R, "fixtures/constructed/issuer-key.txt"), "utf8").trim();
+  const imp = (f, key, invs = packet.invocations) => importRecord(J(f), { profile: "protect-mcp", map, issuerKey: key, invocations: invs });
+  test("the quickstart's allow and deny bind by digest to the one matching call, as pre-execution decisions", () => {
+    const a = imp("fixtures/1-allow.json", K), d = imp("fixtures/2-deny.json", K);
+    assert.deepEqual([a.mapping.binding, a.decision?.invocation, a.decision?.phase], ["digest", "i-1", "pre_execution"]);
+    assert.deepEqual([d.mapping.binding, d.decision?.invocation, d.decision?.mode], ["digest", "i-2", "deny"]);
+  });
+  test("an altered receipt is not bound to anything", () => {
+    const x = imp("fixtures/3-deny-altered-to-allow.json", K);
+    assert.equal(x.integrity.verdict, "verification failed");
+    assert.equal(x.mapping.binding, "not used");
+    assert.equal(x.decision, null);
+  });
+  test("without the signed canonical: \"jcs\" marker, the digest is not compared", () => {
+    const x = imp("fixtures/constructed/4-missing-canonical-marker.json", C);
+    assert.equal(x.integrity.verdict, "pass");
+    assert.equal(x.mapping.binding, "missing");
+    assert.equal(x.decision, null);
+  });
+  test("a post_execution_receipt is bound but not re-expressed as a pre-execution decision", () => {
+    const x = imp("fixtures/constructed/5-post-execution-receipt.json", C);
+    assert.equal(x.mapping.phase, "post_execution");
+    assert.equal(x.decision, null);
+    assert.match(x.mapping.no_decision, /post_execution/);
+    assert.equal(imp("fixtures/constructed/6-allow-resigned.json", C).decision?.invocation, "i-1");   // control
+  });
+  test("a repeated call with the same arguments leaves the receipt unbound, unless a trusted identifier tells them apart", () => {
+    const rep = J("fixtures/constructed/packet-repeated.json"), cor = J("fixtures/constructed/packet-repeated-correlated.json");
+    const u = imp("fixtures/1-allow.json", K, rep.invocations);
+    assert.deepEqual([u.integrity.verdict, u.mapping.binding, u.decision], ["pass", "ambiguous", null]);
+    const b = imp("fixtures/1-allow.json", K, cor.invocations);
+    assert.deepEqual([b.mapping.binding, b.decision?.invocation], ["digest and request_id", "i-1"]);
+  });
+  test("a digest that matches only a call of another action does not bind", () => {
+    const other = packet.invocations.map(i => i.id === "i-1" ? { ...i, declared: { ...i.declared, action: "repo.push" } } : i);
+    const x = imp("fixtures/1-allow.json", K, other);
+    assert.equal(x.mapping.binding, "missing");
+    assert.match(x.mapping.unbound, /another action/);
+  });
+});
+
 // ---- Agent Receipts (agent-receipts/obsigna#1204) ----
 import { agentReceipts, checkChain } from "../src/profiles/agent-receipts.mjs";
 import { digest as coreDigest } from "@stafordtituss/amep/core";
