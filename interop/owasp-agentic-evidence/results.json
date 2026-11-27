@@ -139,6 +139,11 @@
    "invariant": "-",
    "reason": "preserved inside the 10s propagation window: ancestor revoked 5s before effect e-i-1-runner:oracle",
    "gaps": [],
+   "within_window": {
+    "ref": "m-1",
+    "revoked_at": 15,
+    "window": 10
+   },
    "packet_sha256": "4438ba9dee7c42e7749f0ee18aeb08e5e9836bee0b2fa162fdde251bd1e4b4ed"
   },
   {

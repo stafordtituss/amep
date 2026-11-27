@@ -63,7 +63,7 @@ const cases = [];
 const add = (scenario, variant, records, pk, state) => {
   const res = evaluate(pk, keys, sigOk, [], state ?? {});
   const v = verdict(res);
-  cases.push({ scenario, variant, records, outcome: v.outcome, invariant: v.invariant, reason: v.reason, gaps: v.gaps ?? [], packet_sha256: digest(pk) });
+  cases.push({ scenario, variant, records, outcome: v.outcome, invariant: v.invariant, reason: v.reason, gaps: v.gaps ?? [], ...(v.within_window ? { within_window: v.within_window } : {}), packet_sha256: digest(pk) });
 };
 
 // A. Authorized and executed

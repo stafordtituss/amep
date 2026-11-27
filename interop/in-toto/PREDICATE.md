@@ -68,7 +68,8 @@ The predicates compose. Both reference verifiers also publish the verdict as an 
     "packet":   { "sha256": "<hex>" },                       // required; the subject digest when the packet is the subject
     "keyset":   { "sha256": "<hex>" },                       // required
     "verdict":  { "outcome": "<outcome>", "invariant": "<id>", "blame": "<party>" | null, "gaps": [<gap>] },  // required
-    "results":  [{ "id": "<invocation id>", "outcome": "...", "invariant": "...", "blame": ..., "gaps": [...] }],  // required
+    "results":  [{ "id": "<invocation id>", "outcome": "...", "invariant": "...", "blame": ..., "gaps": [...],
+                   "within_window": { "ref": "<id>", "revoked_at": <time>, "window": <seconds> } }],  // required; within_window optional
     "verifier": { "name": "<string>", "version": "<string>" } // optional
   }
 }
@@ -83,7 +84,7 @@ The predicates compose. Both reference verifiers also publish the verdict as an 
 - The payload is the JCS (RFC 8785) form of the statement. Consumers MUST parse it as I-JSON and reject duplicate member names (AMEP Section 12.1).
 - Signatures are Ed25519 over the DSSE pre-authentication encoding, under AMEP's strict acceptance rule (Section 12.2). That rule rejects small-order and non-canonical keys and S ≥ L.
 - `blame` is non-null only when `outcome` is `violated`, and `gaps` is non-empty only when it is `unresolved`.
-- Consumers MUST ignore unknown members of `predicate` and `verifier`. A new outcome, party or need requires a new predicate version.
+- Consumers MUST ignore unknown members of `predicate`, `verifier` and each entry of `results`. A new outcome, party or need requires a new predicate version.
 - **Determinism:** with `verifier` removed, two conforming verifiers given the same packet bytes and key set produce byte-identical predicates.
 
 ## Fields
@@ -97,6 +98,7 @@ The predicates compose. Both reference verifiers also publish the verdict as an 
 | `verdict.blame` | string or null | yes | The party whose own signed record first departs from authority. |
 | `verdict.gaps` | array | yes | Evidence that would let evaluation continue: `{need, ref}`. A gap for a refused signature also carries `cause`: `missing`, `unknown_key`, `role` or `invalid` (AMEP Section 10.5.1). |
 | `results[]` | array | yes | One entry per result, in evaluation order. `id` is the invocation id, or `-` for a packet-level result. |
+| `results[].within_window` | object | no | Present only on a `preserved` result whose call or effect came inside a declared propagation window after a revocation (AMEP Section 5.12.1, v0.3.5): the revoked node (`ref`), the revocation's time (`revoked_at`) and the window in seconds. Lets a consumer count those results apart from results before any revocation. |
 | `verifier` | object | no | The implementation. It's the only member that may differ between conforming verifiers. |
 
 Free-text reasons aren't part of the record, because they differ between implementations.

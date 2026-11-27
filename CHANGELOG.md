@@ -3,6 +3,15 @@
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
 
+## A structured member for results inside a propagation window (unreleased)
+
+- **The gap, from tclancy's review (#41) and OWASP/Agentic-Evidence#21:** a result `preserved` inside a declared propagation window said so only in `reason`, which is free text. A consumer counting across runs couldn't tell those results from results before any revocation without parsing it.
+- **Now (spec 5.12.1, v0.3.5):** such a result carries `within_window`: `{ref, revoked_at, window}`, naming the revoked node, the revocation's time and the window. It's present exactly when an invocation or effect fell inside a window, and the verdict doesn't change. The reason code for the case is `preserved_within_declared_window`.
+- **Verdict records** (`interop/in-toto/PREDICATE.md`) carry it on the result. Consumers already had to ignore unknown members, and the two reference verifiers still produce byte-identical records on every vector.
+- **A lower window maximum (spec 5.12.1):** a profile may set a maximum below 3600 seconds, and treat a grant that declares more as malformed under that profile.
+- **Suite v0.3.5:** 298 core vectors (79 positive, 219 must-reject). The two vectors inside a window now pin `within_window` in `expect`, and a new vector, a revocation after the effect with a window declared, must carry none. No outcome changes.
+- **`interop/owasp-agentic-evidence/`:** the D1 result with a 10 s window records `within_window`.
+
 ## 0.3.2 (2026-11-26)
 
 `amep-protocol` 0.3.2 on PyPI and `@stafordtituss/amep` 0.3.2 on npm, with suite v0.3.4: 297 core vectors (78 positive, 219 must-reject), 16 approval-path vectors and 20 delegation-continuity vectors, 333 in all, plus seven cross-packet sequences. Two fixes, both found by mapping the OWASP Agentic Evidence authorization-to-outcome scenarios (OWASP/Agentic-Evidence#2, #21; research note OWASP/Agentic-Evidence#22):

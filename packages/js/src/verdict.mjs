@@ -15,7 +15,8 @@ export const RULES_URI = "https://github.com/stafordtituss/amep/blob/main/spec/a
 const SPEC_VERSION = "0.3.0-draft.1";
 
 const sha256 = b => createHash("sha256").update(b).digest("hex");
-const resultOf = r => ({ id: r.id, outcome: r.outcome, invariant: r.invariant, blame: r.blame ?? null, gaps: [...(r.gaps ?? [])] });
+const resultOf = r => ({ id: r.id, outcome: r.outcome, invariant: r.invariant, blame: r.blame ?? null, gaps: [...(r.gaps ?? [])],
+  ...(r.within_window ? { within_window: { ...r.within_window } } : {}) });
 
 /** The predicate. packetBytes: the exact bytes evaluated (Buffer or string, UTF-8). */
 export function verdictRecord(packetBytes, keys, results, verifier) {

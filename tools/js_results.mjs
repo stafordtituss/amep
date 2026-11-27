@@ -18,7 +18,7 @@ for (const dir of process.argv.slice(2)) {
       const v = JSON.parse(readFileSync(join(dir, sub, f), "utf8"));
       const st = v.state ? structuredClone(v.state) : {};
       const res = v.packet_text !== undefined ? evaluateText(v.packet_text, keys, sigOk, [], st) : evaluate(v.packet, keys, sigOk, [], st);
-      out[`${dir}/${sub}/${f}`] = res.map(r => ({ id: r.id, outcome: r.outcome, invariant: r.invariant, blame: r.blame ?? null, gaps: r.gaps ?? [] }));
+      out[`${dir}/${sub}/${f}`] = res.map(r => ({ id: r.id, outcome: r.outcome, invariant: r.invariant, blame: r.blame ?? null, gaps: r.gaps ?? [], within_window: r.within_window ?? null }));
     }
   }
 }
