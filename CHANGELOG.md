@@ -3,7 +3,15 @@
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
 
-## A structured member for results inside a propagation window (unreleased)
+## 0.3.3 (2026-11-27)
+
+`amep-protocol` 0.3.3 on PyPI and `@stafordtituss/amep` 0.3.3 on npm, with suite v0.3.5: 298 core vectors (79 positive, 219 must-reject), 16 approval-path vectors and 20 delegation-continuity vectors, 334 in all, plus seven cross-packet sequences. In brief:
+- **`within_window` (spec 5.12.1):** a result preserved inside a declared propagation window now names the revocation as a structured member, so these results can be counted without parsing text. From tclancy (#41) and Jon Odalen, Weaveframe (OWASP/Agentic-Evidence#21).
+- **Profiles may set a lower window maximum,** and a grant over it gets the same result as one over 3600 s.
+
+No outcome changes. Verdict records gain the optional member, and both reference verifiers still produce byte-identical records on every vector.
+
+## A structured member for results inside a propagation window (shipped in 0.3.3; 2026-11-27)
 
 - **The gap, from tclancy's review (#41) and Jon Odalen, Weaveframe (@jonodalen), on OWASP/Agentic-Evidence#21:** a result `preserved` inside a declared propagation window said so only in `reason`, which is free text. A consumer counting across runs couldn't tell those results from results before any revocation without parsing it.
 - **Now (spec 5.12.1, v0.3.5):** such a result carries `within_window`: `{ref, revoked_at, window}`, naming the revoked node, the revocation's time and the window. It's present exactly when an invocation or effect fell inside a window, and the verdict doesn't change. The reason code for the case is `preserved_within_declared_window`.

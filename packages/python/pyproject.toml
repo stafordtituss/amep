@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "amep-protocol"
-version = "0.3.2"
+version = "0.3.3"
 description = "Verify and produce AMEP (Agentic Mandate Evidence Protocol) evidence: proof that AI agent actions stayed within delegated authority."
 readme = "README.md"
 requires-python = ">=3.10"
