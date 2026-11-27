@@ -12,16 +12,16 @@ Every row links to the public record. The full entries, in the reviewers' own wo
 
 ## The baseline
 
-**Release 0.3.3** (`amep-protocol` 0.3.3 on PyPI, `@stafordtituss/amep` 0.3.3 on npm), conformance suite v0.3.5. Suite digests are as printed by `amep-conformance verify`, SHA-256 over the key set and every vector file:
+**Release 0.3.4** (`amep-protocol` 0.3.4 on PyPI, `@stafordtituss/amep` 0.3.4 on npm), conformance suite v0.3.6. Suite digests are as printed by `amep-conformance verify`, SHA-256 over the key set and every vector file:
 
 | Suite | Vectors | Digest |
 |---|---|---|
-| core (`vectors/`) | 298 (79 positive, 219 must-reject) | `a42af0196ee8798e18080a0c5b843b23e5e7fa52153042542d3b7c0b2449a3e5` |
+| core (`vectors/`) | 306 (82 positive, 224 must-reject) | `ac78d2adcd1772bdc55adba8f6fd2a8581538d19ce8244c051aa931c744a0a18` |
 | approval-path attacks (`interop/approval-path-attacks/`) | 16 | `371db5321167b1f29f72262399d29b0a2f4fd7c2bdd4a3df96dfa314298a3eb9` |
 | delegation continuity (`interop/w3c-agent-identity/delegation-continuity/`) | 20 | `018ebe703a21f321bdfb1942e4617717074aeb05f19d93b632b2671b2ce1785c` |
 | cross-packet sequences (`vectors/sequences/operation-state.json`) | 7 sequences, 20 steps | file SHA-256 `8e6f4616d763bb80e9ab448c78bda950432d6669f24a642f27a7e96493e90bb4` |
 
-Earlier results below were against earlier suites. Each row says which, and none of them is a claim about 0.3.3 unless it says so.
+Earlier results below were against earlier suites. Each row says which, and none of them is a claim about 0.3.4 unless it says so.
 
 ## 1. Independent implementations
 
@@ -29,7 +29,7 @@ Written by someone other than the author, without reading the reference verifier
 
 | Who | What | Against | Result | Not covered |
 |---|---|---|---|---|
-| Brennan Zambo, [zambo-amep-verify](https://github.com/zambodotdev/zambo-amep-verify) 0.1.0 | A verifier written from the specification text and the published vectors only (Python, standard library; RFC 8032, RFC 8785) | Core suite at `5f1700c`, rerun at `59d0daf` (24 November, before 0.3.0) | 228 of 228 single-packet vectors on outcome and invariant; 246 of 246 with the cross-packet state supplied. Four unclear passages found and clarified | It does not build cross-packet state itself; the two interop suites; everything added in 0.3.0 to 0.3.3. [#18](https://github.com/stafordtituss/amep/issues/18), [#19](https://github.com/stafordtituss/amep/issues/19) |
+| Brennan Zambo, [zambo-amep-verify](https://github.com/zambodotdev/zambo-amep-verify) 0.1.0 | A verifier written from the specification text and the published vectors only (Python, standard library; RFC 8032, RFC 8785) | Core suite at `5f1700c`, rerun at `59d0daf` (24 November, before 0.3.0) | 228 of 228 single-packet vectors on outcome and invariant; 246 of 246 with the cross-packet state supplied. Four unclear passages found and clarified | It does not build cross-packet state itself; the two interop suites; everything added in 0.3.0 to 0.3.4. [#18](https://github.com/stafordtituss/amep/issues/18), [#19](https://github.com/stafordtituss/amep/issues/19) |
 | nmatt1 (paymnts), APAF-1 | An independent verifier column over AMEP's AP2 payment fixtures. Their own engine and dictionary; AMEP's fixtures and generator | The pinned AP2 fixture sets (22 rows), then the second family with checkouts (33 rows, 24 November) | Matches AMEP's column row by row, including the `held_outcome` gap and the signature gap. Found that the fixtures lacked `payment.reference`; fixed | AMEP's core suite: only the AP2 profile's fixtures. [AP2 #402](https://github.com/google-agentic-commerce/AP2/issues/402) |
 
 ## 2. Reproductions of AMEP's own outputs
@@ -67,10 +67,10 @@ These check whether an AMEP import profile reads the other project's records cor
 
 ## 5. AMEP's own checks (not independent)
 
-| What | Result at 0.3.3 |
+| What | Result at 0.3.4 |
 |---|---|
-| Python and JavaScript reference verifiers. Same author, so agreement shows consistency, not independence | Both agree with every expected outcome, including `within_window` where a vector pins it: 298 core, 16 approval-path, 20 delegation, and all 7 sequences |
-| The offline browser page (the JavaScript core with WebCrypto) | 298 of 298 |
+| Python and JavaScript reference verifiers. Same author, so agreement shows consistency, not independence | Both agree with every expected outcome, including `within_window` where a vector pins it: 306 core, 16 approval-path, 20 delegation, and all 7 sequences |
+| The offline browser page (the JavaScript core with WebCrypto) | 306 of 306 |
 | The vector index, JSON Schemas and CDDL | Every vector as expected (23 deliberately invalid) |
 
 ## 6. AMEP's rules adopted in another specification
@@ -104,9 +104,9 @@ Agent Receipts is an open format for signed receipts of agent actions, with SDKs
 
 ## What has not been checked yet
 
-- **The current suite:** no independent implementation has run suite v0.3.3, v0.3.4 or v0.3.5. Brennan Zambo's results are against the core suite as of 24 November.
+- **The current suite:** no independent implementation has run suite v0.3.3 to v0.3.6. Brennan Zambo's results are against the core suite as of 24 November.
 - **The interop suites** (approval-path attacks, delegation continuity) have no outside run.
-- **The 0.3.1 to 0.3.3 rule changes,** apart from tclancy's review of his own findings. The 0.3.2 changes came from AMEP's own mapping of the OWASP Agentic Evidence scenarios (OWASP/Agentic-Evidence#22), which their author has not yet reviewed.
+- **The 0.3.1 to 0.3.4 rule changes,** apart from tclancy's review of his own findings. The 0.3.2 changes came from AMEP's own mapping of the OWASP Agentic Evidence scenarios (OWASP/Agentic-Evidence#22), which their author has not yet reviewed.
 - **Production use:** nothing here shows AMEP in a production deployment.
 
 To add a row, run the suites against your implementation (`amep-conformance verify`) and open an [implementation report](https://github.com/stafordtituss/amep/issues/new?template=implementation-report.yml).

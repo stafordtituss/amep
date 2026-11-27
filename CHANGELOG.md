@@ -3,7 +3,15 @@
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
 
-## Purpose at the effect (unreleased)
+## 0.3.4 (2026-11-27)
+
+`amep-protocol` 0.3.4 on PyPI and `@stafordtituss/amep` 0.3.4 on npm, with suite v0.3.6: 306 core vectors (82 positive, 224 must-reject), 16 approval-path vectors and 20 delegation-continuity vectors, 342 in all, plus seven cross-packet sequences. In brief:
+- **Purpose at the effect (spec 5.8.3, #14):** a purpose that a call or receipt states is checked against the claims, and a different one is `violated` (I2). From delegation-control-bench, scenario DEL-04.
+- **Purpose checked without trusting the agent:** by its consequences (data-flow rules with lineage) and from the principal's signed intent. The spec says plainly what no record-based verifier can establish.
+
+No existing vector's outcome changes. The JSON Schemas and CDDL gain `purpose` on `declared` and on the executed body.
+
+## Purpose at the effect (shipped in 0.3.4; 2026-11-27)
 
 - **The gap (#14), found by delegation-control-bench (scenario DEL-04):** a mandate's `purpose` was enforced along a delegation chain but not on what ran. An effect in scope on action and resource, done for another purpose, was `preserved`.
 - **Now (spec 5.8.3, suite v0.3.6):**
