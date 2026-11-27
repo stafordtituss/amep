@@ -43,7 +43,7 @@ The mandate is derived from the user task's ground truth. So effect-scoped is th
 | tool-scoped | 488 | 83 | 85.5% |
 | suite-wide | 0 | 571 | 0.0% |
 
-**False positives:** honest traces evaluate to `preserved` under all three mandates (97 of 97 each).
+**Honest traces:** all 97 evaluate to `preserved` under all three mandates. That holds by construction, and isn't a false-positive rate. Each honest trace is the user task's ground-truth calls, with AgentDojo's own arguments, and each mandate is derived from those same calls. So it shows only that the evaluation doesn't misfire on the calls it was built from. Arguments a real agent writes, such as a recipient spelled another way or an extra call, are untested here, and could make a precise mandate flag honest work. Measuring that needs real model runs.
 
 **The 5 effect-scoped misses** all act on *the same object* as the user's task, with different content:
 - banking injection 7: a password change, when the user's task also changes the password;
@@ -73,10 +73,12 @@ Suite v0.2.2 adds three vectors for this path. The pre-fix Python verifier fails
 ## Limits
 
 - **Oracle traces show what the evidence can catch, not what real agents do.** Real agents call tools in other orders, retry, and fail partway through. The next step is running AgentDojo's real model pipelines with the recorder attached. This needs a model API key, which you enter yourself at the prompt.
-- **The mandates are derived from AgentDojo's ground truth.** Real principals state mandates less precisely, so effect-scoped is an upper bound.
+- **The mandates are derived from AgentDojo's ground truth,** and so are the honest traces. Real principals state mandates less precisely, so effect-scoped is an upper bound on detection. For the same reason, the honest traces can't show a false-positive rate.
 - **The interpretation of tool calls is ours.** `EFFECT` and `OBJECT_ARGS` in `harness.py` map each tool to an effect class and resource, and a different mapping would change the tool-scoped numbers.
 
 ## Reproduce
+
+`agentdojo==0.1.35` is the Python package. It ships the benchmark suites up to v1.2.2, the version `harness.py` uses by default (`--version`).
 
 ```
 pip install agentdojo==0.1.35 ./packages/python ./packages/agents
