@@ -2,7 +2,12 @@
  "name": "propagation window of exactly an hour",
  "expect": {
   "outcome": "preserved",
-  "invariant": "-"
+  "invariant": "-",
+  "within_window": {
+   "ref": "m-1",
+   "revoked_at": 15,
+   "window": 3600
+  }
  },
  "packet": {
   "mandates": [

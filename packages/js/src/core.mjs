@@ -26,7 +26,8 @@ class Stop {
   }
 }
 const check = (cond, outcome, invariant, reason, tags) => { if (cond) throw new Stop(outcome, invariant, reason, tags); };
-const result = (id, outcome, invariant, reason, blame = null, gaps = []) => ({ id, outcome, invariant, reason, blame, gaps });
+const result = (id, outcome, invariant, reason, blame = null, gaps = [], withinWindow = null) =>
+  ({ id, outcome, invariant, reason, blame, gaps, ...(withinWindow ? { within_window: withinWindow } : {}) });
 
 export const isGuardrail = (res, extra = []) => {
   const r = "/" + res.replace("~", "home").replace(/^\/+/, "");
@@ -520,6 +521,7 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   const firstCause = os => { const o = os.find(x => !verify(x)); return os.some(x => !verify(x)) ? sigCause(o) : undefined; };
   const objs = {};
   const notes = new Map();   // per invocation: a note for a preserved result (spec 5.12.1)
+  const windows = new Map(); // per invocation: the revocation a preserved result fell inside the window of (spec 5.12.1)
   // spec 5.11 (v0.3.3), from stafordtituss/amep#34: a principal's confirmation of a call shaped by untrusted or
   // quarantined content is an approval (spec 5.10) signed by an approver key that lists, in `findings`, every finding the
   // principal was shown. Like any approval it is bound to the executed effect and used once. The host's own
@@ -585,7 +587,7 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
         check(true, "violated", "I4", `quarantined content reached the agent (${leaked.join(", ")})`, { blame: "host" });
       }
       const why = evalInvocation(inv);
-      out.push(result(id, "preserved", "-", why || notes.get(id) || "continuity preserved"));
+      out.push(result(id, "preserved", "-", why || notes.get(id) || "continuity preserved", null, [], windows.get(id) ?? null));
     } catch (e) {
       if (e instanceof Stop) out.push(result(id, e.outcome, e.invariant, e.reason, e.blame, e.gaps));
       else out.push(result(id, "unresolved", "I7", `malformed evidence: ${e.message}`, null, [{ need: "well_formed_evidence", ref: String(id) }]));
@@ -730,6 +732,9 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
         // noted in the reason instead.
         if (t < rT + w) {
           if (!notes.has(id)) notes.set(id, `preserved inside the ${fmt(w)}s propagation window: ${why} ${fmt(t - rT)}s before ${what}`);
+          // spec 5.12.1 (v0.3.5), stafordtituss/amep#41: the same fact as a structured member, so a consumer can count
+          // these results apart from effects before any revocation without parsing the reason
+          if (!windows.has(id)) windows.set(id, { ref: target, revoked_at: why === "ancestor revoked" ? rec.t : rec.revoked_at, window: w });
           continue;
         }
         check(true, "violated", "I6", `${why} before ${what}`, { blame: "agent" });

@@ -27,7 +27,10 @@ RULES_URI = "https://github.com/stafordtituss/amep/blob/main/spec/amep-v0.2.md"
 
 
 def _result(r) -> dict:
-    return {"id": r.invocation, "outcome": r.outcome, "invariant": r.invariant, "blame": r.blame, "gaps": list(r.gaps)}
+    out = {"id": r.invocation, "outcome": r.outcome, "invariant": r.invariant, "blame": r.blame, "gaps": list(r.gaps)}
+    if r.within_window:
+        out["within_window"] = dict(r.within_window)
+    return out
 
 
 def verdict_record(packet_bytes: bytes, keys: dict, results: list, verifier: dict | None = None) -> dict:

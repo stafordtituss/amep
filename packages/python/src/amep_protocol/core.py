@@ -632,6 +632,7 @@ class Result:
     reason: str
     blame: str | None = None                    # violated: agent, host, delegator, transport or server (spec 10.5)
     gaps: list = field(default_factory=list)    # unresolved: [{"need": ..., "ref": ...}]
+    within_window: dict | None = None          # preserved inside a propagation window: {"ref", "revoked_at", "window"} (spec 5.12.1)
 
 
 class Stop(Exception):
@@ -757,7 +758,7 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
             raise Malformed(f"key {kid}: clock_skew must be a number of seconds from 0 to 3600")
         return v
 
-    ctx = {"v03": v03, "totals": totals, "prior_windows": prior_windows, "same_operator": same_operator, "notes": {}, "clock_skew": clock_skew,
+    ctx = {"v03": v03, "totals": totals, "prior_windows": prior_windows, "same_operator": same_operator, "notes": {}, "windows": {}, "clock_skew": clock_skew,
            "held": {d: h for d, h in held_in.items() if d not in present}, "new_held": {}, "first_cause": first_cause,
            # spec 5.10, held approvals (v0.3): approvals held for earlier invocations whose outcome is unknown; one held by an
            # invocation in this packet is set aside, since this packet decides that invocation afresh
@@ -819,7 +820,8 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
                        need="principal_confirmation", ref=rid)
                 _check(True, "violated", "I4", f"quarantined content reached the agent ({', '.join(leaked)})", blame="host")
             why = _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects, spent, approval_use, extra_protected, order, taint, ctx)
-            out.append(Result(rid, "preserved", "-", why or ctx["notes"].get(rid) or "continuity preserved"))
+            out.append(Result(rid, "preserved", "-", why or ctx["notes"].get(rid) or "continuity preserved",
+                              within_window=ctx["windows"].get(rid)))
         except Stop as s:
             out.append(Result(rid, *s.r))
         except (Malformed, KeyError, TypeError, ValueError, AttributeError) as e:
@@ -1086,6 +1088,9 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
                 # revocation is noted in the reason instead.
                 if t < r_t + w:
                     ctx["notes"].setdefault(rid, f"preserved inside the {w:g}s propagation window: {why} {t - r_t:g}s before {what}")
+                    # spec 5.12.1 (v0.3.5), stafordtituss/amep#41: the same fact as a structured member, so a consumer can
+                    # count these results apart from effects before any revocation without parsing the reason
+                    ctx["windows"].setdefault(rid, {"ref": target, "revoked_at": rec["t"] if why == "ancestor revoked" else rec["revoked_at"], "window": w})
                     continue
                 _check(True, "violated", "I6", f"{why} before {what}", blame="agent")
 

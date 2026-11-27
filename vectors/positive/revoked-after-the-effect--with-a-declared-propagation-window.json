@@ -1,8 +1,9 @@
 {
- "name": "propagation window longer than an hour",
+ "name": "revoked after the effect, with a declared propagation window",
  "expect": {
-  "outcome": "unresolved",
-  "invariant": "I7"
+  "outcome": "preserved",
+  "invariant": "-",
+  "within_window": null
  },
  "packet": {
   "mandates": [
@@ -26,12 +27,12 @@
      "depth": 2
     },
     "revocation": {
-     "window": 3601
+     "window": 10
     },
     "proof": {
      "kid": "issuer-1",
      "alg": "Ed25519",
-     "sig": "7b0b4a09ad2add0e08aa934588c5feba9ae83ea9a903f3c127d4bd38b8b780ae12d2c31fe5ce170c0d5fd250e575fce47cba6dfbe2b20109d6cc8f804a665201"
+     "sig": "9b224c6ecb60f92acbdf069725a5a75529e579910503a657d2f18a0dd859df4a4f074569310a3ee746b9209fa884422a979123e53e978e9bc5c2e228bc4ad604"
     }
    }
   ],
@@ -119,11 +120,11 @@
    {
     "kind": "revocation",
     "target": "m-1",
-    "t": 15,
+    "t": 25,
     "proof": {
      "kid": "issuer-1",
      "alg": "Ed25519",
-     "sig": "bccfd19efce00fccb9f43bbd935bc008f9fc9848d3742b0d14c038d5067fb2a0e5c0e29d249ed8544194d4a1f8bed162d2e21c66eff475c69791b461290a3e0e"
+     "sig": "f1e6686fe27a8f903672b7f996a114ef6ed00f8e3e052021b4c82d7e447c67ad984198106544b933f86c57dd2070d8542a174492e1ae444d6f584b8836056e08"
     }
    }
   ]

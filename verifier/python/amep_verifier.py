@@ -571,12 +571,17 @@ def vectors():
     window = lambda p, I, w: p.update(mandates=[I.sign({**p["mandates"][0], "revocation": {"window": w}})])  # noqa: E731
     # From tclancy's review (stafordtituss/amep#35): the window is part of the signed grant, so an effect inside it is
     # within the authority as granted, and nothing is missing (spec 5.12.1, v0.3.3). The window is bounded at an hour.
-    add("revoked mid-action, inside the declared propagation window", ("preserved", "-"), lambda p, I, H, O, X: (
+    # The result carries the revocation as a structured member, within_window (spec 5.12.1, v0.3.5,
+    # stafordtituss/amep#41, from tclancy and OWASP/Agentic-Evidence#21), so these can be counted without parsing text.
+    add("revoked mid-action, inside the declared propagation window", ("preserved", "-", {"ref": "m-1", "revoked_at": 15, "window": 10}), lambda p, I, H, O, X: (
         window(p, I, 10), times(p, H, O, eff_t=20), rev(p, I, 15)))
-    add("propagation window longer than an hour", ("unresolved", "I7"), lambda p, I, H, O, X: (
+    # Named for what it is, a malformed grant, not missing evidence (Jon Odalen, Weaveframe, OWASP/Agentic-Evidence#21).
+    add("grant declaring a propagation window over the one-hour maximum (malformed)", ("unresolved", "I7"), lambda p, I, H, O, X: (
         window(p, I, 3601), times(p, H, O, eff_t=20), rev(p, I, 15)))
-    add("propagation window of exactly an hour", ("preserved", "-"), lambda p, I, H, O, X: (
+    add("propagation window of exactly an hour", ("preserved", "-", {"ref": "m-1", "revoked_at": 15, "window": 3600}), lambda p, I, H, O, X: (
         window(p, I, 3600), times(p, H, O, eff_t=20), rev(p, I, 15)))
+    add("revoked after the effect, with a declared propagation window", ("preserved", "-", None), lambda p, I, H, O, X: (
+        window(p, I, 10), times(p, H, O, eff_t=20), rev(p, I, 25)))
     # Clocks of different operators (spec 5.12.2, v0.3.4), stafordtituss/amep#43, from OWASP/Agentic-Evidence#21
     # (unordered-revocation): the authority source and the observer each declare a clock skew in the key set. Where an
     # effect falls within their combined skew of the boundary that decides the verdict, the order is not established.
@@ -1253,7 +1258,8 @@ def check_dir(d: str) -> int:
             else:
                 r = verdict(evaluate(v["packet"], keys, state=v.get("state")))
             n += 1
-            if (r.outcome, r.invariant) == (v["expect"]["outcome"], v["expect"]["invariant"]):
+            if (r.outcome, r.invariant) == (v["expect"]["outcome"], v["expect"]["invariant"]) and \
+                    ("within_window" not in v["expect"] or r.within_window == v["expect"]["within_window"]):
                 ok += 1
             else:
                 print(f"FAIL {sub}/{f}: got {r.outcome}/{r.invariant} ({r.reason})")
@@ -1405,8 +1411,11 @@ if __name__ == "__main__":
             if f.endswith(".json"):
                 os.remove(f"{out_dir}/{sub}/{f}")
     json.dump(keys, open(f"{out_dir}/keys.json", "w"), indent=1)
-    for name, (exp_out, exp_inv), packet, state in V:
+    for name, expect, packet, state in V:
+        exp_out, exp_inv = expect[:2]
         doc = {"name": name, "expect": {"outcome": exp_out, "invariant": exp_inv}}
+        if len(expect) > 2:   # spec 5.12.1: the verdict's within_window member, or null where it must be absent
+            doc["expect"]["within_window"] = expect[2]
         if "__text__" in packet:
             doc["packet_text"] = packet["__text__"]
         else:
@@ -1418,7 +1427,7 @@ if __name__ == "__main__":
         slug = "".join(ch if ch.isalnum() else "-" for ch in name.lower()).strip("-")
         folder = "positive" if exp_out == "preserved" else "must-reject"
         json.dump(doc, open(f"{out_dir}/{folder}/{slug}.json", "w", encoding="utf-8"), indent=1, ensure_ascii=False)
-        ok = (r.outcome, r.invariant) == (exp_out, exp_inv)
+        ok = (r.outcome, r.invariant) == (exp_out, exp_inv) and (len(expect) < 3 or r.within_window == expect[2])
         passed += ok
         if not ok:
             print(f"FAIL  {name:45} -> {r.outcome:10} {r.invariant:3} {r.reason}   (expected {exp_out}/{exp_inv})")

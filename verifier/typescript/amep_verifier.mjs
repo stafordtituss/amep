@@ -30,7 +30,8 @@ let ok = 0, n = 0; const fails = [];
 for (const sub of ["positive", "must-reject"]) for (const f of readdirSync(join(dir, sub)).filter(f => f.endsWith(".json")).sort()) {
   const d = JSON.parse(readFileSync(join(dir, sub, f), "utf8")); const st = d.state ? structuredClone(d.state) : {};
   const r = verdict(d.packet_text !== undefined ? evaluateText(d.packet_text, keys, sigOk, [], st) : evaluate(d.packet, keys, sigOk, [], st));
-  n++; if (r.outcome === d.expect.outcome && r.invariant === d.expect.invariant) ok++; else fails.push(`${sub}/${f}: got ${r.outcome}/${r.invariant} (${r.reason})`);
+  n++; if (r.outcome === d.expect.outcome && r.invariant === d.expect.invariant &&
+    (!("within_window" in d.expect) || JSON.stringify(r.within_window ?? null) === JSON.stringify(d.expect.within_window))) ok++; else fails.push(`${sub}/${f}: got ${r.outcome}/${r.invariant} (${r.reason})`);
 }
 console.log(`node verifier agrees with expected outcomes on ${ok}/${n} vectors`); if (fails.length) console.log(fails.join("\n"));
 process.exit(ok === n ? 0 : 1);

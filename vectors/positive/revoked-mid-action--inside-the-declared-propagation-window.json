@@ -2,7 +2,12 @@
  "name": "revoked mid-action, inside the declared propagation window",
  "expect": {
   "outcome": "preserved",
-  "invariant": "-"
+  "invariant": "-",
+  "within_window": {
+   "ref": "m-1",
+   "revoked_at": 15,
+   "window": 10
+  }
  },
  "packet": {
   "mandates": [

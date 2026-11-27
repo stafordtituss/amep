@@ -29,7 +29,7 @@ def python_results():
                 st = json.loads(json.dumps(v["state"])) if v.get("state") else None
                 res = evaluate_text(v["packet_text"], keys, state=st) if "packet_text" in v else evaluate(v["packet"], keys, state=st)
                 out[f"{d}/{sub}/{f}"] = [{"id": r.invocation, "outcome": r.outcome, "invariant": r.invariant,
-                                          "blame": r.blame, "gaps": r.gaps} for r in res]
+                                          "blame": r.blame, "gaps": r.gaps, "within_window": r.within_window} for r in res]
     return out
 
 
@@ -74,7 +74,7 @@ def main():
     results = sum(len(v) for v in py.values())
     for k in bad[:20]:
         print(f"DIFFER {k}\n  python: {py[k]}\n  js:     {js.get(k)}")
-    print(f"{len(py) - len(bad)}/{len(py)} vectors ({results} results): both verifiers agree on outcome, invariant, blame and gaps")
+    print(f"{len(py) - len(bad)}/{len(py)} vectors ({results} results): both verifiers agree on outcome, invariant, blame, gaps and within_window")
     sp, sj = statements()
     sbad = [k for k in sp if sp[k][0] != (sj.get(k) or [None])[0]]
     vbad = [k for k in sp if sp[k][1] != (sj.get(k) or [None, None])[1]]
