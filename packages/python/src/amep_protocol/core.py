@@ -427,6 +427,9 @@ def within_declared(x: dict, inv: dict, v03: bool = False) -> bool:
     class. Found while importing Kilo Code sessions, where an allowed command writes files the call did not name."""
     d = inv["declared"]
     sc = d.get("scope") if v03 else None
+    # spec 5.8 (v0.3.6), stafordtituss/amep#14: where both the call and its receipt state a purpose, they must agree
+    if v03 and isinstance(d.get("purpose"), str) and isinstance(x.get("purpose"), str) and x["purpose"] != d["purpose"]:
+        return False
     if sc is None:
         return (x["action"], x["resource"]) == (d["action"], d["resource"])
     return (any(pat_match(x["action"], p) for p in sc["actions"]) and any(pat_match(x["resource"], p) for p in sc["resources"])
@@ -438,7 +441,19 @@ def scope_well_formed(sc) -> bool:
             and all(isinstance(sc[k], list) and sc[k] and all(isinstance(v, str) and v for v in sc[k]) for k in ("actions", "resources")))
 
 
-def effect_ok(x: dict, c: dict, v03: bool = False) -> tuple[bool, str]:
+def purpose_of(x: dict, inv: dict, v03: bool = False):
+    """spec 5.8 (v0.3.6), stafordtituss/amep#14: the purpose an effect was carried out for is the one its receipt
+    states, else the one its call declared. Undeclared, it is unknown, and the claims' purpose isn't checked: AMEP can
+    check a stated purpose, never an intention nobody recorded."""
+    if not v03:
+        return None
+    if isinstance(x.get("purpose"), str):
+        return x["purpose"]
+    p = inv["declared"].get("purpose")
+    return p if isinstance(p, str) else None
+
+
+def effect_ok(x: dict, c: dict, v03: bool = False, purpose=None) -> tuple[bool, str]:
     gs = grants_of(c, v03)
     act = [g for g in gs if any(pat_match(x["action"], p) for p in g["actions"])]
     if not act: return False, "action outside claims"
@@ -447,6 +462,7 @@ def effect_ok(x: dict, c: dict, v03: bool = False) -> tuple[bool, str]:
     if not any(any(pat_match(x["resource"], p) for p in g["resources"]) for g in act): return False, "resource outside claims"
     if any(pat_match(x["resource"], p) for p in c.get("deny_resources", [])): return False, "resource denied"
     if CEILING.index(x["effect"]) > CEILING.index(c["ceiling"]): return False, "effect above ceiling"
+    if purpose is not None and "purpose" in c and purpose != c["purpose"]: return False, "purpose outside claims"
     # spec 5.3 (v0.3.2), from stafordtituss/amep#16: an effect sent to a service the principal never named is outside
     # authority, even when its action and resource are in scope (a presentation replayed to another audience)
     if "audiences" in c and isinstance(x.get("audience"), str) and not any(pat_match(x["audience"], p) for p in c["audiences"]):
@@ -941,7 +957,7 @@ def _admission(e, inv, eff_claims, extra_protected, ctx):
             return
         note = " (on the actor's own record; not independently observed)"
         _check(is_guardrail(x["resource"], extra_protected), "violated", "I9", "executed effect targets guardrail/evidence store" + note, blame="agent")
-        ok, why = effect_ok(x, eff_claims, ctx["v03"])
+        ok, why = effect_ok(x, eff_claims, ctx["v03"], purpose_of(x, inv, ctx["v03"]))
     except (Malformed, KeyError, TypeError, ValueError, AttributeError):
         return
     _check(not ok, "violated", "I5" if why.startswith("released") else "I2", why + note, blame="agent")
@@ -1029,6 +1045,11 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
         _check(not ctx["v03"], "unresolved", "I7", f"{rid}: declared.scope requires amep_version 0.3", need="well_formed_evidence", ref=rid)
         _check(not scope_well_formed(inv["declared"]["scope"]), "unresolved", "I7",
                f"{rid}: declared.scope must be exactly {{actions, resources}}, each a non-empty list of patterns", need="well_formed_evidence", ref=rid)
+    if "purpose" in (inv.get("declared") or {}):
+        # declared.purpose (spec 5.8, v0.3.6) is an AMEP 0.3 member: ignored, a purpose outside the claims would pass.
+        _check(not ctx["v03"], "unresolved", "I7", f"{rid}: declared.purpose requires amep_version 0.3", need="well_formed_evidence", ref=rid)
+        _check(not (isinstance(inv["declared"]["purpose"], str) and inv["declared"]["purpose"]), "unresolved", "I7",
+               f"{rid}: declared.purpose must be a non-empty string", need="well_formed_evidence", ref=rid)
     if ctx["v03"] and "reserve" in inv:
         try:
             check_reserve(inv["reserve"])
@@ -1240,7 +1261,7 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
             _check(not within_declared(x, inv, ctx["v03"]), "violated", "I2",
                    "executed outside the call's declared scope" if ctx["v03"] and "scope" in inv["declared"] else "declared != executed", blame="server")
         _check(is_guardrail(x["resource"], extra_protected), "violated", "I9", "executed effect targets guardrail/evidence store", blame="agent")
-        ok, why = effect_ok(x, eff_claims, ctx["v03"])
+        ok, why = effect_ok(x, eff_claims, ctx["v03"], purpose_of(x, inv, ctx["v03"]))
         _check(not ok, "violated", "I5" if why.startswith("released") else "I2", why, blame="agent")
         # spec 5.3 (v0.3.2): where the claims name audiences, the receipt must say where the effect was sent
         _check("audiences" in eff_claims and not (isinstance(x.get("audience"), str) and x["audience"]), "unresolved", "I7",

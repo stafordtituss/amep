@@ -31,7 +31,7 @@ Seven verdict records of kind `check-run`, each stating AMEP's verdict on one of
 | an01 | states preserved for av02's vector | refused; FAIL at step 3 (the re-run gives violated, I2) |
 | an02 | names an AMEP verifier build the checker doesn't hold | held; NOT RUN at step 3 |
 
-These ran on the reference checker `vrcheck.py` at commit `ba9ea21`, 7 of 7 as expected. The full reports are in `results.json`. No record or vector was changed after the first run.
+These ran on the reference checker `vrcheck.py` at commit `ba9ea21`, 7 of 7 as expected. The full reports are in `results.json`. No record was changed to make the checker agree. The records are regenerated, and rerun, whenever AMEP's Python verifier changes, since each one names the exact build.
 
 ## Two notes for the draft
 

@@ -1077,6 +1077,28 @@ def vectors():
     add("declared scope with an empty list", ("unresolved", "I7"), lambda p, I, H, O, X:
         command(p, I, H, O, ["repo:app/src/a.ts"], scope={"actions": ["fs.write"], "resources": []}))
 
+    # 8c. Purpose at the effect (spec 5.8, v0.3.6), stafordtituss/amep#14, found by delegation-control-bench (DEL-04):
+    # purpose was checked along the chain but not on what ran. A call may now declare the purpose it acts for, and a
+    # receipt may state it. AMEP checks a stated purpose; an undeclared one stays unchecked, as before.
+    def purpose(p, I, H, O, declared=None, executed=None, versioned=True):
+        p.update(mandates=[{**p["mandates"][0], "claims": claims_of(p, "mandates", purpose="bugfix")}],
+                 delegations=[{**p["delegations"][0], "claims": claims_of(p, "delegations", purpose="bugfix")}])
+        inv = {**p["invocations"][0], "declared": {**p["invocations"][0]["declared"], **({"purpose": declared} if declared is not None else {})}}
+        eff = {**p["effects"][0], "executed": {**p["effects"][0]["executed"], **({"purpose": executed} if executed is not None else {})}}
+        p["invocations"], p["effects"] = [inv], [eff]
+        if versioned:
+            v03(p, I, H, O)
+        else:
+            p.update(mandates=[I.sign(p["mandates"][0])], delegations=[I.sign(p["delegations"][0])],
+                     invocations=[H.sign(inv)], effects=[O.sign(eff)])
+    add("effect for the purpose the mandate states", ("preserved", "-"), lambda p, I, H, O, X: purpose(p, I, H, O, "bugfix"))
+    add("effect for a purpose the mandate doesn't state", ("violated", "I2"), lambda p, I, H, O, X: purpose(p, I, H, O, "release"))
+    add("receipt states another purpose than the call declared", ("violated", "I2"), lambda p, I, H, O, X:
+        purpose(p, I, H, O, "bugfix", executed="release"))
+    add("purpose not declared is not checked", ("preserved", "-"), lambda p, I, H, O, X: purpose(p, I, H, O))
+    add("declared purpose in an unversioned packet", ("unresolved", "I7"), lambda p, I, H, O, X:
+        purpose(p, I, H, O, "release", versioned=False))
+
     # 9. Holds for unknown outcomes (spec 7.6 rule 6, v0.3). From the cross-institution example of
     # finos/ai-governance-framework#421: "a slice with an unknown outcome stays counted until reconciliation shows it was
     # booked or not booked". An earlier call (i-0, reserve 250.00 EUR) had no outcome; verifier state holds it.

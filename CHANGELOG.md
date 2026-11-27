@@ -3,6 +3,19 @@
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
 
+## Purpose at the effect (unreleased)
+
+- **The gap (#14), found by delegation-control-bench (scenario DEL-04):** a mandate's `purpose` was enforced along a delegation chain but not on what ran. An effect in scope on action and resource, done for another purpose, was `preserved`.
+- **Now (spec 5.8.3, suite v0.3.6):**
+  - An invocation may declare `declared.purpose`, and a receipt may state `executed.purpose`.
+  - In a v0.3 packet, an effect whose purpose differs from the claims' purpose is `violated` (I2), charged to the agent.
+  - A receipt whose purpose differs from the call's is a departure from `declared` (I2), charged to the server.
+  - With no purpose stated, nothing changes.
+  - `declared.purpose` in an unversioned packet is malformed (I7).
+- **The limit, stated in the spec:** AMEP checks a purpose that's stated, never an intention nobody recorded. An agent that declares the right purpose and acts for another isn't caught by this rule.
+- **Suite v0.3.6:** 5 new core vectors (2 positive, 3 must-reject), 303 in all. No existing outcome changes. The JSON Schemas and CDDL gain `purpose` on `declared` and on the executed body.
+- **`interop/verdict-record/`:** regenerated for the new verifier build; 7 of 7 still as expected.
+
 ## Benign variations in the AgentDojo experiment, and "not executed" for refused calls in amep-agents (unreleased)
 
 - **The false-positive measurement the AgentDojo experiment lacked** (`experiments/agentdojo/benign_variants.py`). The honest traces were the very calls the mandates came from, so they couldn't show a false-positive rate. Five classes of benign variation (reorder, extra reads, scratch write, alternate arguments, retry) now give one per mandate scope. Raised by a reader on the AARM Slack.
