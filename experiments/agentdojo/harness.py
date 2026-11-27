@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 from collections import Counter, defaultdict
@@ -75,12 +76,28 @@ OBJECT_ARGS = {
 }
 
 
+_ADDRESS = re.compile(r"^[^<>]*<\s*([^<>\s]+@[^<>\s]+)\s*>\s*$")   # "Name <address>"
+_GROUPED_IBAN = re.compile(r"^[A-Za-z]{2}\d{2}(?:\s?[A-Za-z0-9]{1,4})+$")
+
+
+def _canon(x) -> str:
+    """The interpretation's canonical form of one object (spec 5.8): the same contact or account written another
+    legitimate way maps to the same resource. Found with the benign variations (benign_variants.py)."""
+    x = str(x).strip()
+    m = _ADDRESS.match(x)
+    if m:
+        x = m.group(1)
+    if _GROUPED_IBAN.match(x) and " " in x:
+        x = x.replace(" ", "")
+    return x.lower().replace("*", "")
+
+
 def _norm(v) -> str:
     if v is None:
         return ""
     if isinstance(v, (list, tuple)):
-        return ",".join(sorted(str(x).lower() for x in v))
-    return str(v).lower().replace("*", "")
+        return ",".join(sorted(_canon(x) for x in v))
+    return _canon(v)
 
 
 def effect_of(suite: str, tool: str, args: dict) -> Effect:
@@ -132,10 +149,14 @@ def run_trace(suite_name, suite, env, calls, mandate, *, variant=None):
     for n, fc in enumerate(calls):
         cid = f"c{n}"
         rec.declare(cid, fc.function, dict(fc.args))
+        before = env.model_dump()
         out, err = runtime.run_function(env, fc.function, dict(fc.args))
         if variant == "failed-tool" and not failed_once and EFFECT[suite_name].get(fc.function, "read") != "read":
             failed_once, err = True, "simulated tool failure"
-        rec.observe(cid, out, error=err)
+        # The tool runtime (the observer) can see whether a refused call changed anything. If it didn't, it states
+        # "not executed" instead of leaving the outcome unknown. The simulated failure above ran, so it never does.
+        unchanged = err is not None and variant != "failed-tool" and env.model_dump() == before
+        rec.observe(cid, out, error=err, not_executed=unchanged)
         outcomes.append((fc.function, err))
     return rec, outcomes
 

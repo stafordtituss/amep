@@ -52,6 +52,30 @@ The mandate is derived from the user task's ground truth. So effect-scoped is th
 
 A resource-level mandate cannot tell these apart. Approvals bound to the exact effect (I8), or data-release rules (I5) that forbid sending PII externally, would catch them.
 
+### Benign variations of the honest traces: the false-positive measurement
+
+The honest traces above are the calls each mandate was derived from, so they can't measure false positives. `benign_variants.py` varies each honest trace the way an honest agent might, keeps the mandate as derived from the ground truth, and counts every result other than `preserved` as a flag. The classes are a first cut, proposed by a reader on the AARM Slack, and open to revision.
+
+| Class (traces it applies to) | effect-scoped | tool-scoped | suite-wide |
+|---|---|---|---|
+| reorder: reads moved ahead of the side-effecting calls (6) | 0 | 0 | 0 |
+| extra reads: two argument-free reads added (97) | 0 | 0 | 0 |
+| scratch write: a notes file (workspace) or calendar hold (travel) added (60) | **60** | **52** | 0 |
+| alternate arguments: "Name &lt;address&gt;" for an address, an IBAN in groups of four (24) | 0 | 0 | 0 |
+| retry: the first side-effecting call repeated once (60) | 0 | 0 | 0 |
+
+**What the flags mean:**
+- **The scratch write is a real cost of precise mandates.** A mandate that names only the task's objects flags any other write, however harmless. That's by design, and it's the honest number. A deployment that wants scratch space grants it: a resource such as a scratch folder, in the mandate. That widens authority, so it's the principal's choice, not the verifier's.
+- **The 8 scratch writes not flagged under tool-scoped** are tasks that already use the same tool, so the tool is in their mandate.
+
+**Two gaps the variations found, both fixed:**
+1. **Alternate arguments: 19 of 24 flagged at first, under effect-scoped.** The interpretation compared objects as written, so "Emma Johnson &lt;emma.johnson@…&gt;" and the bare address became two resources. The harness's interpretation now maps both to the same canonical object, as AMEP's interpretation layer is meant to (spec 5.8). Only the form changes: a different address still maps to a different resource.
+2. **Retries: 6 of 60 left `unresolved` at every scope.** In each, the tool refused the repeat, for example "user already in the users list" or "file not found", and the recorder had no way to say that nothing ran. `amep_agents.EvidenceRecorder.observe` now takes `not_executed=True`: the tool runtime, which can see that nothing changed, signs a `not_executed` call statement (spec 5.14). Without it, a failed call stays `unresolved`, as before.
+
+**Attack detection is unchanged by both fixes:** rerunning `harness.py` gives the same results as above, byte for byte apart from the run time.
+
+**Not yet measured:** variations a real model produces. These are scripted, from the ground truth, and the classes should come from outside, not only from AMEP's author.
+
 ### Other evidence checks (60 honest traces with side effects)
 
 | Variant | Result |
@@ -83,4 +107,5 @@ Suite v0.2.2 adds three vectors for this path. The pre-fix Python verifier fails
 ```
 pip install agentdojo==0.1.35 ./packages/python ./packages/agents
 python -I experiments/agentdojo/harness.py      # about 8 s; writes results.json
+python -I experiments/agentdojo/benign_variants.py   # about 5 s; writes benign_variants.json
 ```
