@@ -2,7 +2,7 @@
 
 *Working draft for the co-authors. It isn't a publication: nothing here is final until every author has agreed on the whole text, and each author confirms the numbers for their own column or family from their own runs.*
 
-**Proposed authors** (each only with their agreement): Brennan Zambo (AER-1), nmatt1 (APAF-1, the paymnts decision layer), Staford Titus Selvaraj (AMEP); and, for the receipt-layer family (section 4.4), the authors of ccs-ap2-pinned-family. The order is for the authors to decide.
+**Proposed authors** (each only with their agreement): Brennan Zambo (AER-1), nmatt1 (APAF-1, the paymnts decision layer), Staford Titus Selvaraj (AMEP); and Guigui Wang (Correctover), author of the receipt-layer family (section 4.4, ccs-ap2-pinned-family). The order is for the authors to decide.
 
 **Where:** a short technical note with a DOI (Zenodo), linked from AP2 #402 and from each project. It's citable, and authored by three independent parties.
 
@@ -71,3 +71,4 @@ Each column's reading below is the one its owner posted on AP2#402, unedited in 
 The commands for each column, at the pins above.
 - **AMEP:** from a checkout of stafordtituss/amep, `node interop/ap2/verdicts.mjs --check` regenerates both column files and fails if either differs by a byte. The fixtures are `packages/conformance/test/fixtures/ap2/` (`sdk-bundles.json`, `bundles.json`, `sdk-bundles-v2.json`), built by `interop/ap2/make_sdk_bundles.py` and `make_sdk_bundles_v2.py` from AP2's Python SDK at `e1ea56d`. Node.js 20 or later, no network.
 - **APAF-1:** the column file is self-contained for audit. Every row's checks and digests can be recomputed from the public fixtures alone, without running APAF-1's code, and any row can be challenged by name.
+- **CCS (receipt-layer family + fourth column):** the family is pinned at DSHCorrectover/ccs-ap2-pinned-family `4271ac0`; its bundle recomputes to the manifest lock `a9f491074e36…09f8` and `python3 checker.py pinned-set-bundle.json` replays the three vectors, asserting all achieved. The fourth column is at DSHCorrectover/ccs-ap2-column `9307b07` (38 rows, `ccs-column.json`, `manifest.sha256`).
