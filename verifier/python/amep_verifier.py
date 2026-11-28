@@ -602,6 +602,27 @@ def vectors():
         skewed(p, I, O, 3, 12, w=10))
     add("clock skew longer than an hour", ("unresolved", "I7"), lambda p, I, H, O, X:
         skewed(p, I, O, 50, 11, signer=OB))
+    # A default bound for keys of different named operators that declare no skew (spec 5.12.2, v0.3.7),
+    # stafordtituss/amep#60, raised by Jon Odalen (OWASP/Agentic-Evidence#21); boundary cases from Brennan Zambo.
+    IA, OBN = Signer("issuer-operator-a", ["issuer"]), Signer("observer-operator-b", ["observer"])
+    OBT, OAN = Signer("observer-operator-b-tight", ["observer"]), Signer("observer-operator-a", ["observer"])
+    keys[IA.kid] = {**IA.public(), "operator": "op:authority-a.example"}
+    keys[OBN.kid] = {**OBN.public(), "operator": "op:store-b.example"}
+    keys[OBT.kid] = {**OBT.public(), "operator": "op:store-b.example", "clock_skew": 0.1}
+    keys[OAN.kid] = {**OAN.public(), "operator": "op:authority-a.example"}
+    def named(p, rev_t, eff_t, observer):
+        p.update(revocations=[IA.sign({"kind": "revocation", "target": "m-1", "t": rev_t})])
+        p.update(effects=[observer.sign({**p["effects"][0], "executed": {**p["effects"][0]["executed"], "t": eff_t}})])
+    add("different named operators, no skew declared, within the default bound", ("unresolved", "I6"), lambda p, I, H, O, X:
+        named(p, 13, 11, OBN))
+    add("different named operators, no skew declared, exactly at the default bound", ("unresolved", "I6"), lambda p, I, H, O, X:
+        named(p, 21, 11, OBN))
+    add("different named operators, no skew declared, just outside the default bound", ("preserved", "-"), lambda p, I, H, O, X:
+        named(p, 22, 11, OBN))
+    add("one operator declares a tight skew, the other none", ("unresolved", "I6"), lambda p, I, H, O, X:
+        named(p, 15, 11, OBT))
+    add("one named operator, no skew declared: ordered as given", ("preserved", "-"), lambda p, I, H, O, X:
+        named(p, 12, 11, OAN))
     add("revoked mid-action, after the propagation window", ("violated", "I6"), lambda p, I, H, O, X: (
         window(p, I, 3), times(p, H, O, eff_t=20), rev(p, I, 15)))
 

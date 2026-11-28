@@ -763,18 +763,18 @@ def evaluate(packet: dict, keys: dict, extra_protected=(), state: dict | None = 
         x = operator_of(a)
         return x is not None and x == operator_of(b)
 
-    def clock_skew(o):
+    def clock_skew(o, fallback=0):
         # spec 5.12.2 (v0.3.4): the clock skew a key's signer declares for the times it reports, in seconds, from the key set
         kid = (o.get("proof") or {}).get("kid") if isinstance(o, dict) else None
         k = keys.get(kid) if isinstance(kid, str) else None
         if not isinstance(k, dict) or "clock_skew" not in k:
-            return 0
+            return fallback
         v = k["clock_skew"]
         if isinstance(v, bool) or not isinstance(v, (int, float)) or v != v or v < 0 or v > 3600:
             raise Malformed(f"key {kid}: clock_skew must be a number of seconds from 0 to 3600")
         return v
 
-    ctx = {"v03": v03, "totals": totals, "prior_windows": prior_windows, "same_operator": same_operator, "notes": {}, "windows": {}, "clock_skew": clock_skew,
+    ctx = {"v03": v03, "totals": totals, "prior_windows": prior_windows, "same_operator": same_operator, "operator_of": operator_of, "notes": {}, "windows": {}, "clock_skew": clock_skew,
            "held": {d: h for d, h in held_in.items() if d not in present}, "new_held": {}, "first_cause": first_cause,
            # spec 5.10, held approvals (v0.3): approvals held for earlier invocations whose outcome is unknown; one held by an
            # invocation in this packet is set aside, since this packet decides that invocation afresh
@@ -910,6 +910,7 @@ def _units_str(u: int) -> str:
     return f"{ip}.{fp_s}" if fp_s else str(ip)
 
 
+DEFAULT_CLOCK_SKEW = 5          # spec 5.12.2 (v0.3.7): for a key of a named operator that declares none
 MAX_REVOCATION_WINDOW = 3600   # spec 5.12.1 (v0.3.3): a window may not outlast an hour
 
 
@@ -1100,7 +1101,11 @@ def _evaluate_invocation(inv, packet, objs, vsig, revocations, statuses, effects
             # revocation and an action timed by different operators' clocks can't be ordered more finely than their
             # declared skew. Where the action falls within that skew of the boundary that decides the verdict (the
             # revocation, plus any window), the order is not established.
-            skew = ctx["clock_skew"](rec) + ctx["clock_skew"](timed)
+            # spec 5.12.2 (v0.3.7), stafordtituss/amep#60, from Jon Odalen (OWASP/Agentic-Evidence#21): where the key
+            # set names two different operators, a key that declares no skew isn't taken to keep perfect time
+            ra, ta = ctx["operator_of"](rec), ctx["operator_of"](timed)
+            fallback = DEFAULT_CLOCK_SKEW if ra is not None and ta is not None and ra != ta else 0
+            skew = ctx["clock_skew"](rec, fallback) + ctx["clock_skew"](timed, fallback)
             _check(skew > 0 and not ctx["same_operator"](rec, timed) and abs(t - (r_t + w)) <= skew, "unresolved", "I6",
                    f"{why} within {skew:g}s of {what}, on clocks of different operators: the order is not established", need="ordering", ref=target)
             if r_t <= t:

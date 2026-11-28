@@ -70,6 +70,43 @@
   "operator": "op:store.example",
   "clock_skew": 7200
  },
+ "issuer-operator-a": {
+  "kid": "issuer-operator-a",
+  "alg": "Ed25519",
+  "x": "c5a4b0a1965ae4dff30d82d3e0d090c11dd0ba376c29d7306880d8af15cee37a",
+  "roles": [
+   "issuer"
+  ],
+  "operator": "op:authority-a.example"
+ },
+ "observer-operator-b": {
+  "kid": "observer-operator-b",
+  "alg": "Ed25519",
+  "x": "27bea7076d827f0028c0dd866519f3bbd29820ca9bc677cc9e8b586e8f7e85c8",
+  "roles": [
+   "observer"
+  ],
+  "operator": "op:store-b.example"
+ },
+ "observer-operator-b-tight": {
+  "kid": "observer-operator-b-tight",
+  "alg": "Ed25519",
+  "x": "7b32652e95845d5e7776f0a8827786de873c467ad46d90c08ad7fc9d279a1971",
+  "roles": [
+   "observer"
+  ],
+  "operator": "op:store-b.example",
+  "clock_skew": 0.1
+ },
+ "observer-operator-a": {
+  "kid": "observer-operator-a",
+  "alg": "Ed25519",
+  "x": "d3ace2dcbdddb371751448181d135888d585dfc5897212bdf09eafdedba78447",
+  "roles": [
+   "observer"
+  ],
+  "operator": "op:authority-a.example"
+ },
  "bank-observer-1": {
   "kid": "bank-observer-1",
   "alg": "Ed25519",

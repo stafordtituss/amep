@@ -3,6 +3,12 @@
 Specification drafts, conformance-suite versions and package versions are listed together. Package versions follow PEP 440 (Python) and SemVer (npm).
 
 
+## A default clock bound between named operators (unreleased)
+
+- **The gap (#60), raised by Jon Odalen (Weaveframe) on OWASP/Agentic-Evidence#21:** a key that declared no `clock_skew` counted as 0. So a revocation and an action signed by two different operators were ordered as if one clock had produced both, and a verdict on a close pair rested on an agreement neither operator had stated.
+- **Now (spec 5.12.2, suite v0.3.7):** where the key set names a different operator for each key, a key that declares no skew counts as 5 seconds, the default of OWASP Agentic Evidence's G-TIME-001. A pair within the bound is `unresolved` (I6, gap `ordering`). A tight declared skew on one side doesn't remove the default on the other. Same-operator pairs, and keys with no named operator, are compared as given, and the spec says so.
+- **Suite v0.3.7:** 5 new core vectors (2 positive, 3 must-reject), 311 in all: within the bound, exactly at it, just outside it, one side declared and the other silent, and one operator. The boundary cases are Brennan Zambo's (#60). `keys.json` gains four keys. No existing outcome changes.
+
 ## 0.3.4 (2026-11-27)
 
 `amep-protocol` 0.3.4 on PyPI and `@stafordtituss/amep` 0.3.4 on npm, with suite v0.3.6: 306 core vectors (82 positive, 224 must-reject), 16 approval-path vectors and 20 delegation-continuity vectors, 342 in all, plus seven cross-packet sequences. In brief:
