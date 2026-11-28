@@ -435,7 +435,8 @@ function limitsNarrower(c, p) {
   }
   return null;
 }
-export const MAX_REVOCATION_WINDOW = 3600;   // spec 5.12.1 (v0.3.3): a window may not outlast an hour
+export const MAX_REVOCATION_WINDOW = 3600;
+export const DEFAULT_CLOCK_SKEW = 5;          // spec 5.12.2 (v0.3.7): for a key of a named operator that declares none   // spec 5.12.1 (v0.3.3): a window may not outlast an hour
 function revocationWindow(node) {
   const w = (node.revocation || {}).window ?? 0;
   if (typeof w !== "number" || !Number.isFinite(w) || w < 0) throw new Malformed("revocation window must be a non-negative number of seconds");
@@ -509,8 +510,8 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
   // key is the actor, whatever it puts in observed_by. Found by the exhaustive model check in formal/ (v0.3.2).
   const kidOf = o => (o && typeof o === "object" && o.proof && typeof o.proof === "object" && typeof o.proof.kid === "string") ? o.proof.kid : null;
   // spec 5.12.2 (v0.3.4): the clock skew a key's signer declares for the times it reports, in seconds, from the key set.
-  const clockSkew = o => { const kid = kidOf(o); const k = kid !== null && Object.hasOwn(keys, kid) ? keys[kid] : null;
-    if (!k || !("clock_skew" in k)) return 0;
+  const clockSkew = (o, fallback = 0) => { const kid = kidOf(o); const k = kid !== null && Object.hasOwn(keys, kid) ? keys[kid] : null;
+    if (!k || !("clock_skew" in k)) return fallback;
     const v = k.clock_skew;
     if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > 3600) throw new Malformed(`key ${kid}: clock_skew must be a number of seconds from 0 to 3600`);
     return v; };
@@ -737,7 +738,11 @@ export function evaluate(pk, keys, sigOk, extraProtected = [], state = {}) {
         // and an action timed by different operators' clocks can't be ordered more finely than their declared skew. Where
         // the action falls within that skew of the boundary that decides the verdict (the revocation, plus any window),
         // the order is not established.
-        const skew = clockSkew(rec) + clockSkew(timed);
+        // spec 5.12.2 (v0.3.7), stafordtituss/amep#60, from Jon Odalen (OWASP/Agentic-Evidence#21): where the key set
+        // names two different operators, a key that declares no skew isn't taken to keep perfect time
+        const ra = operatorOf(rec), ta = operatorOf(timed);
+        const fallback = ra !== null && ta !== null && ra !== ta ? DEFAULT_CLOCK_SKEW : 0;
+        const skew = clockSkew(rec, fallback) + clockSkew(timed, fallback);
         check(skew > 0 && !sameOperator(rec, timed) && Math.abs(t - (rT + w)) <= skew, "unresolved", "I6",
           `${why} within ${fmt(skew)}s of ${what}, on clocks of different operators: the order is not established`, { need: "ordering", ref: target });
         if (rT > t) continue;
